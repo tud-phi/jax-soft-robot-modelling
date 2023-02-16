@@ -15,6 +15,11 @@ def symbolically_derive_pendulum_model(
     Args:
         num_links: number of pendulum links
         filepath: path to save the derived model
+    Returns:
+        sym_exps: dictionary with entries
+            params_syms: dictionary of robot parameters
+            state_syms: dictionary of state variables
+            exps: dictionary of symbolic expressions
     """
     m_syms = sp.symbols(f"m1:{num_links + 1}")  # mass of each link
     I_syms = sp.symbols(f"I1:{num_links + 1}")  # moment of inertia of each link

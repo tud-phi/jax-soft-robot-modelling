@@ -9,6 +9,7 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Sequence, Tuple, Union
 
+from .utils import load_and_substitute_symbolic_expressions
 
 def make_jax_functions(filepath: Union[str, Path], params: Dict[str, jnp.array]) -> Callable:
     """
@@ -19,36 +20,18 @@ def make_jax_functions(filepath: Union[str, Path], params: Dict[str, jnp.array])
     Returns:
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and A matrices
     """
-
-    # load saved symbolic data
-    sym_pendulum = dill.load(open(str(filepath), "rb"))
-
-    # symbols for robot parameters
-    params_syms = sym_pendulum["params_syms"]
-    # symbols of state variables
-    state_syms = sym_pendulum["state_syms"]
-    # symbolic expressions
-    exps = sym_pendulum["exps"]
+    sym_exps = load_and_substitute_symbolic_expressions(filepath, params)
 
     # number of degrees of freedom
-    n_q = len(state_syms["q"])
-
-    for exp_key in exps.keys():
-        for param_key, param_sym in params_syms.items():
-            if issubclass(type(param_sym), Iterable):
-                for idx, param_sym_item in enumerate(param_sym):
-                    exps[exp_key] = exps[exp_key].subs(param_sym_item, params[param_key][idx])
-            else:
-                exps[exp_key] = exps[exp_key].subs(param_sym, params[param_key])
-            exps[exp_key] = exps[exp_key].subs(params_syms[param_key], params[param_key])
+    n_q = len(sym_exps["state_syms"]["q"])
 
     # concatenate the list of state symbols
-    state_syms_cat = state_syms["q"] + state_syms["q_d"]
+    state_syms_cat = sym_exps["state_syms"]["q"] + sym_exps["state_syms"]["q_d"]
 
     # lambdify symbolic expressions
-    B_lambda = sp.lambdify(state_syms["q"], exps["B"], "jax")
-    C_lambda = sp.lambdify(state_syms_cat, exps["C"], "jax")
-    G_lambda = sp.lambdify(state_syms["q"], exps["G"], "jax")
+    B_lambda = sp.lambdify(sym_exps["state_syms"]["q"], sym_exps["exps"]["B"], "jax")
+    C_lambda = sp.lambdify(state_syms_cat, sym_exps["exps"]["C"], "jax")
+    G_lambda = sp.lambdify(sym_exps["state_syms"]["q"], sym_exps["exps"]["G"], "jax")
 
     # elastic and dissipative matrices
     K = params.get("K", jnp.zeros((n_q, n_q)))
