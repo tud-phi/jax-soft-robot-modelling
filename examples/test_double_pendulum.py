@@ -10,8 +10,8 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Tuple, Union
 
-from jax_soft_robot_modelling.systems import euler_lagrangian
-from jax_soft_robot_modelling.systems import pendulum
+from jsrm.systems import euler_lagrangian
+from jsrm.systems import pendulum
 
 sym_exp_filepath = Path(__file__).parent.parent / "symbolic_expressions" / "double_pendulum.dill"
 params = {

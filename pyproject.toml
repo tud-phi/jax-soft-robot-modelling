@@ -137,6 +137,10 @@ test = ["coverage"]
 "Bug Reports" = "https://github.com/tud-cor-sr/jax-soft-robot-modelling/issues"
 "Source" = "https://github.com/tud-cor-sr/jax-soft-robot-modelling"
 
+[tool.setuptools.packages.find]
+# include = ["jsrm"]
+exclude = ["build", "examples", "symbolic_expressions", "tests"]
+
 # The following would provide a command line executable called `sample`
 # which executes the function `main` from this package when invoked.
 [project.scripts]  # Optional
