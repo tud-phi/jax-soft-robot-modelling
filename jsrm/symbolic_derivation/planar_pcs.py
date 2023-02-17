@@ -45,8 +45,8 @@ def symbolically_derive_planar_pcs_model(
 
     # orientation scalar and rotation matrix
     th_ls, R_ls = [], []
-    # matrix with symbolic expressions to derive the positions along each segment
-    p_mx = sp.zeros(2, num_segments)
+    # matrix with symbolic expressions to derive the poses along each segment
+    chi_sms = sp.zeros(3, num_segments)
     # positional Jacobians of tip of link and center of mass respectively
     Jp_ls, Jpc_ls = [], []
     # orientation Jacobian
@@ -95,9 +95,12 @@ def symbolically_derive_planar_pcs_model(
 
         # position along the current rod as a function of the point s
         p = p_prev + sp.integrate(dp_ds, (s, 0.0, s))
-        p_mx[:, i] = p
 
-        print(f"p of segment {i+1}:\n", p)
+        # save the symbolic expression for the pose in the current segment as a function of the point s
+        chi_sms[:2, i] = p  # the x and y position
+        chi_sms[2, i] = th  # the orientation angle theta
+
+        print(f"chi of segment {i+1}:\n", chi_sms[:, i])
 
         # positional Jacobian as a function of the point s
         Jp = sp.simplify(p.jacobian(xi))
@@ -151,8 +154,8 @@ def symbolically_derive_planar_pcs_model(
             "xi_d": xi_d_syms,
         },
         "exps": {
-            "p": p_mx,  # matrix with positions as a function
-            "pee": p_mx.subs(s, l[-1]),  # vector of shape (2, ) with end-effector position
+            "chi_sms": chi_sms,  # matrix with positions as a function
+            "chiee_sms": chi_sms.subs(s, l[-1]),  # vector of shape (2, ) with end-effector position
             "B": B,
             "C": C,
             "G": G,
