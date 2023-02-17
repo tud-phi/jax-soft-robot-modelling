@@ -26,8 +26,8 @@ if __name__ == "__main__":
     forward_kinematics_fn, dynamical_matrices_fn = pendulum.make_jax_functions(sym_exp_filepath)
 
     q, q_d = jnp.zeros((2, )), jnp.zeros((2, ))
-    p = forward_kinematics_fn(params, q)
-    print("p =\n", p)
+    chi_sms = forward_kinematics_fn(params, q)
+    print("chi_sms =\n", chi_sms)
 
     nonlinear_state_space_fn = partial(
         euler_lagrangian.nonlinear_state_space,

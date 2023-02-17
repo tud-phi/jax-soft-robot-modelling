@@ -45,7 +45,7 @@ def symbolically_derive_pendulum_model(
     # orientation scalar and rotation matrix
     th_ls, R_ls = [], []
     # matrix with tip of link and center of mass positions
-    p_mx, pc_mx = sp.zeros(2, num_links), sp.zeros(2, num_links)
+    chi_sms, chic_sms = sp.zeros(3, num_links), sp.zeros(3, num_links)
     # positional Jacobians of tip of link and center of mass respectively
     Jp_ls, Jpc_ls = [], []
     # orientation Jacobian
@@ -72,11 +72,13 @@ def symbolically_derive_pendulum_model(
 
         # absolute position of center of mass
         pc = sp.simplify(p_prev + R @ sp.Matrix([lc[i], 0]))
-        pc_mx[:, i] = pc
+        chic_sms[0:2, i] = pc
+        chic_sms[2, i] = th
 
         # absolute position of end of link
         p = sp.simplify(p_prev + R @ sp.Matrix([l[i], 0]))
-        p_mx[:, i] = p
+        chi_sms[0:2, i] = p
+        chi_sms[2, i] = th
 
         # positional Jacobian of end of link
         Jp = sp.simplify(p.jacobian(q))
@@ -99,6 +101,8 @@ def symbolically_derive_pendulum_model(
         # update for next iteration
         th_prev = th_ls[i]
         p_prev = p
+
+    print("chi_sms.T:\n", chi_sms.T)
 
     # simplify mass matrix
     B = sp.simplify(B)
@@ -125,9 +129,9 @@ def symbolically_derive_pendulum_model(
             "q_d": q_d_syms,
         },
         "exps": {
-            "p": p_mx,  # matrix with tip positions of shape (2, n_q)
-            "pc": pc_mx,  # matrix with position of center of masses of shape (2, n_q)
-            "pee": p_mx[:, -1],  # matrix with end-effector position of shape (2, 1)
+            "chi_sms": chi_sms,  # matrix with tip poses of shape (3, n_q)
+            "chic_sms": chic_sms,  # matrix with poses of center of masses of shape (3, n_q)
+            "chiee": chi_sms[:, -1],  # matrix with end-effector poses of shape (3, 1)
             "B": B,
             "C": C,
             "G": G,

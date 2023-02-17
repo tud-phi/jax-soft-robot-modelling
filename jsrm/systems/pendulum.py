@@ -43,7 +43,7 @@ def make_jax_functions(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
     state_syms_cat = sym_exps["state_syms"]["q"] + sym_exps["state_syms"]["q_d"]
 
     # lambdify symbolic expressions
-    p_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["p"], "jax")
+    chi_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["chi_sms"], "jax")
     B_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["B"], "jax")
     C_lambda = sp.lambdify(params_syms_cat + state_syms_cat, sym_exps["exps"]["C"], "jax")
     G_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["G"], "jax")
@@ -56,11 +56,13 @@ def make_jax_functions(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
             params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
         Returns:
-            p: positions of tip of links of shape (2, n_q)
+            chi_sms: poses of tip of links of shape (3, n_q) consisting of [p_x, p_y, theta]
+                where p_x is the x-position, p_y is the y-position,
+                and theta is the planar orientation with respect to the x-axis
         """
         params_ls = params_dict_to_list(params)
-        p = p_lambda(*params_ls, *q)
-        return p
+        chi_sms = chi_lambda(*params_ls, *q)
+        return chi_sms
 
     # actuation matrix
     A = jnp.identity(n_q)
