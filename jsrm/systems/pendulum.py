@@ -18,7 +18,7 @@ def make_jax_functions(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
     Args:
         filepath: path to file containing symbolic expressions
     Returns:
-        forward_kinematics_fn: function that returns the p vector of shape (2, n_q) with the positions
+        forward_kinematics_fn: function that returns the p vector of shape (3, n_q) with the positions
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and A matrices
     """
     # load saved symbolic data
@@ -43,7 +43,7 @@ def make_jax_functions(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
     state_syms_cat = sym_exps["state_syms"]["q"] + sym_exps["state_syms"]["q_d"]
 
     # lambdify symbolic expressions
-    chi_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["chi_sms"], "jax")
+    chi_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["chi_ls"], "jax")
     B_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["B"], "jax")
     C_lambda = sp.lambdify(params_syms_cat + state_syms_cat, sym_exps["exps"]["C"], "jax")
     G_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["G"], "jax")
@@ -56,13 +56,13 @@ def make_jax_functions(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
             params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
         Returns:
-            chi_sms: poses of tip of links of shape (3, n_q) consisting of [p_x, p_y, theta]
+            chi_ls: poses of tip of links of shape (3, n_q) consisting of [p_x, p_y, theta]
                 where p_x is the x-position, p_y is the y-position,
                 and theta is the planar orientation with respect to the x-axis
         """
-        params_ls = params_dict_to_list(params)
-        chi_sms = chi_lambda(*params_ls, *q)
-        return chi_sms
+        params_list = params_dict_to_list(params)
+        chi_ls = chi_lambda(*params_list, *q)
+        return chi_ls
 
     # actuation matrix
     A = jnp.identity(n_q)
@@ -91,11 +91,11 @@ def make_jax_functions(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
         K = params.get("K", jnp.zeros((n_q, n_q)))
         D = params.get("D", jnp.zeros((n_q, n_q)))
 
-        params_ls = params_dict_to_list(params)
+        params_list = params_dict_to_list(params)
 
-        B = B_lambda(*params_ls, *q)
-        C = C_lambda(*params_ls, *q, *q_d)
-        G = G_lambda(*params_ls, *q).squeeze()
+        B = B_lambda(*params_list, *q)
+        C = C_lambda(*params_list, *q, *q_d)
+        G = G_lambda(*params_list, *q).squeeze()
 
         # K(q) = K @ q
         _K = K @ q
