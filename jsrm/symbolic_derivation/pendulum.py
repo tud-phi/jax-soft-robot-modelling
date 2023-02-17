@@ -44,10 +44,10 @@ def symbolically_derive_pendulum_model(
 
     # orientation scalar and rotation matrix
     th_ls, R_ls = [], []
-    # positions of tip of link and center of mass respectively
-    x_ls, xc_ls = [], []
+    # matrix with tip of link and center of mass positions
+    p_mx, pc_mx = sp.zeros(2, num_links), sp.zeros(2, num_links)
     # positional Jacobians of tip of link and center of mass respectively
-    Jx_ls, Jxc_ls = [], []
+    Jp_ls, Jpc_ls = [], []
     # orientation Jacobian
     Jo_ls = []
     # mass matrix
@@ -57,7 +57,7 @@ def symbolically_derive_pendulum_model(
 
     # initialize
     th_prev = 0.0
-    x_prev = sp.Matrix([0, 0])
+    p_prev = sp.Matrix([0, 0])
     for i in range(num_links):
         # orientation of link
         th = th_prev + q[i]
@@ -71,34 +71,34 @@ def symbolically_derive_pendulum_model(
         R_ls.append(R)
 
         # absolute position of center of mass
-        xc = sp.simplify(x_prev + R @ sp.Matrix([lc[i], 0]))
-        xc_ls.append(xc)
+        pc = sp.simplify(p_prev + R @ sp.Matrix([lc[i], 0]))
+        pc_mx[:, i] = pc
 
         # absolute position of end of link
-        x = sp.simplify(x_prev + R @ sp.Matrix([l[i], 0]))
-        x_ls.append(x)
+        p = sp.simplify(p_prev + R @ sp.Matrix([l[i], 0]))
+        p_mx[:, i] = p
 
         # positional Jacobian of end of link
-        Jx = sp.simplify(x.jacobian(q))
-        Jx_ls.append(Jx)
+        Jp = sp.simplify(p.jacobian(q))
+        Jp_ls.append(Jp)
 
         # positional Jacobian of center of mass
-        Jxc = sp.simplify(xc.jacobian(q))
-        Jxc_ls.append(Jxc)
+        Jpc = sp.simplify(pc.jacobian(q))
+        Jpc_ls.append(Jpc)
 
         # orientation Jacobian
         Jo = sp.simplify(sp.Matrix([[th]]).jacobian(q))
         Jo_ls.append(Jo)
 
         # add to mass matrix
-        B = B + sp.simplify(m[i] * Jxc.T @ Jxc + I[i] * Jo.T @ Jo)
+        B = B + sp.simplify(m[i] * Jpc.T @ Jpc + I[i] * Jo.T @ Jo)
 
         # add to potential energy
-        U = U + sp.simplify(m[i] * g.T @ xc)
+        U = U + sp.simplify(m[i] * g.T @ pc)
 
         # update for next iteration
         th_prev = th_ls[i]
-        x_prev = x_ls[i]
+        p_prev = p
 
     # simplify mass matrix
     B = sp.simplify(B)
@@ -125,6 +125,8 @@ def symbolically_derive_pendulum_model(
             "q_d": q_d_syms,
         },
         "exps": {
+            "p": p_mx,
+            "pc": pc_mx,
             "B": B,
             "C": C,
             "G": G,
