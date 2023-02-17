@@ -21,15 +21,15 @@ def symbolically_derive_pendulum_model(
             state_syms: dictionary of state variables
             exps: dictionary of symbolic expressions
     """
-    m_syms = sp.symbols(f"m1:{num_links + 1}")  # mass of each link
-    I_syms = sp.symbols(f"I1:{num_links + 1}")  # moment of inertia of each link
-    l_syms = sp.symbols(f"l1:{num_links + 1}")  # length of each link
-    lc_syms = sp.symbols(f"lc1:{num_links + 1}")  # center of mass of each link (distance from joint)
-    g_syms = sp.symbols(f"g1:3")  # gravity vector
+    m_syms = list(sp.symbols(f"m1:{num_links + 1}"))  # mass of each link
+    I_syms = list(sp.symbols(f"I1:{num_links + 1}"))  # moment of inertia of each link
+    l_syms = list(sp.symbols(f"l1:{num_links + 1}"))  # length of each link
+    lc_syms = list(sp.symbols(f"lc1:{num_links + 1}"))  # center of mass of each link (distance from joint)
+    g_syms = list(sp.symbols(f"g1:3"))  # gravity vector
 
     # configuration variables and their derivatives
-    q_syms = sp.symbols(f"q1:{num_links + 1}")  # joint angle
-    q_d_syms = sp.symbols(f"q_d1:{num_links + 1}")  # joint velocity
+    q_syms = list(sp.symbols(f"q1:{num_links + 1}"))  # joint angle
+    q_d_syms = list(sp.symbols(f"q_d1:{num_links + 1}"))  # joint velocity
 
     # construct the symbolic matrices
     m = sp.Matrix(m_syms)  # mass of each link
@@ -125,8 +125,9 @@ def symbolically_derive_pendulum_model(
             "q_d": q_d_syms,
         },
         "exps": {
-            "p": p_mx,
-            "pc": pc_mx,
+            "p": p_mx,  # matrix with tip positions of shape (2, n_q)
+            "pc": pc_mx,  # matrix with position of center of masses of shape (2, n_q)
+            "pee": p_mx[:, -1],  # matrix with end-effector position of shape (2, 1)
             "B": B,
             "C": C,
             "G": G,

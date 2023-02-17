@@ -23,10 +23,10 @@ params = {
 }
 
 if __name__ == "__main__":
-    forward_kinematics_fn, dynamical_matrices_fn = pendulum.make_jax_functions(sym_exp_filepath, params)
+    forward_kinematics_fn, dynamical_matrices_fn = pendulum.make_jax_functions(sym_exp_filepath)
 
     q, q_d = jnp.zeros((2, )), jnp.zeros((2, ))
-    p = forward_kinematics_fn(q)
+    p = forward_kinematics_fn(params, q)
     print("p =\n", p)
 
     nonlinear_state_space_fn = partial(
@@ -37,5 +37,5 @@ if __name__ == "__main__":
     x = jnp.concatenate((q, q_d), axis=0)
     tau = jnp.zeros((2, ))
 
-    x_d = nonlinear_state_space_fn(x, tau)
+    x_d = nonlinear_state_space_fn(params, x, tau)
     print("x_d =\n", x_d)

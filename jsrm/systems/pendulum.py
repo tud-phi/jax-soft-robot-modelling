@@ -1,3 +1,4 @@
+import dill
 from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
@@ -8,20 +9,32 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Sequence, Tuple, Union
 
-from .utils import load_and_substitute_symbolic_expressions
+from .utils import substitute_symbolic_expressions, params_dict_to_list
 
 
-def make_jax_functions(filepath: Union[str, Path], params: Dict[str, Array]) -> Tuple[Callable, Callable]:
+def make_jax_functions(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
     """
     Create jax functions from file containing symbolic expressions.
     Args:
         filepath: path to file containing symbolic expressions
-        params: dictionary of robot parameters
     Returns:
         forward_kinematics_fn: function that returns the p vector of shape (2, n_q) with the positions
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and A matrices
     """
-    sym_exps = load_and_substitute_symbolic_expressions(filepath, params)
+    # load saved symbolic data
+    sym_exps = dill.load(open(str(filepath), "rb"))
+
+    # symbols for robot parameters
+    params_syms = sym_exps["params_syms"]
+    # symbols of state variables
+    state_syms = sym_exps["state_syms"]
+    # symbolic expressions
+    exps = sym_exps["exps"]
+
+    # concatenate the robot params symbols
+    params_syms_cat = []
+    for params_key, params_sym in params_syms.items():
+        params_syms_cat += params_sym
 
     # number of degrees of freedom
     n_q = len(sym_exps["state_syms"]["q"])
@@ -30,38 +43,38 @@ def make_jax_functions(filepath: Union[str, Path], params: Dict[str, Array]) -> 
     state_syms_cat = sym_exps["state_syms"]["q"] + sym_exps["state_syms"]["q_d"]
 
     # lambdify symbolic expressions
-    p_lambda = sp.lambdify(sym_exps["state_syms"]["q"], sym_exps["exps"]["p"], "jax")
-    B_lambda = sp.lambdify(sym_exps["state_syms"]["q"], sym_exps["exps"]["B"], "jax")
-    C_lambda = sp.lambdify(state_syms_cat, sym_exps["exps"]["C"], "jax")
-    G_lambda = sp.lambdify(sym_exps["state_syms"]["q"], sym_exps["exps"]["G"], "jax")
+    p_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["p"], "jax")
+    B_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["B"], "jax")
+    C_lambda = sp.lambdify(params_syms_cat + state_syms_cat, sym_exps["exps"]["C"], "jax")
+    G_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["G"], "jax")
 
     @jit
-    def forward_kinematics_fn(q: Array) -> Array:
+    def forward_kinematics_fn(params: Dict[str, Array], q: Array) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
         Args:
+            params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
         Returns:
             p: positions of tip of links of shape (2, n_q)
         """
-        p = p_lambda(*q)
+        params_ls = params_dict_to_list(params)
+        p = p_lambda(*params_ls, *q)
         return p
-
-    # elastic and dissipative matrices
-    K = params.get("K", jnp.zeros((n_q, n_q)))
-    D = params.get("D", jnp.zeros((n_q, n_q)))
 
     # actuation matrix
     A = jnp.identity(n_q)
 
     @jit
     def dynamical_matrices_fn(
+            params: Dict[str, Array],
             q: Array,
             q_d: Array
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
         Compute the dynamical matrices of the system.
         Args:
+            params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
             q_d: generalized velocities of shape (n_q, )
         Returns:
@@ -72,9 +85,15 @@ def make_jax_functions(filepath: Union[str, Path], params: Dict[str, Array]) -> 
             D: dissipative matrix of shape (n_q, n_q)
             A: actuation matrix of shape (n_q, n_tau)
         """
-        B = B_lambda(*q)
-        C = C_lambda(*q, *q_d)
-        G = G_lambda(*q).squeeze()
+        # elastic and dissipative matrices
+        K = params.get("K", jnp.zeros((n_q, n_q)))
+        D = params.get("D", jnp.zeros((n_q, n_q)))
+
+        params_ls = params_dict_to_list(params)
+
+        B = B_lambda(*params_ls, *q)
+        C = C_lambda(*params_ls, *q, *q_d)
+        G = G_lambda(*params_ls, *q).squeeze()
 
         # K(q) = K @ q
         _K = K @ q

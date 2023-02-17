@@ -5,18 +5,19 @@ jax_config.update("jax_enable_x64", True)  # double precision
 import jax
 from jax import jit, vmap
 from jax import numpy as jnp
-import sympy as sp
-from pathlib import Path
 from typing import Callable, Dict, Iterable, Sequence, Tuple, Union
 
 
-def load_and_substitute_symbolic_expressions(
-        filepath: Union[str, Path], params: Dict[str, jnp.array]
+def substitute_symbolic_expressions(
+        sym_exps: Dict, params: Dict[str, jnp.array]
 ) -> Dict:
     """
-    Load symbolic expressions and substitute in robot parameters.
+    Substitute robot parameters into symbolic expressions.
     Args:
-        filepath: path to file containing symbolic expressions
+        sym_exps: dictionary with entries
+            params_syms: dictionary of robot parameters
+            state_syms: dictionary of state variables
+            exps: dictionary of symbolic expressions
         params: dictionary of robot parameters
     Returns:
         sym_exps: dictionary with entries
@@ -24,9 +25,6 @@ def load_and_substitute_symbolic_expressions(
             state_syms: dictionary of state variables
             exps: dictionary of symbolic expressions
     """
-    # load saved symbolic data
-    sym_exps = dill.load(open(str(filepath), "rb"))
-
     # symbols for robot parameters
     params_syms = sym_exps["params_syms"]
     # symbols of state variables
@@ -44,3 +42,18 @@ def load_and_substitute_symbolic_expressions(
             exps[exp_key] = exps[exp_key].subs(params_syms[param_key], params[param_key])
 
     return sym_exps
+
+
+@jit
+def params_dict_to_list(params_dict: Dict[str, jnp.array]) -> jnp.array:
+    """
+    Convert dictionary of robot parameters to unrolled list.
+    Args:
+        params_dict: dictionary of robot parameters
+    Returns:
+        params_list: list of robot parameters
+    """
+    params_list = []
+    for param_key, param_val in params_dict.items():
+        params_list.extend(param_val)
+    return params_list
