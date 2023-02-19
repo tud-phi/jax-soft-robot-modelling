@@ -119,7 +119,18 @@ dependencies = [ # Optional
 # Similar to `dependencies` above, these must be valid existing
 # projects.
 [project.optional-dependencies] # Optional
-dev = ["check-manifest"]
+dev = [
+    "black",
+    "bump2version",
+    "check-manifest",
+    "codecov",
+    "coverage",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "pytest-html",
+    "tox",
+]
 test = ["coverage"]
 
 # List URLs that are relevant to your project
