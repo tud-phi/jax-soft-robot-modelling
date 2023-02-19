@@ -3,7 +3,7 @@ from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
 import jax
-from jax import jit, vmap
+from jax import Array, jit, vmap
 from jax import numpy as jnp
 from typing import Callable, Dict, Iterable, Sequence, Tuple, Union
 
@@ -57,3 +57,24 @@ def params_dict_to_list(params_dict: Dict[str, jnp.array]) -> jnp.array:
     for param_key, param_val in params_dict.items():
         params_list.extend(param_val)
     return params_list
+
+
+def compute_planar_strain_basis(
+    strain_selector: Array = jnp.ones((3,), dtype=bool),
+) -> jnp.ndarray:
+    """
+    Compute strain basis for planar robot based on strain selector.
+    Args:
+        strain_selector: boolean array of length 3 specifying which strain components are active
+    Returns:
+        strain_basis: strain basis matrix of shape (3, n_q) where n_q is the number of configuration variables
+                    per segment
+    """
+    n_q = strain_selector.sum().item()
+    strain_basis = jnp.zeros((3, n_q), dtype=int)
+    strain_basis_cumsum = jnp.cumsum(strain_selector)
+    for i in range(strain_selector.shape[0]):
+        j = int(strain_basis_cumsum[i].item()) - 1
+        if strain_selector[i].item() is True:
+            strain_basis = strain_basis.at[i, j].set(1)
+    return strain_basis
