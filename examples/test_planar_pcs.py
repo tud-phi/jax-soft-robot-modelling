@@ -29,7 +29,7 @@ if __name__ == "__main__":
     )
 
     q, q_d = jnp.zeros((6, )), jnp.zeros((6, ))
-    chi_sms = forward_kinematics_fn(params, q)
+    chi_sms = forward_kinematics_fn(params, q, 0.05)
     print("chi_sms =\n", chi_sms)
 
     nonlinear_state_space_fn = partial(
@@ -38,6 +38,7 @@ if __name__ == "__main__":
     )
 
     x = jnp.concatenate((q, q_d), axis=0)
+    print("x =\n", x)
     tau = jnp.zeros_like(q)
 
     x_d = nonlinear_state_space_fn(params, x, tau)

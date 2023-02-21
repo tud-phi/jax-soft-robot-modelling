@@ -44,13 +44,11 @@ def symbolically_derive_planar_pcs_model(
     xi_d = sp.Matrix(xi_d_syms)  # strain time derivatives
 
     # orientation scalar and rotation matrix
-    th_ls, R_ls = [], []
+    th_sms = []
     # matrix with symbolic expressions to derive the poses along each segment
-    chi_sms = sp.zeros(3, num_segments)
-    # positional Jacobians of tip of link and center of mass respectively
-    Jp_ls, Jpc_ls = [], []
-    # orientation Jacobian
-    Jo_ls = []
+    chi_sms = []
+    # Jacobians (positional + orientation) in each segment as a function of the point coordinate s
+    J_sms = []
     # linear inertia distribution for each segment
     I = sp.zeros(num_segments)
     # inertia matrix
@@ -88,7 +86,6 @@ def symbolically_derive_planar_pcs_model(
             [sp.cos(th), -sp.sin(th)],
             [sp.sin(th), sp.cos(th)]]
         )
-        R_ls.append(R)
 
         # derivative of Cartesian position as function of the point s
         dp_ds = R @ sp.Matrix([sigma_x, sigma_y])
@@ -96,19 +93,25 @@ def symbolically_derive_planar_pcs_model(
         # position along the current rod as a function of the point s
         p = p_prev + sp.integrate(dp_ds, (s, 0.0, s))
 
-        # save the symbolic expression for the pose in the current segment as a function of the point s
-        chi_sms[:2, i] = p  # the x and y position
-        chi_sms[2, i] = th  # the orientation angle theta
+        # symbolic expression for the pose in the current segment as a function of the point s
+        chi = sp.zeros(3, 1)
+        chi[:2, 0] = p  # the x and y position
+        chi[2, 0] = th  # the orientation angle theta
+        chi_sms.append(chi)
 
-        print(f"chi of segment {i+1}:\n", chi_sms[:, i])
+        print(f"chi of segment {i+1}:\n", chi)
 
         # positional Jacobian as a function of the point s
         Jp = sp.simplify(p.jacobian(xi))
-        Jp_ls.append(Jp)
 
         # orientation Jacobian
         Jo = sp.simplify(sp.Matrix([[th]]).jacobian(xi))
-        Jo_ls.append(Jo)
+
+        # combine positional and orientation Jacobian
+        # the first two rows correspond to the position and the last row to the orientation
+        # the columns correspond to the strains xi
+        J = Jp.col_join(Jo)
+        J_sms.append(J)
 
         # derivative of mass matrix with respect to the point coordinate s
         dB_ds = sp.simplify(lambda_i * Jp.T @ Jp + I[i] * Jo.T @ Jo)
@@ -125,8 +128,7 @@ def symbolically_derive_planar_pcs_model(
         U = U + U_i
 
         # update the orientation for the next segment
-        th_ls.append(th.subs(s, l[i]))
-        th_prev = th_ls[i]
+        th_prev = th.subs(s, l[i])
 
         # update the position for the next segment
         p_prev = p.subs(s, l[i])
@@ -142,20 +144,24 @@ def symbolically_derive_planar_pcs_model(
     G = sp.simplify(- U.jacobian(xi).transpose())
     print("G =\n", G)
 
-    # dictionary with functions
+    # dictionary with expressions
     sym_exps = {
         "params_syms": {
             "rho": rho_syms,
             "l": l_syms,
+            "r": r_syms,
             "g": g_syms,
         },
         "state_syms": {
             "xi": xi_syms,
             "xi_d": xi_d_syms,
+            "s": s,
         },
         "exps": {
-            "chi_sms": chi_sms,  # matrix with positions as a function
-            "chiee_sms": chi_sms.subs(s, l[-1]),  # vector of shape (2, ) with end-effector position
+            "chi_sms": chi_sms,  # list of pose expressions (for each segment)
+            "chiee": chi_sms[-1].subs(s, l[-1]),  # expression for end-effector pose of shape (3, )
+            "J_sms": J_sms,
+            "Jee": J_sms[-1].subs(s, l[-1]),
             "B": B,
             "C": C,
             "G": G,
