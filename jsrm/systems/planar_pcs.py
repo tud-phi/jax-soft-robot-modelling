@@ -159,12 +159,17 @@ def make_jax_functions(
 
         params_ls = params_dict_to_list(params)
 
-        B = B_lambda(*params_ls, *xi)
-        C = C_lambda(*params_ls, *xi, *xi_d)
-        G = G_lambda(*params_ls, *xi).squeeze()
+        B = B_xi.T @ B_lambda(*params_ls, *xi) @ B_xi
+        C = B_xi.T @ C_lambda(*params_ls, *xi, *xi_d) @ B_xi
+        G = B_xi.T @ G_lambda(*params_ls, *xi).squeeze()
 
-        _K = K @ xi
+        # apply the strain basis to the elastic and dissipative matrices
+        _K = B_xi.T @ K @ xi  # evaluate K(xi) = K @ xi
+        _D = B_xi.T @ D @ B_xi
 
-        return B, C, G, _K, D, A
+        # apply the strain basis to the actuation matrix
+        _A = B_xi.T @ A @ B_xi
+
+        return B, C, G, _K, _D, _A
 
     return forward_kinematics_fn, dynamical_matrices_fn
