@@ -67,6 +67,7 @@ def nonlinear_state_space(
     Returns:
         x_d: state derivative vector of shape (2 * n_q, ) containing the velocity and acceleration vectors
     """
-    q_dd = forward_dynamics(dynamical_matrices_fn, params, x[:2], x[2:], tau)
-    x_d = jnp.concatenate([x[2:], q_dd])
+    n_q = x.shape[0] // 2
+    q_dd = forward_dynamics(dynamical_matrices_fn, params, x[:n_q], x[n_q:], tau)
+    x_d = jnp.concatenate([x[n_q:], q_dd])
     return x_d
