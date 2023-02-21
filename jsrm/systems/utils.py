@@ -59,19 +59,19 @@ def params_dict_to_list(params_dict: Dict[str, jnp.array]) -> jnp.array:
     return params_list
 
 
-def compute_planar_strain_basis(
-    strain_selector: Array = jnp.ones((3,), dtype=bool),
+def compute_strain_basis(
+    strain_selector: Array,
 ) -> jnp.ndarray:
     """
-    Compute strain basis for planar robot based on strain selector.
+    Compute strain basis based on boolean strain selector.
     Args:
-        strain_selector: boolean array of length 3 specifying which strain components are active
+        strain_selector: boolean array of shape (n_xi, ) specifying which strain components are active
     Returns:
-        strain_basis: strain basis matrix of shape (3, n_q) where n_q is the number of configuration variables
-                    per segment
+        strain_basis: strain basis matrix of shape (n_xi, n_q) where n_q is the number of configuration variables
+            and n_xi is the number of strains
     """
     n_q = strain_selector.sum().item()
-    strain_basis = jnp.zeros((3, n_q), dtype=int)
+    strain_basis = jnp.zeros((strain_selector.shape[0], n_q), dtype=int)
     strain_basis_cumsum = jnp.cumsum(strain_selector)
     for i in range(strain_selector.shape[0]):
         j = int(strain_basis_cumsum[i].item()) - 1

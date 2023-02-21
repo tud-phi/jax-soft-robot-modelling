@@ -20,7 +20,7 @@ params = {
     "g": jnp.array([0.0, -9.81]),
 }
 # activate all strains (i.e. bending, shear, and axial)
-strain_selector = jnp.ones((3, ), dtype=bool)
+strain_selector = jnp.ones((6, ), dtype=bool)
 
 if __name__ == "__main__":
     forward_kinematics_fn, dynamical_matrices_fn = planar_pcs.make_jax_functions(
