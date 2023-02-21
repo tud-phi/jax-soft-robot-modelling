@@ -3,7 +3,7 @@ from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
 import jax
-from jax import Array, jit, lax, vmap
+from jax import Array, debug, jit, lax, vmap
 from jax import numpy as jnp
 import sympy as sp
 from pathlib import Path
@@ -105,11 +105,14 @@ def make_jax_functions(
         # cumsum of the segment lengths
         l_cum = jnp.cumsum(params["l"])
         # determine in which segment the point is located
-        segment_idx = jnp.argmax(s < l_cum).astype(int)
+        # use argmax to find the last index where the condition is true
+        segment_idx = jnp.argmax((s >= l_cum)[::-1]).astype(int)
         # add zero to the beginning of the array
         l_cum_padded = jnp.concatenate([jnp.array([0.0]), l_cum], axis=0)
         # point coordinate along the segment in the interval [0, l_segment]
-        s_segment = s - l_cum_padded[segment_idx - 1]
+        s_segment = s - l_cum_padded[segment_idx]
+
+        # convert the dictionary of parameters to a list, which we can pass to the lambda function
         params_ls = params_dict_to_list(params)
 
         chi = lax.switch(
