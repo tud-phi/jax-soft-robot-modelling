@@ -25,8 +25,9 @@ if __name__ == "__main__":
     )
 
     q, q_d = jnp.zeros((6, )), jnp.zeros((6, ))
-    chi_sms = forward_kinematics_fn(params, q, 0.05)
-    print("chi_sms =\n", chi_sms)
+    s = params["l"][0] / 2
+    chi = forward_kinematics_fn(params, q, s)
+    print("chi =\n", chi)
 
     nonlinear_state_space_fn = partial(
         euler_lagrangian.nonlinear_state_space,
