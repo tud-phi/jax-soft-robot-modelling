@@ -54,7 +54,7 @@ def params_dict_to_list(params_dict: Dict[str, jnp.array]) -> jnp.array:
         params_list: list of robot parameters
     """
     params_list = []
-    for param_key, param_val in params_dict.items():
+    for param_key, param_val in sorted(params_dict.items()):
         params_list.extend(param_val)
     return params_list
 
