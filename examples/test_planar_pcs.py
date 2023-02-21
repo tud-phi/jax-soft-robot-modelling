@@ -1,13 +1,9 @@
-import dill
 from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
-import jax
-from jax import jit, vmap
 from jax import numpy as jnp
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, Tuple, Union
 
 from jsrm.systems import euler_lagrangian
 from jsrm.systems import planar_pcs
