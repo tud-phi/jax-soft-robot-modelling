@@ -103,7 +103,6 @@ classifiers = [  # Optional
 # https://packaging.python.org/discussions/install-requires-vs-requirements/
 dependencies = [ # Optional
   "dill",
-  "diffrax",
   "jax",
   "numpy",
   "peppercorn",
@@ -131,7 +130,19 @@ dev = [
     "pytest-html",
     "tox",
 ]
-test = ["coverage"]
+examples = [
+    "diffrax",
+    "matplotlib",
+    "opencv-python",
+]
+test = [
+    "codecov",
+    "coverage",
+    "pytest",
+    "pytest-cov",
+    "pytest-html",
+    "tox",
+]
 
 # List URLs that are relevant to your project
 #
