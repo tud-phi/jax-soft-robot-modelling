@@ -10,8 +10,8 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Tuple, Union
 
-from jsrm.systems import euler_lagrangian
-from jsrm.systems import pendulum
+from jsrm.integration import ode_factory
+from jsrm.systems import euler_lagrangian, pendulum
 
 sym_exp_filepath = Path(__file__).parent.parent / "symbolic_expressions" / "double_pendulum.dill"
 params = {
@@ -23,12 +23,7 @@ params = {
 }
 
 if __name__ == "__main__":
-    forward_kinematics_fn, dynamical_matrices_fn = pendulum.make_jax_functions(sym_exp_filepath)
-
-    q, q_d = jnp.zeros((2, )), jnp.zeros((2, ))
-    chi_sms = forward_kinematics_fn(params, q)
-    print("chi_sms =\n", chi_sms)
-
+    forward_kinematics_fn, dynamical_matrices_fn = pendulum.factory(sym_exp_filepath)
     nonlinear_state_space_fn = partial(
         euler_lagrangian.nonlinear_state_space,
         dynamical_matrices_fn

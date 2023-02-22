@@ -27,7 +27,7 @@ params = {
 strain_selector = jnp.ones((num_segments * 3, ), dtype=bool)
 
 if __name__ == "__main__":
-    strain_basis, forward_kinematics_fn, dynamical_matrices_fn = planar_pcs.make_jax_functions(
+    strain_basis, forward_kinematics_fn, dynamical_matrices_fn = planar_pcs.factory(
         sym_exp_filepath,
         strain_selector
     )

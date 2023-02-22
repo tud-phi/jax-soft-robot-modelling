@@ -12,12 +12,16 @@ from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
 from .utils import params_dict_to_list, compute_strain_basis
 
 
-def make_jax_functions(
+def factory(
         filepath: Union[str, Path],
         strain_selector: Array = None,
         xi0: Array = None,
         eps: float = 1e-6,
-) -> Tuple[Array, Callable, Callable]:
+) -> Tuple[
+    Array,
+    Callable[[Dict[str, Array], Array, Array], Array],
+    Callable[[Dict[str, Array], Array, Array], Tuple[Array, Array, Array, Array, Array, Array]],
+]:
     """
     Create jax functions from file containing symbolic expressions.
     Args:
@@ -102,7 +106,7 @@ def make_jax_functions(
     G_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax")
 
     @jit
-    def forward_kinematics_fn(params: Dict[str, Array], q: Array, s: float) -> Array:
+    def forward_kinematics_fn(params: Dict[str, Array], q: Array, s: Array) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
         Args:

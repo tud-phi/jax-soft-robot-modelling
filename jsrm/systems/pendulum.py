@@ -12,7 +12,7 @@ from typing import Callable, Dict, Iterable, Sequence, Tuple, Union
 from .utils import substitute_symbolic_expressions, params_dict_to_list
 
 
-def make_jax_functions(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
+def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
     """
     Create jax functions from file containing symbolic expressions.
     Args:
