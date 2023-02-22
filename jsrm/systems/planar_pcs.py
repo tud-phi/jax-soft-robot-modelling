@@ -7,7 +7,7 @@ from jax import Array, debug, jit, lax, vmap
 from jax import numpy as jnp
 import sympy as sp
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Sequence, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
 
 from .utils import params_dict_to_list, compute_strain_basis
 
@@ -17,7 +17,7 @@ def make_jax_functions(
         strain_selector: Array = None,
         xi0: Array = None,
         eps: float = 1e-6,
-) -> Tuple[Callable, Callable]:
+) -> Tuple[Array, Callable, Callable]:
     """
     Create jax functions from file containing symbolic expressions.
     Args:
@@ -27,6 +27,7 @@ def make_jax_functions(
         xi0: array of shape (3 * num_segments) with the rest strains of the rod
         eps: small number to avoid division by zero
     Returns:
+        B_xi: strain basis matrix of shape (3 * num_segments, n_q)
         forward_kinematics_fn: function that returns the p vector of shape (3, n_q) with the positions
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and A matrices
     """
@@ -35,6 +36,23 @@ def make_jax_functions(
 
     # symbols for robot parameters
     params_syms = sym_exps["params_syms"]
+
+    @jit
+    def select_params_for_lambdify(params: Dict[str, Array]) -> List[Array]:
+        """
+        Select the parameters for lambdify
+        Args:
+            params: Dictionary of robot parameters
+        Returns:
+            params_for_lambdify: list of with each robot parameter
+        """
+        params_for_lambdify = []
+        for params_key, params_vals in sorted(params.items()):
+            if params_key in params_syms.keys():
+                for param in params_vals:
+                    params_for_lambdify.append(param)
+        return params_for_lambdify
+
     # symbols of state variables
     state_syms = sym_exps["state_syms"]
     # symbolic expressions
@@ -104,27 +122,25 @@ def make_jax_functions(
 
         # cumsum of the segment lengths
         l_cum = jnp.cumsum(params["l"])
-        # determine in which segment the point is located
-        # use argmax to find the last index where the condition is true
-        segment_idx = jnp.argmax((s >= l_cum)[::-1]).astype(int)
         # add zero to the beginning of the array
         l_cum_padded = jnp.concatenate([jnp.array([0.0]), l_cum], axis=0)
+        # determine in which segment the point is located
+        # use argmax to find the last index where the condition is true
+        segment_idx = l_cum.shape[0] - 1 - jnp.argmax((s >= l_cum_padded[:-1])[::-1]).astype(int)
         # point coordinate along the segment in the interval [0, l_segment]
         s_segment = s - l_cum_padded[segment_idx]
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
-        params_ls = params_dict_to_list(params)
+        # params_for_lambdify = params_dict_to_list(params, indices_of_params_for_lambdify)
+        params_for_lambdify = select_params_for_lambdify(params)
 
         chi = lax.switch(
             segment_idx,
             chi_lambda_sms,
-            *params_ls, *xi, s_segment
+            *params_for_lambdify, *xi, s_segment
         ).squeeze()
 
         return chi
-
-    # actuation matrix
-    A = jnp.identity(n_xi)
 
     @jit
     def dynamical_matrices_fn(
@@ -153,23 +169,27 @@ def make_jax_functions(
         # make sure that we prevent singularities
         xi = xi + jnp.sign(xi + eps) * eps
 
-        # elastic and dissipative matrices
-        K = params.get("K", jnp.zeros((n_xi, n_xi)))
+        # elastic and shear modulus
+        E, G = params["E"], params["G"]
+        # we define the elastic matrix as K(xi) = K @ xi where K is equal to
+        K = jnp.array([E * J, G * A, E * A])
+
+        # dissipative matrix from the parameters
         D = params.get("D", jnp.zeros((n_xi, n_xi)))
 
-        params_ls = params_dict_to_list(params)
+        params_for_lambdify = select_params_for_lambdify(params)
 
-        B = B_xi.T @ B_lambda(*params_ls, *xi) @ B_xi
-        C = B_xi.T @ C_lambda(*params_ls, *xi, *xi_d) @ B_xi
-        G = B_xi.T @ G_lambda(*params_ls, *xi).squeeze()
+        B = B_xi.T @ B_lambda(*params_for_lambdify, *xi) @ B_xi
+        C = B_xi.T @ C_lambda(*params_for_lambdify, *xi, *xi_d) @ B_xi
+        G = B_xi.T @ G_lambda(*params_for_lambdify, *xi).squeeze()
 
         # apply the strain basis to the elastic and dissipative matrices
-        _K = B_xi.T @ K @ xi  # evaluate K(xi) = K @ xi
-        _D = B_xi.T @ D @ B_xi
+        K = B_xi.T @ K @ xi  # evaluate K(xi) = K @ xi
+        D = B_xi.T @ D @ B_xi
 
         # apply the strain basis to the actuation matrix
-        _A = B_xi.T @ A @ B_xi
+        A = B_xi.T @ jnp.identity(n_xi) @ B_xi
 
-        return B, C, G, _K, _D, _A
+        return B, C, G, K, D, A
 
-    return forward_kinematics_fn, dynamical_matrices_fn
+    return B_xi, forward_kinematics_fn, dynamical_matrices_fn
