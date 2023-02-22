@@ -1,4 +1,4 @@
-import dill
+from diffrax import diffeqsolve, Dopri5, ODETerm, SaveAt
 from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
@@ -6,7 +6,6 @@ import jax
 from jax import jit, vmap
 from jax import numpy as jnp
 from functools import partial
-import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Tuple, Union
 
@@ -29,8 +28,31 @@ if __name__ == "__main__":
         dynamical_matrices_fn
     )
 
+    q, q_d = jnp.zeros((2, )), jnp.zeros((2, ))
+    chi_sms = forward_kinematics_fn(params, q)
+    print("chi_sms =\n", chi_sms)
+
     x = jnp.concatenate((q, q_d), axis=0)
-    tau = jnp.zeros((2, ))
+    tau = jnp.zeros(q.shape)
 
     x_d = nonlinear_state_space_fn(params, x, tau)
     print("x_d =\n", x_d)
+
+    ode_fn = ode_factory(dynamical_matrices_fn, params, tau)
+    term = ODETerm(ode_fn)
+
+    x0 = jnp.zeros((4,))  # initial condition
+    dt = 1e-2  # time step
+    ts = jnp.arange(0.0, 1.0, dt)  # time steps
+    sol = diffeqsolve(
+        term,
+        solver=Dopri5(),
+        t0=ts[0],
+        t1=ts[-1],
+        dt0=dt,
+        y0=x0,
+        saveat=SaveAt(ts=ts)
+    )
+    print("sol =\n", sol)
+    print("sol.ts =\n", sol.ts)
+    print("sol.ys =\n", sol.ys)
