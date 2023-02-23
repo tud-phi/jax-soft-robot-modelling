@@ -26,6 +26,7 @@ sym_exp_filepath = (
 
 # set parameters
 rho = 1070 * jnp.ones((num_segments,))  # Volumetric density of Dragon Skin 20 [kg/m^3]
+D = 1e-5 * jnp.diag(jnp.array([1e0, 1e3, 1e3, 1e0, 1e3, 1e3]))  # Damping coefficient
 params = {
     "rho": rho,
     "l": jnp.array([1e-1, 1e-1]),
@@ -33,8 +34,7 @@ params = {
     "g": jnp.array([0.0, -9.81]),
     "E": 1e4 * jnp.ones((num_segments,)),  # Elastic modulus [Pa]
     "G": 1e3 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
-    "D": 1e-5
-    * jnp.diag(jnp.array([1e0, 1e2, 1e2, 1e0, 1e2, 1e2])),  # Damping coefficient
+    "D": D,
 }
 
 # activate all strains (i.e. bending, shear, and axial)
@@ -122,8 +122,10 @@ if __name__ == "__main__":
     term = ODETerm(ode_fn)
 
     sol = diffeqsolve(
-        term, solver=Dopri5(), t0=ts[0], t1=ts[-1], dt0=dt, y0=x0, max_steps=100000, saveat=SaveAt(ts=video_ts)
+        term, solver=Euler(), t0=ts[0], t1=ts[-1], dt0=dt, y0=x0, max_steps=100000, saveat=SaveAt(ts=video_ts)
     )
+
+    print("sol.ys =\n", sol.ys)
 
     # create video
     fourcc = cv2.VideoWriter_fourcc(*"MP4V")

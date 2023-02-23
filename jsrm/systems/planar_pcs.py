@@ -124,8 +124,11 @@ def factory(
         xi_reshaped = xi.reshape((-1, 3))
 
         xi_epsed = xi_reshaped
-        # only add eps to the bending strain (i.e. the first column)
-        xi_epsed = xi_epsed.at[:, 0].add(jnp.sign(xi_epsed[:, 0]) * _eps)
+        xi_bend_sign = jnp.sign(xi_reshaped[:, 0])
+        # set zero sign to 1 (i.e. positive)
+        xi_bend_sign = jnp.where(xi_bend_sign == 0, 1, xi_bend_sign)
+        # add eps to the bending strain (i.e. the first column)
+        xi_epsed = xi_epsed.at[:, 0].add(xi_bend_sign * _eps)
 
         # flatten the array
         xi_epsed = xi_epsed.flatten()
