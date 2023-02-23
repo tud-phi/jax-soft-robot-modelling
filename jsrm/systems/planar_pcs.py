@@ -9,7 +9,7 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
 
-from .utils import params_dict_to_list, compute_strain_basis
+from .utils import compute_strain_basis
 
 
 def factory(
@@ -172,10 +172,26 @@ def factory(
         # make sure that we prevent singularities
         xi = xi + jnp.sign(xi + eps) * eps
 
+        # number of segments
+        num_segments = params["r"].shape[0]
+
+        # cross-sectional area and second moment of area
+        A = jnp.pi * params["r"] ** 2
+        I = A ** 2 / (4 * jnp.pi)
+
+        # volumetric mass density
+        rho = params["rho"]
         # elastic and shear modulus
         E, G = params["E"], params["G"]
-        # we define the elastic matrix as K(xi) = K @ xi where K is equal to
-        K = jnp.array([E * J, G * A, E * A])
+
+        # stiffness matrix of shape (num_segments, 3)
+        S = jnp.zeros((num_segments, 3))
+        S = S.at[:, 0].set(E * I)  # bending stiffness
+        S = S.at[:, 1].set(G * A)  # shear stiffness
+        S = S.at[:, 2].set(E * A)  # axial stiffness
+
+        # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
+        K = jnp.diag(S.flatten())
 
         # dissipative matrix from the parameters
         D = params.get("D", jnp.zeros((n_xi, n_xi)))
@@ -187,7 +203,7 @@ def factory(
         G = B_xi.T @ G_lambda(*params_for_lambdify, *xi).squeeze()
 
         # apply the strain basis to the elastic and dissipative matrices
-        K = B_xi.T @ K @ xi  # evaluate K(xi) = K @ xi
+        K = B_xi.T @ K @ (xi - xi0)  # evaluate K(xi) = K @ xi
         D = B_xi.T @ D @ B_xi
 
         # apply the strain basis to the actuation matrix

@@ -24,7 +24,7 @@ def symbolically_derive_planar_pcs_model(
     # number of degrees of freedom
     num_dof = 3 * num_segments  # we allow for 3 strains for each segment (bending, shear, elongation)
 
-    rho_syms = list(sp.symbols(f"rho1:{num_segments + 1}", nonnegative=True))  # surface mass density [kg/m^2]
+    rho_syms = list(sp.symbols(f"rho1:{num_segments + 1}", nonnegative=True))  # volumetric mass density [kg/m^3]
     l_syms = list(sp.symbols(f"l1:{num_segments + 1}", nonnegative=True, nonzero=True))  # length of each segment [m]
     r_syms = list(sp.symbols(f"r1:{num_segments + 1}", nonnegative=True))  # radius of each segment [m]
     g_syms = list(sp.symbols(f"g1:3"))  # gravity vector
@@ -34,7 +34,7 @@ def symbolically_derive_planar_pcs_model(
     xi_d_syms = list(sp.symbols(f"xi_d1:{num_dof + 1}"))  # strain time derivatives
 
     # construct the symbolic matrices
-    rho = sp.Matrix(rho_syms)  # surface mass density [kg/m^2]
+    rho = sp.Matrix(rho_syms)  # volumetric mass density [kg/m^3]
     l = sp.Matrix(l_syms)  # length of each link
     r = sp.Matrix(r_syms)   # radius of segment
     g = sp.Matrix(g_syms)  # gravity vector
@@ -47,7 +47,9 @@ def symbolically_derive_planar_pcs_model(
     chi_sms = []
     # Jacobians (positional + orientation) in each segment as a function of the point coordinate s
     J_sms = []
-    # linear inertia distribution for each segment
+    # cross-sectional area of each segment
+    A = sp.zeros(num_segments)
+    # second area moment of inertia of each segment
     I = sp.zeros(num_segments)
     # inertia matrix
     B = sp.zeros(num_dof, num_dof)
@@ -56,8 +58,6 @@ def symbolically_derive_planar_pcs_model(
 
     # symbol for the point coordinate
     s = sp.symbols("s", real=True, nonnegative=True)
-    # symbol for integration of inertia distribution
-    _r = sp.symbols("_r")
 
     # initialize
     th_prev = 0.0
@@ -70,11 +70,11 @@ def symbolically_derive_planar_pcs_model(
         # elongation strain
         sigma_y = xi[3 * i + 2]
 
-        # linear mass density [kg / m]
-        lambda_i = 2 * r[i] * rho[i]
+        # compute the cross-sectional area of the rod
+        A[i] = sp.pi * r[i] ** 2
 
-        # compute the inertia distribution
-        I[i] = sp.integrate(rho[i] * _r ** 2, (_r, -r[i], r[i]))
+        # compute the second area moment of inertia of the rod
+        I[i] = A[i] ** 2 / (4 * sp.pi)
 
         # planar orientation of robot as a function of the point s
         th = th_prev + s * kappa
@@ -112,14 +112,14 @@ def symbolically_derive_planar_pcs_model(
         J_sms.append(J)
 
         # derivative of mass matrix with respect to the point coordinate s
-        dB_ds = sp.simplify(lambda_i * Jp.T @ Jp + I[i] * Jo.T @ Jo)
+        dB_ds = sp.simplify(rho[i] * A[i] * Jp.T @ Jp + rho[i] * I[i] * Jo.T @ Jo)
         # mass matrix of the current segment
         B_i = sp.simplify(sp.integrate(dB_ds, (s, 0, l[i])))
         # add mass matrix of segment to previous segments
         B = B + B_i
 
         # derivative of the potential energy with respect to the point coordinate s
-        dU_ds = sp.simplify(lambda_i * g.T @ p)
+        dU_ds = sp.simplify(rho[i] * A[i] * g.T @ p)
         # potential energy of the current segment
         U_i = sp.simplify(sp.integrate(dU_ds, (s, 0, l[i])))
         # add potential energy of segment to previous segments
