@@ -169,8 +169,8 @@ def factory(
         xi = xi0 + B_xi @ q
         xi_d = B_xi @ q_d
 
-        # make sure that we prevent singularities
-        xi = xi + jnp.sign(xi + eps) * eps
+        # make sure that we prevent singularities where needed
+        xi_epsed = xi + jnp.sign(xi + eps) * eps
 
         # number of segments
         num_segments = params["r"].shape[0]
@@ -198,9 +198,9 @@ def factory(
 
         params_for_lambdify = select_params_for_lambdify(params)
 
-        B = B_xi.T @ B_lambda(*params_for_lambdify, *xi) @ B_xi
-        C = B_xi.T @ C_lambda(*params_for_lambdify, *xi, *xi_d) @ B_xi
-        G = B_xi.T @ G_lambda(*params_for_lambdify, *xi).squeeze()
+        B = B_xi.T @ B_lambda(*params_for_lambdify, *xi_epsed) @ B_xi
+        C = B_xi.T @ C_lambda(*params_for_lambdify, *xi_epsed, *xi_d) @ B_xi
+        G = B_xi.T @ G_lambda(*params_for_lambdify, *xi_epsed).squeeze()
 
         # apply the strain basis to the elastic and dissipative matrices
         K = B_xi.T @ K @ (xi - xi0)  # evaluate K(xi) = K @ xi
