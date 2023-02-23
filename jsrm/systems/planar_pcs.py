@@ -125,7 +125,7 @@ def factory(
 
         xi_epsed = xi_reshaped
         # only add eps to the bending strain (i.e. the first column)
-        xi_epsed = xi_epsed.at[:, 0].add(jnp.sign(xi_epsed[:, 0] + _eps) * _eps)
+        xi_epsed = xi_epsed.at[:, 0].add(jnp.sign(xi_epsed[:, 0]) * _eps)
 
         # flatten the array
         xi_epsed = xi_epsed.flatten()
@@ -167,9 +167,7 @@ def factory(
         params_for_lambdify = select_params_for_lambdify(params)
 
         chi = lax.switch(
-            segment_idx,
-            chi_lambda_sms,
-            *params_for_lambdify, *xi_epsed, s_segment
+            segment_idx, chi_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
         ).squeeze()
 
         return chi
@@ -197,7 +195,7 @@ def factory(
         xi_d = B_xi @ q_d
 
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains(xi, 1e3 * eps)
+        xi_epsed = apply_eps_to_bend_strains(xi, 1e4 * eps)
 
         # number of segments
         num_segments = params["r"].shape[0]
@@ -226,11 +224,12 @@ def factory(
         params_for_lambdify = select_params_for_lambdify(params)
 
         B = B_xi.T @ B_lambda(*params_for_lambdify, *xi_epsed) @ B_xi
-        C = B_xi.T @ C_lambda(*params_for_lambdify, *xi_epsed, *xi_d) @ B_xi
+        C_xi = C_lambda(*params_for_lambdify, *xi_epsed, *xi_d)
+        C = B_xi.T @ C_xi @ B_xi
         G = B_xi.T @ G_lambda(*params_for_lambdify, *xi_epsed).squeeze()
 
         # apply the strain basis to the elastic and dissipative matrices
-        K = B_xi.T @ K @ (xi - xi0)  # evaluate K(xi) = K @ xi
+        K = B_xi.T @ K @ (xi - xi_eq)  # evaluate K(xi) = K @ xi
         D = B_xi.T @ D @ B_xi
 
         # apply the strain basis to the actuation matrix
