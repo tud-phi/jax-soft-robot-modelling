@@ -5,7 +5,6 @@ jax_config.update("jax_enable_x64", True)  # double precision
 import jax
 from jax import Array, debug, jit, vmap
 from jax import numpy as jnp
-from jax.tree_util import Partial
 from typing import Callable, Dict, Generic
 
 from jsrm.systems import euler_lagrangian
@@ -15,7 +14,7 @@ def ode_factory(
         dynamical_matrices_fn: Callable,
         params: Dict[str, Array],
         tau: Array
-) -> Callable[[float, Array, *Generic], Array]:
+) -> Callable[[float, Array], Array]:
     """
     Make an ODE function of the form ode_fn(t, x) -> x_dot.
     This function assumes a constant torque input (i.e. zero-order hold).
