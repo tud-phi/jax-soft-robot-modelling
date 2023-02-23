@@ -7,7 +7,7 @@ from .symbolic_utils import compute_coriolis_matrix
 
 
 def symbolically_derive_planar_pcs_model(
-        num_segments: int, filepath: Union[str, Path] = None
+    num_segments: int, filepath: Union[str, Path] = None
 ) -> Dict:
     """
     Symbolically derive the kinematics and dynamics of a planar continuum soft robot modelled with
@@ -22,11 +22,19 @@ def symbolically_derive_planar_pcs_model(
             exps: dictionary of symbolic expressions
     """
     # number of degrees of freedom
-    num_dof = 3 * num_segments  # we allow for 3 strains for each segment (bending, shear, elongation)
+    num_dof = (
+        3 * num_segments
+    )  # we allow for 3 strains for each segment (bending, shear, elongation)
 
-    rho_syms = list(sp.symbols(f"rho1:{num_segments + 1}", nonnegative=True))  # volumetric mass density [kg/m^3]
-    l_syms = list(sp.symbols(f"l1:{num_segments + 1}", nonnegative=True, nonzero=True))  # length of each segment [m]
-    r_syms = list(sp.symbols(f"r1:{num_segments + 1}", nonnegative=True))  # radius of each segment [m]
+    rho_syms = list(
+        sp.symbols(f"rho1:{num_segments + 1}", nonnegative=True)
+    )  # volumetric mass density [kg/m^3]
+    l_syms = list(
+        sp.symbols(f"l1:{num_segments + 1}", nonnegative=True, nonzero=True)
+    )  # length of each segment [m]
+    r_syms = list(
+        sp.symbols(f"r1:{num_segments + 1}", nonnegative=True)
+    )  # radius of each segment [m]
     g_syms = list(sp.symbols(f"g1:3"))  # gravity vector
 
     # planar strains and their derivatives
@@ -36,7 +44,7 @@ def symbolically_derive_planar_pcs_model(
     # construct the symbolic matrices
     rho = sp.Matrix(rho_syms)  # volumetric mass density [kg/m^3]
     l = sp.Matrix(l_syms)  # length of each link
-    r = sp.Matrix(r_syms)   # radius of segment
+    r = sp.Matrix(r_syms)  # radius of segment
     g = sp.Matrix(g_syms)  # gravity vector
 
     # configuration variables and their derivatives
@@ -80,10 +88,7 @@ def symbolically_derive_planar_pcs_model(
         th = th_prev + s * kappa
 
         # absolute rotation of link
-        R = sp.Matrix([
-            [sp.cos(th), -sp.sin(th)],
-            [sp.sin(th), sp.cos(th)]]
-        )
+        R = sp.Matrix([[sp.cos(th), -sp.sin(th)], [sp.sin(th), sp.cos(th)]])
 
         # derivative of Cartesian position as function of the point s
         dp_ds = R @ sp.Matrix([sigma_x, sigma_y])
@@ -139,7 +144,7 @@ def symbolically_derive_planar_pcs_model(
     print("C =\n", C)
 
     # compute the gravity force vector
-    G = sp.simplify(- U.jacobian(xi).transpose())
+    G = sp.simplify(-U.jacobian(xi).transpose())
     print("G =\n", G)
 
     # dictionary with expressions
@@ -157,13 +162,15 @@ def symbolically_derive_planar_pcs_model(
         },
         "exps": {
             "chi_sms": chi_sms,  # list of pose expressions (for each segment)
-            "chiee": chi_sms[-1].subs(s, l[-1]),  # expression for end-effector pose of shape (3, )
+            "chiee": chi_sms[-1].subs(
+                s, l[-1]
+            ),  # expression for end-effector pose of shape (3, )
             "J_sms": J_sms,
             "Jee": J_sms[-1].subs(s, l[-1]),
             "B": B,
             "C": C,
             "G": G,
-        }
+        },
     }
 
     if filepath is not None:
