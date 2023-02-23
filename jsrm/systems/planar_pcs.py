@@ -106,6 +106,22 @@ def factory(
     G_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax")
 
     @jit
+    def apply_eps_to_bend_strains(xi: Array, _eps: float) -> Array:
+        """
+        Add a small number to the bending strain to avoid singularities
+        """
+        xi_reshaped = xi.reshape((-1, 3))
+
+        xi_epsed = xi_reshaped
+        # only add eps to the bending strain (i.e. the first column)
+        xi_epsed = xi_epsed.at[:, 0].add(jnp.sign(xi_epsed[:, 0] + _eps) * _eps)
+
+        # flatten the array
+        xi_epsed = xi_epsed.flatten()
+
+        return xi_epsed
+
+    @jit
     def forward_kinematics_fn(params: Dict[str, Array], q: Array, s: Array) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
@@ -121,8 +137,8 @@ def factory(
         # map the configuration to the strains
         xi = xi0 + B_xi @ q
 
-        # make sure that we prevent singularities
-        xi = xi + jnp.sign(xi + eps) * eps
+        # add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
 
         # cumsum of the segment lengths
         l_cum = jnp.cumsum(params["l"])
@@ -140,7 +156,7 @@ def factory(
         chi = lax.switch(
             segment_idx,
             chi_lambda_sms,
-            *params_for_lambdify, *xi, s_segment
+            *params_for_lambdify, *xi_epsed, s_segment
         ).squeeze()
 
         return chi
@@ -169,8 +185,8 @@ def factory(
         xi = xi0 + B_xi @ q
         xi_d = B_xi @ q_d
 
-        # make sure that we prevent singularities where needed
-        xi_epsed = xi + jnp.sign(xi + eps) * eps
+        # add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, 1e3 * eps)
 
         # number of segments
         num_segments = params["r"].shape[0]
