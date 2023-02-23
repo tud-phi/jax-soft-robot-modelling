@@ -9,7 +9,7 @@ from typing import Callable, Dict, Iterable, Sequence, Tuple, Union
 
 
 def substitute_symbolic_expressions(
-        sym_exps: Dict, params: Dict[str, jnp.array]
+    sym_exps: Dict, params: Dict[str, jnp.array]
 ) -> Dict:
     """
     Substitute robot parameters into symbolic expressions.
@@ -36,10 +36,14 @@ def substitute_symbolic_expressions(
         for param_key, param_sym in params_syms.items():
             if issubclass(type(param_sym), Iterable):
                 for idx, param_sym_item in enumerate(param_sym):
-                    exps[exp_key] = exps[exp_key].subs(param_sym_item, params[param_key][idx])
+                    exps[exp_key] = exps[exp_key].subs(
+                        param_sym_item, params[param_key][idx]
+                    )
             else:
                 exps[exp_key] = exps[exp_key].subs(param_sym, params[param_key])
-            exps[exp_key] = exps[exp_key].subs(params_syms[param_key], params[param_key])
+            exps[exp_key] = exps[exp_key].subs(
+                params_syms[param_key], params[param_key]
+            )
 
     return sym_exps
 

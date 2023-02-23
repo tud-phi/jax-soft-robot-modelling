@@ -1,4 +1,4 @@
-from jax import Array, jit, vmap
+from jax import Array, debug, jit, vmap
 from jax import numpy as jnp
 from functools import partial
 from typing import Callable, Dict, Tuple, Union
@@ -6,11 +6,11 @@ from typing import Callable, Dict, Tuple, Union
 
 @partial(jit, static_argnums=0, static_argnames="dynamical_matrices_fn")
 def forward_dynamics(
-        dynamical_matrices_fn: Callable,
-        params: Dict[str, Array],
-        q: Array,
-        q_d: Array,
-        tau: Array,
+    dynamical_matrices_fn: Callable,
+    params: Dict[str, Array],
+    q: Array,
+    q_d: Array,
+    tau: Array,
 ):
     """
     Compute the forward dynamics of a Lagrangian system.
@@ -44,10 +44,10 @@ def forward_dynamics(
 
 @partial(jit, static_argnums=0, static_argnames="dynamical_matrices_fn")
 def nonlinear_state_space(
-        dynamical_matrices_fn: Callable,
-        params: Dict[str, Array],
-        x: Array,
-        tau: Array,
+    dynamical_matrices_fn: Callable,
+    params: Dict[str, Array],
+    x: Array,
+    tau: Array,
 ) -> jnp.array:
     """
     Compute the nonlinear state space dynamics of a Lagrangian system (i.e. the ODE function).

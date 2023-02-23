@@ -64,19 +64,25 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
     # iterate through symbolic expressions for each segment
     for chi_exp in sym_exps["exps"]["chi_ls"]:
         chi_lambda = sp.lambdify(
-            params_syms_cat + sym_exps["state_syms"]["q"],
-            chi_exp,
-            "jax"
+            params_syms_cat + sym_exps["state_syms"]["q"], chi_exp, "jax"
         )
         chi_lambda_ls.append(chi_lambda)
 
     # lambdify symbolic expressions
-    B_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["B"], "jax")
-    C_lambda = sp.lambdify(params_syms_cat + state_syms_cat, sym_exps["exps"]["C"], "jax")
-    G_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["G"], "jax")
+    B_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["B"], "jax"
+    )
+    C_lambda = sp.lambdify(
+        params_syms_cat + state_syms_cat, sym_exps["exps"]["C"], "jax"
+    )
+    G_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["q"], sym_exps["exps"]["G"], "jax"
+    )
 
     @jit
-    def forward_kinematics_fn(params: Dict[str, Array], q: Array, link_idx: int) -> Array:
+    def forward_kinematics_fn(
+        params: Dict[str, Array], q: Array, link_idx: int
+    ) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
         Args:
@@ -91,11 +97,7 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
         params_for_lambdify = select_params_for_lambdify(params)
 
-        chi = lax.switch(
-            link_idx,
-            chi_lambda_ls,
-            *params_for_lambdify, *q
-        ).squeeze()
+        chi = lax.switch(link_idx, chi_lambda_ls, *params_for_lambdify, *q).squeeze()
 
         return chi
 
@@ -104,9 +106,7 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
 
     @jit
     def dynamical_matrices_fn(
-            params: Dict[str, Array],
-            q: Array,
-            q_d: Array
+        params: Dict[str, Array], q: Array, q_d: Array
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
         Compute the dynamical matrices of the system.

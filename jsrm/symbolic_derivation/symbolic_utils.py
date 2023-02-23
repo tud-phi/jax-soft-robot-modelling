@@ -20,7 +20,9 @@ def compute_coriolis_matrix(B: sp.Matrix, q: sp.Matrix, q_d: sp.Matrix) -> sp.Ma
         for j in range(num_dof):
             for k in range(num_dof):
                 # Ch[i, j, k] = sp.simplify(0.5 * (B[i, j].diff(q[k]) + B[i, k].diff(q[j]) - B[j, k].diff(q[i])))
-                Ch_ijk = 0.5 * (B[i, j].diff(q[k]) + B[i, k].diff(q[j]) - B[j, k].diff(q[i]))
+                Ch_ijk = 0.5 * (
+                    B[i, j].diff(q[k]) + B[i, k].diff(q[j]) - B[j, k].diff(q[i])
+                )
                 Ch_flat.append(sp.simplify(Ch_ijk, rational=True))
     Ch = sp.Array(Ch_flat, (num_dof, num_dof, num_dof))
 

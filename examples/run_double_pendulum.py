@@ -12,7 +12,9 @@ from typing import Callable, Dict, Tuple, Union
 from jsrm.integration import ode_factory
 from jsrm.systems import euler_lagrangian, pendulum
 
-sym_exp_filepath = Path(__file__).parent.parent / "symbolic_expressions" / "double_pendulum.dill"
+sym_exp_filepath = (
+    Path(__file__).parent.parent / "symbolic_expressions" / "double_pendulum.dill"
+)
 params = {
     "m": jnp.array([10.0, 6.0]),
     "I": jnp.array([3.0, 2.0]),
@@ -24,11 +26,10 @@ params = {
 if __name__ == "__main__":
     forward_kinematics_fn, dynamical_matrices_fn = pendulum.factory(sym_exp_filepath)
     nonlinear_state_space_fn = partial(
-        euler_lagrangian.nonlinear_state_space,
-        dynamical_matrices_fn
+        euler_lagrangian.nonlinear_state_space, dynamical_matrices_fn
     )
 
-    q, q_d = jnp.zeros((2, )), jnp.zeros((2, ))
+    q, q_d = jnp.zeros((2,)), jnp.zeros((2,))
     # compute the pose of the end-effector
     chiee = forward_kinematics_fn(params, q, -1)
     print("chiee =\n", chiee)
@@ -46,13 +47,7 @@ if __name__ == "__main__":
     dt = 1e-2  # time step
     ts = jnp.arange(0.0, 1.0, dt)  # time steps
     sol = diffeqsolve(
-        term,
-        solver=Dopri5(),
-        t0=ts[0],
-        t1=ts[-1],
-        dt0=dt,
-        y0=x0,
-        saveat=SaveAt(ts=ts)
+        term, solver=Dopri5(), t0=ts[0], t1=ts[-1], dt0=dt, y0=x0, saveat=SaveAt(ts=ts)
     )
     print("sol =\n", sol)
     print("sol.ts =\n", sol.ts)

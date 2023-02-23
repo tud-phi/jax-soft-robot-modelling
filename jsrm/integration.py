@@ -11,9 +11,7 @@ from jsrm.systems import euler_lagrangian
 
 
 def ode_factory(
-        dynamical_matrices_fn: Callable,
-        params: Dict[str, Array],
-        tau: Array
+    dynamical_matrices_fn: Callable, params: Dict[str, Array], tau: Array
 ) -> Callable[[float, Array], Array]:
     """
     Make an ODE function of the form ode_fn(t, x) -> x_dot.
@@ -33,6 +31,7 @@ def ode_factory(
     Returns:
         ode_fn: ODE function of the form ode_fn(t, x) -> x_dot
     """
+
     @jit
     def ode_fn(t: float, x: Array, *args) -> Array:
         """

@@ -7,7 +7,7 @@ from .symbolic_utils import compute_coriolis_matrix
 
 
 def symbolically_derive_pendulum_model(
-        num_links: int, filepath: Union[str, Path] = None
+    num_links: int, filepath: Union[str, Path] = None
 ) -> Dict:
     """
     Symbolically derive the kinematics and dynamics of a n-link pendulum.
@@ -24,7 +24,9 @@ def symbolically_derive_pendulum_model(
     m_syms = list(sp.symbols(f"m1:{num_links + 1}"))  # mass of each link
     I_syms = list(sp.symbols(f"I1:{num_links + 1}"))  # moment of inertia of each link
     l_syms = list(sp.symbols(f"l1:{num_links + 1}"))  # length of each link
-    lc_syms = list(sp.symbols(f"lc1:{num_links + 1}"))  # center of mass of each link (distance from joint)
+    lc_syms = list(
+        sp.symbols(f"lc1:{num_links + 1}")
+    )  # center of mass of each link (distance from joint)
     g_syms = list(sp.symbols(f"g1:3"))  # gravity vector
 
     # configuration variables and their derivatives
@@ -59,10 +61,7 @@ def symbolically_derive_pendulum_model(
         th = th_prev + q[i]
 
         # absolute rotation of link
-        R = sp.Matrix([
-            [sp.cos(th), -sp.sin(th)],
-            [sp.sin(th), sp.cos(th)]]
-        )
+        R = sp.Matrix([[sp.cos(th), -sp.sin(th)], [sp.sin(th), sp.cos(th)]])
 
         # absolute position of center of mass
         pc = sp.simplify(p_prev + R @ sp.Matrix([lc[i], 0]))
@@ -118,7 +117,7 @@ def symbolically_derive_pendulum_model(
     print("C =\n", C)
 
     # compute the gravity force vector
-    G = sp.simplify(- U.jacobian(q).transpose())
+    G = sp.simplify(-U.jacobian(q).transpose())
     print("G =\n", G)
 
     # dictionary with functions
@@ -144,7 +143,7 @@ def symbolically_derive_pendulum_model(
             "B": B,
             "C": C,
             "G": G,
-        }
+        },
     }
 
     if filepath is not None:

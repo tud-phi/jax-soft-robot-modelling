@@ -12,6 +12,8 @@ num_links_to_filename_map = {
 
 if __name__ == "__main__":
     sym_exp_filepath = (
-            Path(__file__).parent.parent / "symbolic_expressions" / num_links_to_filename_map[NUM_LINKS]
+        Path(__file__).parent.parent
+        / "symbolic_expressions"
+        / num_links_to_filename_map[NUM_LINKS]
     )
     symbolically_derive_pendulum_model(num_links=NUM_LINKS, filepath=sym_exp_filepath)
