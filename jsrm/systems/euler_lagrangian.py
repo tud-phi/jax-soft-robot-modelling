@@ -15,15 +15,15 @@ def forward_dynamics(
     """
     Compute the forward dynamics of a Lagrangian system.
     Args:
-        dynamical_matrices_fn: Callable that returns the B, C, G, K, D, and A matrices. Needs to conform to the signature:
-            dynamical_matrices_fn(params, q, q_d) -> Tuple[B, C, G, K, D, A]
+        dynamical_matrices_fn: Callable that returns the B, C, G, K, D, and alpha matrices. Needs to conform to the signature:
+            dynamical_matrices_fn(params, q, q_d) -> Tuple[B, C, G, K, D, alpha]
             where q and q_d are the configuration and velocity vectors, respectively,
             B is the inertia matrix of shape (n_q, n_q),
             C is the Coriolis matrix of shape (n_q, n_q),
             G is the gravity vector of shape (n_q, ),
             K is the stiffness vector of shape (n_q, ),
             D is the damping matrix of shape (n_q, n_q),
-            and A is the actuation matrix of shape (n_q, n_tau).
+            and alpha is the actuation matrix of shape (n_q, n_tau).
         params: Dictionary with robot parameters
         q: configuration vector of shape (n_q, )
         q_d: configuration velocity vector of shape (n_q, )
@@ -31,13 +31,13 @@ def forward_dynamics(
     Returns:
         q_dd: configuration acceleration vector of shape (n_q, )
     """
-    B, C, G, K, D, A = dynamical_matrices_fn(params, q, q_d)
+    B, C, G, K, D, alpha = dynamical_matrices_fn(params, q, q_d)
 
     # inverse of B
     B_inv = jnp.linalg.inv(B)
 
     # compute the acceleration
-    q_dd = B_inv @ (A @ tau - C @ q_d - G - K - D @ q_d)
+    q_dd = B_inv @ (alpha @ tau - C @ q_d - G - K - D @ q_d)
 
     return q_dd
 
@@ -60,7 +60,7 @@ def nonlinear_state_space(
             G is the gravity vector of shape (n_q, ),
             K is the stiffness vector of shape (n_q, ),
             D is the damping matrix of shape (n_q, n_q),
-            and A is the actuation matrix of shape (n_q, n_tau).
+            and alpha is the actuation matrix of shape (n_q, n_tau).
         params: Dictionary with robot parameters
         x: state vector of shape (2 * n_q, ) containing the configuration and velocity vectors
         tau: generalized torque vector of shape (n_tau, )

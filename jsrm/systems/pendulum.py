@@ -19,7 +19,7 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
         filepath: path to file containing symbolic expressions
     Returns:
         forward_kinematics_fn: function that returns the p vector of shape (3, n_q) with the positions
-        dynamical_matrices_fn: function that returns the B, C, G, K, D, and A matrices
+        dynamical_matrices_fn: function that returns the B, C, G, K, D, and alpha matrices
     """
     # load saved symbolic data
     sym_exps = dill.load(open(str(filepath), "rb"))
@@ -100,7 +100,7 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
         return chi
 
     # actuation matrix
-    A = jnp.identity(n_q)
+    alpha = jnp.identity(n_q)
 
     @jit
     def dynamical_matrices_fn(
@@ -120,7 +120,7 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
             G: gravity vector of shape (n_q, )
             K: elastic vector of shape (n_q, )
             D: dissipative matrix of shape (n_q, n_q)
-            A: actuation matrix of shape (n_q, n_tau)
+            alpha: actuation matrix of shape (n_q, n_tau)
         """
         # elastic and dissipative matrices
         K = params.get("K", jnp.zeros((n_q, n_q)))
@@ -133,9 +133,9 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
         C = C_lambda(*params_for_lambdify, *q, *q_d)
         G = G_lambda(*params_for_lambdify, *q).squeeze()
 
-        # K(q) = K @ q
-        _K = K @ q
+        # compute elastic matrices as K(q) = K q
+        K = K @ q
 
-        return B, C, G, _K, D, A
+        return B, C, G, K, D, alpha
 
     return forward_kinematics_fn, dynamical_matrices_fn

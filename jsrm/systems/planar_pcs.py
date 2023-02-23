@@ -33,7 +33,7 @@ def factory(
     Returns:
         B_xi: strain basis matrix of shape (3 * num_segments, n_q)
         forward_kinematics_fn: function that returns the p vector of shape (3, n_q) with the positions
-        dynamical_matrices_fn: function that returns the B, C, G, K, D, and A matrices
+        dynamical_matrices_fn: function that returns the B, C, G, K, D, and alpha matrices
     """
     # load saved symbolic data
     sym_exps = dill.load(open(str(filepath), "rb"))
@@ -163,7 +163,7 @@ def factory(
             G: gravity vector of shape (n_q, )
             K: elastic vector of shape (n_q, )
             D: dissipative matrix of shape (n_q, n_q)
-            A: actuation matrix of shape (n_q, n_tau)
+            alpha: actuation matrix of shape (n_q, n_tau)
         """
         # map the configuration to the strains
         xi = xi0 + B_xi @ q
@@ -191,8 +191,8 @@ def factory(
         D = B_xi.T @ D @ B_xi
 
         # apply the strain basis to the actuation matrix
-        A = B_xi.T @ jnp.identity(n_xi) @ B_xi
+        alpha = B_xi.T @ jnp.identity(n_xi) @ B_xi
 
-        return B, C, G, K, D, A
+        return B, C, G, K, D, alpha
 
     return B_xi, forward_kinematics_fn, dynamical_matrices_fn
