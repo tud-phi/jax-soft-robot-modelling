@@ -13,14 +13,17 @@ from .utils import compute_strain_basis
 
 
 def factory(
-        filepath: Union[str, Path],
-        strain_selector: Array = None,
-        xi0: Array = None,
-        eps: float = 1e-6,
+    filepath: Union[str, Path],
+    strain_selector: Array = None,
+    xi_eq: Array = None,
+    eps: float = 1e-6,
 ) -> Tuple[
     Array,
     Callable[[Dict[str, Array], Array, Array], Array],
-    Callable[[Dict[str, Array], Array, Array], Tuple[Array, Array, Array, Array, Array, Array]],
+    Callable[
+        [Dict[str, Array], Array, Array],
+        Tuple[Array, Array, Array, Array, Array, Array],
+    ],
 ]:
     """
     Create jax functions from file containing symbolic expressions.
@@ -28,7 +31,7 @@ def factory(
         filepath: path to file containing symbolic expressions
         strain_selector: array of shape (3, ) with boolean values indicating which components of the
                 strain are active / non-zero
-        xi0: array of shape (3 * num_segments) with the rest strains of the rod
+        xi_eq: array of shape (3 * num_segments) with the rest strains of the rod
         eps: small number to avoid division by zero
     Returns:
         B_xi: strain basis matrix of shape (3 * num_segments, n_q)
@@ -78,14 +81,14 @@ def factory(
     B_xi = compute_strain_basis(strain_selector)
 
     # initialize the rest strain
-    if xi0 is None:
-        xi0 = jnp.zeros((n_xi,))
+    if xi_eq is None:
+        xi_eq = jnp.zeros((n_xi,))
         # by default, set the axial rest strain (local y-axis) along the entire rod to 1.0
-        rest_strain_reshaped = xi0.reshape((-1, 3))
+        rest_strain_reshaped = xi_eq.reshape((-1, 3))
         rest_strain_reshaped = rest_strain_reshaped.at[:, -1].set(1.0)
-        xi0 = rest_strain_reshaped.flatten()
+        xi_eq = rest_strain_reshaped.flatten()
     else:
-        assert xi0.shape == (n_xi,)
+        assert xi_eq.shape == (n_xi,)
 
     # concatenate the list of state symbols
     state_syms_cat = sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["xi_d"]
@@ -95,15 +98,23 @@ def factory(
     # iterate through symbolic expressions for each segment
     for chi_exp in sym_exps["exps"]["chi_sms"]:
         chi_lambda = sp.lambdify(
-            params_syms_cat + sym_exps["state_syms"]["xi"] + [sym_exps["state_syms"]["s"]],
+            params_syms_cat
+            + sym_exps["state_syms"]["xi"]
+            + [sym_exps["state_syms"]["s"]],
             chi_exp,
-            "jax"
+            "jax",
         )
         chi_lambda_sms.append(chi_lambda)
 
-    B_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["B"], "jax")
-    C_lambda = sp.lambdify(params_syms_cat + state_syms_cat, sym_exps["exps"]["C"], "jax")
-    G_lambda = sp.lambdify(params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax")
+    B_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["B"], "jax"
+    )
+    C_lambda = sp.lambdify(
+        params_syms_cat + state_syms_cat, sym_exps["exps"]["C"], "jax"
+    )
+    G_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax"
+    )
 
     @jit
     def apply_eps_to_bend_strains(xi: Array, _eps: float) -> Array:
@@ -135,7 +146,7 @@ def factory(
                 and theta is the planar orientation with respect to the x-axis
         """
         # map the configuration to the strains
-        xi = xi0 + B_xi @ q
+        xi = xi_eq + B_xi @ q
 
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains(xi, eps)
@@ -146,7 +157,9 @@ def factory(
         l_cum_padded = jnp.concatenate([jnp.array([0.0]), l_cum], axis=0)
         # determine in which segment the point is located
         # use argmax to find the last index where the condition is true
-        segment_idx = l_cum.shape[0] - 1 - jnp.argmax((s >= l_cum_padded[:-1])[::-1]).astype(int)
+        segment_idx = (
+            l_cum.shape[0] - 1 - jnp.argmax((s >= l_cum_padded[:-1])[::-1]).astype(int)
+        )
         # point coordinate along the segment in the interval [0, l_segment]
         s_segment = s - l_cum_padded[segment_idx]
 
@@ -163,9 +176,7 @@ def factory(
 
     @jit
     def dynamical_matrices_fn(
-            params: Dict[str, Array],
-            q: Array,
-            q_d: Array
+        params: Dict[str, Array], q: Array, q_d: Array
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
         Compute the dynamical matrices of the system.
@@ -182,7 +193,7 @@ def factory(
             alpha: actuation matrix of shape (n_q, n_tau)
         """
         # map the configuration to the strains
-        xi = xi0 + B_xi @ q
+        xi = xi_eq + B_xi @ q
         xi_d = B_xi @ q_d
 
         # add a small number to the bending strain to avoid singularities
@@ -193,7 +204,7 @@ def factory(
 
         # cross-sectional area and second moment of area
         A = jnp.pi * params["r"] ** 2
-        I = A ** 2 / (4 * jnp.pi)
+        I = A**2 / (4 * jnp.pi)
 
         # volumetric mass density
         rho = params["rho"]
