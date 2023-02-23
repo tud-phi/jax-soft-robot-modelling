@@ -135,7 +135,6 @@ def factory(
         s_segment = s - l_cum_padded[segment_idx]
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
-        # params_for_lambdify = params_dict_to_list(params, indices_of_params_for_lambdify)
         params_for_lambdify = select_params_for_lambdify(params)
 
         chi = lax.switch(

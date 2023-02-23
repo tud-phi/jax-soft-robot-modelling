@@ -43,8 +43,6 @@ def symbolically_derive_planar_pcs_model(
     xi = sp.Matrix(xi_syms)  # strains
     xi_d = sp.Matrix(xi_d_syms)  # strain time derivatives
 
-    # orientation scalar and rotation matrix
-    th_sms = []
     # matrix with symbolic expressions to derive the poses along each segment
     chi_sms = []
     # Jacobians (positional + orientation) in each segment as a function of the point coordinate s

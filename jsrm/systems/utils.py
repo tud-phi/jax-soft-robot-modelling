@@ -44,21 +44,6 @@ def substitute_symbolic_expressions(
     return sym_exps
 
 
-@jit
-def params_dict_to_list(params_dict: Dict[str, jnp.array]) -> jnp.array:
-    """
-    Convert dictionary of robot parameters to unrolled list.
-    Args:
-        params_dict: dictionary of robot parameters
-    Returns:
-        params_list: list of robot parameters
-    """
-    params_list = []
-    for param_key, param_val in sorted(params_dict.items()):
-        params_list.extend(param_val)
-    return params_list
-
-
 def compute_strain_basis(
     strain_selector: Array,
 ) -> jnp.ndarray:

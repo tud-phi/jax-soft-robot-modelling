@@ -29,8 +29,9 @@ if __name__ == "__main__":
     )
 
     q, q_d = jnp.zeros((2, )), jnp.zeros((2, ))
-    chi_sms = forward_kinematics_fn(params, q)
-    print("chi_sms =\n", chi_sms)
+    # compute the pose of the end-effector
+    chiee = forward_kinematics_fn(params, q, -1)
+    print("chiee =\n", chiee)
 
     x = jnp.concatenate((q, q_d), axis=0)
     tau = jnp.zeros(q.shape)
