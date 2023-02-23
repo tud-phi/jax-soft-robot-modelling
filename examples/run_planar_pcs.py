@@ -47,6 +47,7 @@ q0 = jnp.array([jnp.pi, 0.0, 0.0, -2 * jnp.pi, 0.0, 0.0])
 dt = 1e-4  # time step
 ts = jnp.arange(0.0, 5, dt)  # time steps
 skip_step = 100  # how many time steps to skip in between video frames
+video_ts = ts[::skip_step]  # time steps for video
 
 # video settings
 video_width, video_height = 700, 700  # img height and width
@@ -120,6 +121,11 @@ if __name__ == "__main__":
     ode_fn = ode_factory(dynamical_matrices_fn, params, tau)
     term = ODETerm(ode_fn)
 
+    sol = diffeqsolve(
+        term, solver=Dopri5(), t0=ts[0], t1=ts[-1], dt0=dt, y0=x0, max_steps=100000, saveat=SaveAt(ts=video_ts)
+    )
+
+    # create video
     fourcc = cv2.VideoWriter_fourcc(*"MP4V")
     video_path.parent.mkdir(parents=True, exist_ok=True)
     video = cv2.VideoWriter(
@@ -129,36 +135,15 @@ if __name__ == "__main__":
         (video_width, video_height),
     )
 
-    x = x0
-    for time_idx, t in enumerate(ts):
-        x_d = ode_fn(t, x)
-        # euler forward integration
-        x = x + dt * x_d
-
-        if jnp.isnan(x_d).any():
-            print("Encountered NaN. Exiting...")
-            print("x:\n", x, "\nx_d:\n", x_d)
-            video.release()
-            exit()
-
-        if time_idx % skip_step == 0:
-            print(f"t = {t} s")
-            img = draw_robot(
-                batched_forward_kinematics,
-                params,
-                x[: (x.shape[0] // 2)],
-                video_width,
-                video_height,
-            )
-            video.write(img)
+    for time_idx, t in enumerate(video_ts):
+        x = sol.ys[time_idx]
+        img = draw_robot(
+            batched_forward_kinematics,
+            params,
+            x[: (x.shape[0] // 2)],
+            video_width,
+            video_height,
+        )
+        video.write(img)
 
     video.release()
-
-    exit()
-
-    sol = diffeqsolve(
-        term, solver=Euler(), t0=ts[0], t1=ts[-1], dt0=dt, y0=x0, saveat=SaveAt(ts=ts)
-    )
-    print("sol =\n", sol)
-    print("sol.ts =\n", sol.ts)
-    print("sol.ys =\n", sol.ys)
