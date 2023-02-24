@@ -3,7 +3,7 @@ from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
 import jax
-from jax import Array, jit, lax, vmap
+from jax import Array, debug, jit, lax, vmap
 from jax import numpy as jnp
 import sympy as sp
 from pathlib import Path
@@ -81,14 +81,14 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
 
     @jit
     def forward_kinematics_fn(
-        params: Dict[str, Array], q: Array, link_idx: int
+        params: Dict[str, Array], q: Array, link_idx: Array
     ) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
         Args:
             params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
-            link_idx: index of link to evaluate
+            link_idx: index of link to evaluate with shape ()
         Returns:
             chi_ls: poses of tip of link of shape (3, ) consisting of [p_x, p_y, theta]
                 where p_x is the x-position, p_y is the y-position,
