@@ -61,7 +61,7 @@ def draw_robot(
 
     # poses along the robot of shape (3, N)
     link_indices = jnp.arange(params["l"].shape[0], dtype=jnp.int32)
-    chi_ls = jnp.zeros((link_indices.shape[0] + 1, 3))
+    chi_ls = jnp.zeros((3, link_indices.shape[0] + 1))
     chi_ls = chi_ls.at[:, 1:].set(batched_forward_kinematics_fn(params, q, link_indices))
 
     img = 255 * onp.ones((w, h, 3), dtype=jnp.uint8)  # initialize background to white

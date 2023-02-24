@@ -50,7 +50,7 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
 
     # concatenate the robot params symbols
     params_syms_cat = []
-    for params_key, params_sym in params_syms.items():
+    for params_key, params_sym in sorted(params_syms.items()):
         params_syms_cat += params_sym
 
     # number of degrees of freedom
