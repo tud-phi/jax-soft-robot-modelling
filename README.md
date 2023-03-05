@@ -5,7 +5,7 @@
 The plugin can be installed from PyPI:
 
 ```bash
-pip install jax-spcs-kinematics
+pip install jax-soft-robot-modelling
 ```
 
 or locally from the source code:
