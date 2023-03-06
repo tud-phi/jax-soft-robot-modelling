@@ -139,3 +139,12 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
         return B, C, G, K, D, alpha
 
     return forward_kinematics_fn, dynamical_matrices_fn
+
+
+@jit
+def normalize_joint_angles(q: Array) -> Array:
+    """
+    Normalize the joint angles `q` to the interval [-pi, pi].
+    """
+    q_norm = jnp.mod(q + jnp.pi, 2 * jnp.pi) - jnp.pi
+    return q_norm
