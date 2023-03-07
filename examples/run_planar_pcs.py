@@ -121,7 +121,7 @@ if __name__ == "__main__":
     term = ODETerm(ode_fn)
 
     sol = diffeqsolve(
-        term, solver=Euler(), t0=ts[0], t1=ts[-1], dt0=dt, y0=x0, max_steps=100000, saveat=SaveAt(ts=video_ts)
+        term, solver=Euler(), t0=ts[0], t1=ts[-1], dt0=dt, y0=x0, max_steps=None, saveat=SaveAt(ts=video_ts)
     )
 
     print("sol.ys =\n", sol.ys)
