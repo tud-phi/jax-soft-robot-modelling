@@ -144,7 +144,8 @@ def factory(
             q: generalized coordinates of shape (n_q, )
             s: point coordinate along the rod in the interval [0, L].
         Returns:
-            chi_sms: poses of tip of links of shape (3, n_q) consisting of [p_x, p_y, theta]
+            chi: pose of the backbone point in Cartesian-space with shape (3, )
+                Consists of [p_x, p_y, theta]
                 where p_x is the x-position, p_y is the y-position,
                 and theta is the planar orientation with respect to the x-axis
         """

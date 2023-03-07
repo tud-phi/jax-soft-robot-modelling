@@ -90,7 +90,8 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
             q: generalized coordinates of shape (n_q, )
             link_idx: index of link to evaluate with shape ()
         Returns:
-            chi_ls: poses of tip of link of shape (3, ) consisting of [p_x, p_y, theta]
+            chi: pose of the tip of the link in Cartesian-space with shape (3, )
+                Consists of [p_x, p_y, theta]
                 where p_x is the x-position, p_y is the y-position,
                 and theta is the planar orientation with respect to the x-axis
         """
