@@ -7,7 +7,7 @@ from .symbolic_utils import compute_coriolis_matrix
 
 
 def symbolically_derive_planar_hsa_model(
-    num_segments: int, filepath: Union[str, Path] = None
+    num_segments: int, filepath: Union[str, Path] = None, th0: float = 0.0
 ) -> Dict:
     """
     Symbolically derive the kinematics and dynamics of a planar hsa robot modelled with
@@ -15,6 +15,7 @@ def symbolically_derive_planar_hsa_model(
     Args:
         num_segments: number of constant strain segments
         filepath: path to save the derived model
+        th0: initial angle of the robot
     Returns:
         sym_exps: dictionary with entries
             params_syms: dictionary of robot parameters
@@ -76,15 +77,15 @@ def symbolically_derive_planar_hsa_model(
     s = sp.symbols("s", real=True, nonnegative=True)
 
     # initialize
-    th_prev = 0.0
+    th_prev = th0
     p_prev = sp.Matrix([0, 0])
     for i in range(num_segments):
         # bending strain
         kappa = xi[3 * i]
         # shear strain
-        sigma_x = xi[3 * i + 1]
-        # elongation strain
-        sigma_y = xi[3 * i + 2]
+        sigma_sh = xi[3 * i + 1]
+        # axial strain
+        sigma_a = xi[3 * i + 2]
 
         # compute the cross-sectional area of the rod
         A[i] = sp.pi * (rout[i] ** 2 - rin[i] ** 2)
@@ -99,7 +100,7 @@ def symbolically_derive_planar_hsa_model(
         R = sp.Matrix([[sp.cos(th), -sp.sin(th)], [sp.sin(th), sp.cos(th)]])
 
         # derivative of Cartesian position as function of the point s
-        dp_ds = R @ sp.Matrix([sigma_x, sigma_y])
+        dp_ds = R @ sp.Matrix([sigma_sh, sigma_a])
 
         # position along the virtual center rod as a function of the point s
         p = p_prev + sp.integrate(dp_ds, (s, 0.0, s))
