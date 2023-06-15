@@ -44,7 +44,7 @@ params = {
     "h": jnp.ones((num_segments, rods_per_segment)),
     # offset [m] of each rod from the centerline. The rows correspond to the segments.
     "roff": jnp.array([[-24e-3, 24e-3]]),
-    "pcudim": jnp.array([95e-3, 3e-3, 95e-3]),  # width, height, depth of the platform [m]
+    "pcudim": jnp.array([[95e-3, 3e-3, 95e-3]]),  # width, height, depth of the platform [m]
     "rhor": 1.05e3 * jnp.ones((num_segments, rods_per_segment)),  # Volumetric density of rods [kg/m^3],
     "rhop": 0.7e3 * jnp.ones((num_segments, )),  # Volumetric density of platform [kg/m^3],
     "g": jnp.array([0.0, -9.81]),
@@ -137,10 +137,31 @@ def draw_robot(
     cv2.polylines(img, [curve_rod_right], isClosed=False, color=rod_color, thickness=10)
 
     # draw the platform
-    for j in chip_ps.shape[0]:
+    for i in range(chip_ps.shape[0]):
         # iterate over the platforms
-        pass
-        # cv2.rectangle(img, chi2u(), (w, h), color=platform_color, thickness=-1)
+        platform_R = jnp.array([
+            [jnp.cos(chip_ps[i, 2]), -jnp.sin(chip_ps[i, 2])],
+            [jnp.sin(chip_ps[i, 2]), jnp.cos(chip_ps[i, 2])]
+        ])  # rotation matrix for the platform
+        platform_llc = chip_ps[i, :2] + platform_R @ jnp.array([
+            -params["pcudim"][i, 0] / 2,  # go half the width to the left
+            -params["pcudim"][i, 1] / 2,  # go half the height down
+        ])  # lower left corner of the platform
+        platform_ulc = chip_ps[i, :2] + platform_R @ jnp.array([
+            -params["pcudim"][i, 0] / 2,  # go half the width to the left
+            +params["pcudim"][i, 1] / 2,  # go half the height down
+        ])  # upper left corner of the platform
+        platform_urc = chip_ps[i, :2] + platform_R @ jnp.array([
+            +params["pcudim"][i, 0] / 2,  # go half the width to the left
+            +params["pcudim"][i, 1] / 2,  # go half the height down
+        ])  # upper right corner of the platform
+        platform_lrc = chip_ps[i, :2] + platform_R @ jnp.array([
+            +params["pcudim"][i, 0] / 2,  # go half the width to the left
+            -params["pcudim"][i, 1] / 2,  # go half the height down
+        ])  # lower right corner of the platform
+        platform_curve = jnp.stack([platform_llc, platform_ulc, platform_urc, platform_lrc, platform_llc], axis=1)
+        # cv2.polylines(img, [onp.array(batched_chi2u(platform_curve))], isClosed=True, color=platform_color, thickness=5)
+        cv2.fillPoly(img, [onp.array(batched_chi2u(platform_curve))], color=platform_color)
 
     return img
 
