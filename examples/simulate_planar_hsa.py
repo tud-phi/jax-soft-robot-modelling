@@ -10,8 +10,6 @@ import numpy as onp
 from pathlib import Path
 from typing import Callable, Dict
 
-from jsrm.integration import ode_factory
-from jsrm.systems import euler_lagrangian
 from jsrm.systems import planar_hsa
 
 num_segments = 1
@@ -34,8 +32,9 @@ zeta = 1e-4 * jnp.repeat(
     axis=0, repeats=num_segments
 )
 params = {
-    "th0": jnp.array([0.0]),  # initial orientation angle [rad]
-    "l": jnp.array([1e-1]),  # length of each rod [m]
+    "th0": jnp.array(0.0),  # initial orientation angle [rad]
+    "l": 1e-1 * jnp.ones((num_segments, )),  # length of each rod [m]
+    "C_varepsilon": 1e-2,  # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
     # outside radius of each rod [m]. The rows correspond to the segments.
     "rout": 25.4e-3 / 2 * jnp.ones((num_segments, rods_per_segment)),
     # inside radius of each rod [m]. The rows correspond to the segments.
@@ -210,9 +209,9 @@ if __name__ == "__main__":
 
     x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
-    tau = jnp.zeros_like(q0)  # torques
+    phi = jnp.zeros((2, ))  # motor actuation angles
 
-    ode_fn = ode_factory(dynamical_matrices_fn, params, tau)
+    ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params, phi)
     term = ODETerm(ode_fn)
 
     sol = diffeqsolve(

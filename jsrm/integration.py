@@ -25,7 +25,7 @@ def ode_factory(
             G is the gravity vector of shape (n_q, ),
             K is the stiffness vector of shape (n_q, ),
             D is the damping matrix of shape (n_q, n_q),
-            and A is the actuation matrix of shape (n_q, n_tau).
+            A is the actuation matrix of shape (n_q, n_tau).
         params: Dictionary with robot parameters
         tau: torque vector of shape (n_tau, )
     Returns:
