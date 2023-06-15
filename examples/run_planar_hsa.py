@@ -20,7 +20,7 @@ num_segments = 1
 sym_exp_filepath = (
     Path(__file__).parent.parent
     / "symbolic_expressions"
-    / "planar_hsa_ns-1.dill"
+    / "planar_hsa_ns-1_nrs-2.dill"
 )
 
 # set parameters

@@ -56,7 +56,7 @@ def factory(
         params_for_lambdify = []
         for params_key, params_vals in sorted(params.items()):
             if params_key in params_syms.keys():
-                for param in params_vals:
+                for param in params_vals.flatten():
                     params_for_lambdify.append(param)
         return params_for_lambdify
 
