@@ -141,9 +141,7 @@ def symbolically_derive_planar_hsa_model(
             # compute the second area moment of inertia of the rod
             Ir[i, j] = sp.pi / 4 * (rout[i, j] ** 4 - rin[i, j] ** 4)
 
-            pr = p.subs(
-                s, l[-1]
-            ) + R @ sp.Matrix([roff[i, j], 0.0])
+            pr = p + R @ sp.Matrix([roff[i, j], 0.0])
             chir = sp.zeros(3, 1)
             chir[:2, 0] = pr  # the x and y position
             chir[2, 0] = th  # the orientation angle theta
