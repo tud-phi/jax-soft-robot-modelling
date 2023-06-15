@@ -26,15 +26,16 @@ sym_exp_filepath = (
 # set parameters
 rods_per_segment = 2
 # Damping coefficient
-zeta = 1e-5 * jnp.repeat(
+zeta = 1e-4 * jnp.repeat(
     jnp.repeat(
-        jnp.diag(jnp.array([1e0, 1e3, 1e3])).reshape((1, 1, 3, 3)),
+        jnp.array([1e0, 1e2, 1e2]).reshape((1, 1, 3)),
         axis=1, repeats=rods_per_segment
     ),
     axis=0, repeats=num_segments
 )
 params = {
-    "l": jnp.array([1e-1, 1e-1]),  # length of each rod [m]
+    "th0": jnp.array([0.0]),  # initial orientation angle [rad]
+    "l": jnp.array([1e-1]),  # length of each rod [m]
     # outside radius of each rod [m]. The rows correspond to the segments.
     "rout": 25.4e-3 / 2 * jnp.ones((num_segments, rods_per_segment)),
     # inside radius of each rod [m]. The rows correspond to the segments.
@@ -140,8 +141,6 @@ if __name__ == "__main__":
     cv2.waitKey()
     cv2.destroyWindow(window_name)
 
-    exit()
-
     x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
     tau = jnp.zeros_like(q0)  # torques
@@ -168,7 +167,7 @@ if __name__ == "__main__":
     for time_idx, t in enumerate(video_ts):
         x = sol.ys[time_idx]
         img = draw_robot(
-            batched_forward_kinematics,
+            batched_forward_kinematics_virtual_backbone_fn,
             params,
             x[: (x.shape[0] // 2)],
             video_width,

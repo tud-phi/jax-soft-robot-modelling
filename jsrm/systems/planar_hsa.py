@@ -6,7 +6,7 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
 
-from .utils import compute_strain_basis
+from .utils import compute_strain_basis, compute_planar_stiffness_matrix
 from jsrm.math_utils import blk_diag
 
 
@@ -61,7 +61,7 @@ def factory(
         params_for_lambdify = []
         for params_key, params_vals in sorted(params.items()):
             if params_key in params_syms.keys():
-                for param in params_vals:
+                for param in params_vals.flatten():
                     params_for_lambdify.append(param)
         return params_for_lambdify
 
@@ -142,6 +142,10 @@ def factory(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax"
     )
 
+    compute_stiffness_matrix_for_all_rods_fn = vmap(
+        vmap(compute_planar_stiffness_matrix, in_axes=(0, 0, 0, 0), out_axes=0), in_axes=(0, 0, 0, 0), out_axes=0
+    )
+
     @jit
     def apply_eps_to_bend_strains(xi: Array, _eps: float) -> Array:
         """
@@ -196,12 +200,6 @@ def factory(
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
         params_for_lambdify = select_params_for_lambdify(params)
 
-        debug.print("params for lambdify: {params}", params=params_for_lambdify)
-        debug.print("xi epsed: {xi_epsed}", xi_epsed=xi_epsed)
-        debug.print("s segment: {s_segment}", s_segment=s_segment)
-        print("params for lambdify: ", params_for_lambdify)
-        print("xi epsed: ", xi_epsed)
-        print("s segment: ", s_segment)
         chi = lax.switch(
             segment_idx, chiv_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
         ).squeeze()
@@ -284,22 +282,22 @@ def factory(
 
 
     @jit
-    def beta_fn(params: Dict[str, Array], q: Array) -> Array:
+    def beta_fn(params: Dict[str, Array], vxi: Array) -> Array:
         """
         Map the generalized coordinates to the strains in the physical rods
         Args:
             params: Dictionary of robot parameters
-            q: generalized coordinates of shape (n_q, )
+            vxi: strains of the virtual backbone of shape (n_xi, )
         Returns:
-            pxi: strains in the physical rods of shape (num_segments, num_rods_per_segment, n_xi)
+            pxi: strains in the physical rods of shape (num_segments, num_rods_per_segment, 3)
         """
         num_segments, num_rods_per_segment = params["rout"].shape[0], params["rout"].shape[1]
 
         # strains of the virtual rod
-        vxi = (B_xi @ q).reshape((num_segments, 1, -1))
+        vxi = vxi.reshape((num_segments, 1, -1))
 
         pxi = jnp.repeat(vxi, num_rods_per_segment, axis=1)
-        psigma_a = pxi[:, :, 2] + params["rout"] * jnp.repeat(vxi, num_rods_per_segment, axis=1)[..., 0]
+        psigma_a = pxi[:, :, 2] + params["roff"] * jnp.repeat(vxi, num_rods_per_segment, axis=1)[..., 0]
         pxi = pxi.at[:, :, 2].set(psigma_a)
 
         return pxi
@@ -323,12 +321,15 @@ def factory(
             alpha: actuation matrix of shape (n_q, n_tau)
         """
         # map the configuration to the strains
-        # TODO: fix this for multiple rod case
         xi = xi_eq + B_xi @ q
         xi_d = B_xi @ q_d
 
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains(xi, 1e4 * eps)
+
+        # the strains of the physical rods as array of shape (num_segments, num_rods_per_segment, 3)
+        pxi = beta_fn(params, xi_epsed)
+        pxi_eq = beta_fn(params, xi_eq)  # equilibrium strains of the physical rods
 
         # number of segments
         num_segments = params["rout"].shape[0]
@@ -341,23 +342,20 @@ def factory(
 
         # cross-sectional area and second moment of area for bending
         A = jnp.pi * (params["rout"] ** 2 - params["rin"] ** 2)
-        I_b = jnp.pi / 4 * (params["rout"] ** 4 - params["rin"] ** 4)
+        Ib = jnp.pi / 4 * (params["rout"] ** 4 - params["rin"] ** 4)
 
         # volumetric mass density
-        rho = params["rho"]
         # nominal elastic and shear modulus
         Ehat, Ghat = params["E"], params["G"]
         # scale factors for the elastic and shear modulus
         C_E, C_G = params["C_E"], params["C_G"]
-        # compute the elastic and shear modulus
-        E = Ehat + C_E * h * (xi_epsed[0::3] - xi_eq[0::3])  # TODO fix this for current convention
-        G = Ghat + C_G * h * (xi_epsed[1::3] - xi_eq[1::3])
+        # compute the elastic and shear modulus for each rod
+        # will be arrays of shape (num_segments, num_rods_per_segment)
+        # E = Ehat + C_E * h * (pxi[..., ] - pxi_eq)  # TODO fix this for current convention
+        # G = Ghat + C_G * h * (xi_epsed[1::3] - xi_eq[1::3])
 
         # stiffness matrix of shape (num_segments, 3)
-        S = jnp.zeros((num_segments, num_rods_per_segment, 3))
-        S = S.at[..., 0].set(E * I_b)  # bending stiffness
-        S = S.at[..., 1].set(4/3 * G * A)  # shear stiffness
-        S = S.at[..., 2].set(E * A)  # axial stiffness
+        Shat = compute_stiffness_matrix_for_all_rods_fn(A, Ib, Ehat, Ghat)
 
         # Jacobian of the strain of the physical HSA rods with respect to the configuration variables
         J_beta = jnp.zeros((num_segments, num_rods_per_segment, 3, 3))
@@ -367,16 +365,15 @@ def factory(
         J_beta = J_beta.at[..., 2, 0].set(roff)
 
         # we define the elastic matrix of the physical rods of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
-        pxi = beta_fn(params, q)
         vK = vmap(  # vmap over the segments
             vmap(  # vmap over the rods of each segment
-                lambda _J_beta, _S, _pxi: _J_beta @ jnp.diag(_S) @ (_pxi - xi_eq),
-                in_axes=(0, 0, 0),
-                out_axes=(0, ),
+                lambda _J_beta, _S, _pxi, _pxi_eq: _J_beta @ _S @ (_pxi - _pxi_eq),
+                in_axes=(0, 0, 0, 0),
+                out_axes=0,
             ),
-            in_axes=(0, 0, 0),
-            out_axes=(0, ),
-        )(J_beta, S, pxi)  # shape (num_segments, num_rods_per_segment, 3)
+            in_axes=(0, 0, 0, 0),
+            out_axes=0,
+        )(J_beta, Shat, pxi, pxi_eq)  # shape (num_segments, num_rods_per_segment, 3)
         # sum the elastic forces over all rods of each segment
         K = jnp.sum(vK, axis=1).flatten()  # shape (n_xi, )
 
@@ -384,12 +381,12 @@ def factory(
         zeta = params.get("zeta", jnp.zeros((num_segments, num_rods_per_segment, 3)))
         vD = vmap(  # vmap over the segments
             vmap(  # vmap over the rods of each segment
-                lambda _J_beta, _zeta: _J_beta @ jnp.diag(zeta),
+                lambda _J_beta, _zeta: _J_beta @ jnp.diag(_zeta),
                 in_axes=(0, 0),
-                out_axes=(0,),
+                out_axes=0,
             ),
             in_axes=(0, 0),
-            out_axes=(0,),
+            out_axes=0,
         )(J_beta, zeta)  # shape (num_segments, num_rods_per_segment, 3, 3)
         # dissipative matrix
         D = blk_diag(jnp.sum(vD, axis=1))  # shape (n_xi, n_xi)
