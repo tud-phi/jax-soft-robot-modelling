@@ -19,3 +19,21 @@ If you want to run the examples, you will also need to install the following dep
 ```bash
 pip install ".[examples]"
 ```
+
+## Usage
+Always, first source all necessary environment variables when opening a new terminal:
+
+```bash
+source 01-configure-env-vars.sh
+```
+
+Then, we can symbolically derive the pendulum kinematics and dynamics
+
+```bash
+    python examples/derive_pendulum.py
+```
+
+Finally, we can simulate the pendulum
+```bash
+    python examples/simulate_pendulum.py
+```
