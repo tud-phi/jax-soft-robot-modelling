@@ -135,7 +135,6 @@ def symbolically_derive_planar_hsa_model(
         Jv = Jvp.col_join(Jvo)
         Jv_sms.append(Jv)
 
-        chir_sms.append([])
         for j in range(num_rods_per_segment):
             # compute the cross-sectional area of the rod
             Ar[i, j] = sp.pi * (rout[i, j] ** 2 - rin[i, j] ** 2)
@@ -148,11 +147,12 @@ def symbolically_derive_planar_hsa_model(
             chir = sp.zeros(3, 1)
             chir[:2, 0] = pr  # the x and y position
             chir[2, 0] = th  # the orientation angle theta
-            chir_sms[-1].append(chir)
+            chir_sms.append(chir)
 
             # Jacobian of rod poses with respect to strains of virtual center rod
             Jr = chiv.jacobian(xi)
             Jrp = pr.jacobian(xi)  # positional Jacobian
+            Jr_sms.append(Jr)
 
             # integrate mass matrix of each rod
             dBr_ds = sp.simplify(
@@ -238,10 +238,13 @@ def symbolically_derive_planar_hsa_model(
         },
         "exps": {
             "chiv_sms": chiv_sms,  # list of pose expressions (for the virtual rod along the centerline of each segment)
-            "chir_sms": chir_sms,  # list of lists of pose expressions (for the centerline of each rod)
+            # list of pose expressions (for the centerline of each rod).
+            # Total length is n_segments * num_rods_per_segment
+            "chir_sms": chir_sms,
             "chip_sms": chip_sms,  # expression for the pose of the CoG of the platform of shape (3, )
             "chiee": chiee,  # expression for the pose of the end-effector of shape (3, )
-            "Jv_sms": Jv_sms,
+            "Jv_sms": Jv_sms,  # list of the Jacobians of the virtual backbone of each segment
+            "Jr_sms": Jr_sms,  # list of the Jacobians of the centerline of each rod
             "Jp_sms": Jp_sms,  # list of the platform Jacobians
             "Jee": chiee.jacobian(xi),  # Jacobian of the end-effector
             "B": B,

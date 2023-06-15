@@ -1,7 +1,4 @@
 import dill
-from jax import config as jax_config
-
-jax_config.update("jax_enable_x64", True)  # double precision
 import jax
 from jax import Array, debug, jit, lax, vmap
 from jax import numpy as jnp
@@ -21,6 +18,8 @@ def factory(
 ) -> Tuple[
     Array,
     Callable[[Dict[str, Array], Array, Array], Array],
+    Callable[[Dict[str, Array], Array, Array, Array], Array],
+    Callable[[Dict[str, Array], Array, Array], Array],
     Callable[
         [Dict[str, Array], Array, Array],
         Tuple[Array, Array, Array, Array, Array, Array],
@@ -36,7 +35,12 @@ def factory(
         eps: small number to avoid division by zero
     Returns:
         B_xi: strain basis matrix of shape (3 * num_segments, n_q)
-        forward_kinematics_fn: function that returns the p vector of shape (3, n_q) with the positions
+        forward_kinematics_virtual_backbone_fn: function that returns the chi vector of shape (3, n_q) with the
+            positions and orientations of the virtual backbone
+        forward_kinematics_rod_fn: function that returns the chi vector of shape (3, n_q) with the
+            positions and orientations of the rod
+        forward_kinematics_platform_fn: function that returns the chi vector of shape (3, n_q) with the positions
+            and orientations of the platform
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and alpha matrices
     """
     # load saved symbolic data
@@ -61,15 +65,13 @@ def factory(
                     params_for_lambdify.append(param)
         return params_for_lambdify
 
-    # symbols of state variables
-    state_syms = sym_exps["state_syms"]
-    # symbolic expressions
-    exps = sym_exps["exps"]
-
     # concatenate the robot params symbols
     params_syms_cat = []
     for params_key, params_sym in sorted(params_syms.items()):
-        params_syms_cat += params_sym
+        if type(params_sym) in [list, tuple]:
+            params_syms_cat += params_sym
+        else:
+            params_syms_cat.append(params_sym)
 
     # number of degrees of freedom
     n_xi = len(sym_exps["state_syms"]["xi"])
@@ -95,17 +97,40 @@ def factory(
     state_syms_cat = sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["xi_d"]
 
     # lambdify symbolic expressions
-    chi_lambda_sms = []
+    chiv_lambda_sms = []
     # iterate through symbolic expressions for each segment
-    for chi_exp in sym_exps["exps"]["chi_sms"]:
-        chi_lambda = sp.lambdify(
+    for chiv_exp in sym_exps["exps"]["chiv_sms"]:
+        chiv_lambda = sp.lambdify(
             params_syms_cat
             + sym_exps["state_syms"]["xi"]
             + [sym_exps["state_syms"]["s"]],
-            chi_exp,
+            chiv_exp,
             "jax",
         )
-        chi_lambda_sms.append(chi_lambda)
+        chiv_lambda_sms.append(chiv_lambda)
+
+    chir_lambda_sms = []
+    # iterate through symbolic expressions for each segment
+    for chir_exp in sym_exps["exps"]["chir_sms"]:
+        chir_lambda = sp.lambdify(
+            params_syms_cat
+            + sym_exps["state_syms"]["xi"]
+            + [sym_exps["state_syms"]["s"]],
+            chir_exp,
+            "jax",
+        )
+        chir_lambda_sms.append(chir_lambda)
+
+    chip_lambda_sms = []
+    # iterate through symbolic expressions for each segment
+    for chip_exp in sym_exps["exps"]["chip_sms"]:
+        chip_lambda = sp.lambdify(
+            params_syms_cat
+            + sym_exps["state_syms"]["xi"],
+            chip_exp,
+            "jax",
+        )
+        chip_lambda_sms.append(chip_lambda)
 
     B_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["B"], "jax"
@@ -137,9 +162,9 @@ def factory(
         return xi_epsed
 
     @jit
-    def forward_kinematics_fn(params: Dict[str, Array], q: Array, s: Array) -> Array:
+    def forward_kinematics_virtual_backbone_fn(params: Dict[str, Array], q: Array, s: Array) -> Array:
         """
-        Evaluate the forward kinematics the tip of the links
+        Evaluate the forward kinematics the virtual backbone
         Args:
             params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
@@ -171,11 +196,92 @@ def factory(
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
         params_for_lambdify = select_params_for_lambdify(params)
 
+        debug.print("params for lambdify: {params}", params=params_for_lambdify)
+        debug.print("xi epsed: {xi_epsed}", xi_epsed=xi_epsed)
+        debug.print("s segment: {s_segment}", s_segment=s_segment)
+        print("params for lambdify: ", params_for_lambdify)
+        print("xi epsed: ", xi_epsed)
+        print("s segment: ", s_segment)
         chi = lax.switch(
-            segment_idx, chi_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
+            segment_idx, chiv_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
         ).squeeze()
 
         return chi
+
+    @jit
+    def forward_kinematics_rod_fn(params: Dict[str, Array], q: Array, s: Array, rod_idx: Array) -> Array:
+        """
+        Evaluate the forward kinematics of the physical rods
+        Args:
+            params: Dictionary of robot parameters
+            q: generalized coordinates of shape (n_q, )
+            s: point coordinate along the rod in the interval [0, L].
+            rod_idx: index of the rod. If there are two rods per segment, then rod_idx can be 0 or 1.
+        Returns:
+            chir: pose of the rod centerline point in Cartesian-space with shape (3, )
+                Consists of [p_x, p_y, theta]
+                where p_x is the x-position, p_y is the y-position,
+                and theta is the planar orientation with respect to the x-axis
+        """
+        num_segments, num_rods_per_segment = params["rout"].shape[0], params["rout"].shape[1]
+
+        # map the configuration to the strains
+        xi = xi_eq + B_xi @ q
+
+        # add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+
+        # cumsum of the segment lengths
+        l_cum = jnp.cumsum(params["l"])
+        # add zero to the beginning of the array
+        l_cum_padded = jnp.concatenate([jnp.array([0.0]), l_cum], axis=0)
+        # determine in which segment the point is located
+        # use argmax to find the last index where the condition is true
+        segment_idx = (
+                l_cum.shape[0] - 1 - jnp.argmax((s >= l_cum_padded[:-1])[::-1]).astype(int)
+        )
+        # point coordinate along the segment in the interval [0, l_segment]
+        s_segment = s - l_cum_padded[segment_idx]
+
+        # convert the dictionary of parameters to a list, which we can pass to the lambda function
+        params_for_lambdify = select_params_for_lambdify(params)
+
+        chir_lambda_sms_idx = segment_idx*num_rods_per_segment + rod_idx
+        chir = lax.switch(
+            chir_lambda_sms_idx, chiv_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
+        ).squeeze()
+
+        return chir
+
+    @jit
+    def forward_kinematics_platform_fn(params: Dict[str, Array], q: Array, segment_idx: Array) -> Array:
+        """
+        Evaluate the forward kinematics the platform
+        Args:
+            params: Dictionary of robot parameters
+            q: generalized coordinates of shape (n_q, )
+            segment_idx: index of the segment
+        Returns:
+            chip: pose of the CoG of the platform in Cartesian-space with shape (3, )
+                Consists of [p_x, p_y, theta]
+                where p_x is the x-position, p_y is the y-position,
+                and theta is the planar orientation with respect to the x-axis
+        """
+        # map the configuration to the strains
+        xi = xi_eq + B_xi @ q
+
+        # add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+
+        # convert the dictionary of parameters to a list, which we can pass to the lambda function
+        params_for_lambdify = select_params_for_lambdify(params)
+
+        chip = lax.switch(
+            segment_idx, chip_lambda_sms, *params_for_lambdify, *xi_epsed
+        ).squeeze()
+
+        return chip
+
 
     @jit
     def beta_fn(params: Dict[str, Array], q: Array) -> Array:
@@ -304,4 +410,8 @@ def factory(
 
         return B, C, G, K, D, alpha
 
-    return B_xi, forward_kinematics_fn, dynamical_matrices_fn
+    return (
+        B_xi,
+        forward_kinematics_virtual_backbone_fn, forward_kinematics_rod_fn, forward_kinematics_platform_fn,
+        dynamical_matrices_fn
+    )

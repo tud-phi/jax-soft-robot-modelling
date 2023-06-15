@@ -12,7 +12,7 @@ from typing import Callable, Dict
 
 from jsrm.integration import ode_factory
 from jsrm.systems import euler_lagrangian
-from jsrm.systems import planar_pcs
+from jsrm.systems import planar_hsa
 
 num_segments = 1
 
@@ -24,12 +24,16 @@ sym_exp_filepath = (
 )
 
 # set parameters
-rho = 1.05e3 * jnp.ones((num_segments,))  # Volumetric density [kg/m^3]
 rods_per_segment = 2
 # Damping coefficient
-zeta = 1e-5 * jnp.repeat(jnp.diag(jnp.array([1e0, 1e3, 1e3])).reshape((1, 1, 3)), axis=1, repeats=rods_per_segment)
+zeta = 1e-5 * jnp.repeat(
+    jnp.repeat(
+        jnp.diag(jnp.array([1e0, 1e3, 1e3])).reshape((1, 1, 3, 3)),
+        axis=1, repeats=rods_per_segment
+    ),
+    axis=0, repeats=num_segments
+)
 params = {
-    "rho": rho,
     "l": jnp.array([1e-1, 1e-1]),  # length of each rod [m]
     # outside radius of each rod [m]. The rows correspond to the segments.
     "rout": 25.4e-3 / 2 * jnp.ones((num_segments, rods_per_segment)),
@@ -39,6 +43,9 @@ params = {
     "h": jnp.ones((num_segments, rods_per_segment)),
     # offset [m] of each rod from the centerline. The rows correspond to the segments.
     "roff": jnp.array([[-24e-3, 24e-3]]),
+    "pcudim": jnp.array([95e-3, 3e-3, 95e-3]),  # width, height, depth of the platform [m]
+    "rhor": 1.05e3 * jnp.ones((num_segments, rods_per_segment)),  # Volumetric density of rods [kg/m^3],
+    "rhop": 0.7e3 * jnp.ones((num_segments, )),  # Volumetric density of platform [kg/m^3],
     "g": jnp.array([0.0, -9.81]),
     "E": 1e4 * jnp.ones((num_segments, rods_per_segment)),  # Elastic modulus of each rod [Pa]
     "G": 1e3 * jnp.ones((num_segments, rods_per_segment)),  # Shear modulus of each rod [Pa]
@@ -46,14 +53,14 @@ params = {
     "C_E": 0e0 * jnp.ones((num_segments, rods_per_segment)),
     # Constant to scale the Shear modulus linearly with the twist strain [Pa/(rad/m)]
     "C_G": 0e0 * jnp.ones((num_segments, rods_per_segment)),
-    "zeta": zeta,  # damping coefficient
+    "zeta": zeta,  # damping coefficient of shape (num_segments, rods_per_segment, 3, 3)
 }
 
 # activate all strains (i.e. bending, shear, and axial)
 strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
 
 # define initial configuration
-q0 = jnp.array([jnp.pi, 0.0, 0.0, -2 * jnp.pi, 0.0, 0.0])
+q0 = jnp.array([0.0, 0.0, 0.0])
 
 # set simulation parameters
 dt = 1e-4  # time step
@@ -63,7 +70,7 @@ video_ts = ts[::skip_step]  # time steps for video
 
 # video settings
 video_width, video_height = 700, 700  # img height and width
-video_path = Path(__file__).parent / "videos" / "planar_pcs_two_segments.mp4"
+video_path = Path(__file__).parent / "videos" / "planar_hsa.mp4"
 
 
 def draw_robot(
@@ -103,28 +110,37 @@ def draw_robot(
 
 
 if __name__ == "__main__":
-    strain_basis, forward_kinematics_fn, dynamical_matrices_fn = planar_pcs.factory(
+    (
+        strain_basis,
+        forward_kinematics_virtual_backbone_fn, forward_kinematics_rod_fn, forward_kinematics_platform_fn,
+        dynamical_matrices_fn
+    ) = planar_hsa.factory(
         sym_exp_filepath, strain_selector
     )
-    batched_forward_kinematics = vmap(
-        forward_kinematics_fn, in_axes=(None, None, 0), out_axes=-1
+    batched_forward_kinematics_virtual_backbone_fn = vmap(
+        forward_kinematics_virtual_backbone_fn, in_axes=(None, None, 0), out_axes=-1
     )
 
-    # import matplotlib.pyplot as plt
-    # plt.plot(chi_ps[0, :], chi_ps[1, :])
-    # plt.axis("equal")
-    # plt.grid(True)
-    # plt.xlabel("x [m]")
-    # plt.ylabel("y [m]")
-    # plt.show()
+    s_ps = jnp.linspace(0, jnp.sum(params["l"]), 100)
+    chi_ps = batched_forward_kinematics_virtual_backbone_fn(params, q0, s_ps)
+
+    import matplotlib.pyplot as plt
+    plt.plot(chi_ps[0, :], chi_ps[1, :])
+    plt.axis("equal")
+    plt.grid(True)
+    plt.xlabel("x [m]")
+    plt.ylabel("y [m]")
+    plt.show()
 
     # Displaying the image
-    # window_name = f"Planar PCS with {num_segments} segments"
-    # img = draw_robot(batched_forward_kinematics, params, q0, video_width, video_height)
-    # cv2.namedWindow(window_name)
-    # cv2.imshow(window_name, img)
-    # cv2.waitKey()
-    # cv2.destroyWindow(window_name)
+    window_name = f"Planar HSA with {num_segments} segments"
+    img = draw_robot(batched_forward_kinematics_virtual_backbone_fn, params, q0, video_width, video_height)
+    cv2.namedWindow(window_name)
+    cv2.imshow(window_name, img)
+    cv2.waitKey()
+    cv2.destroyWindow(window_name)
+
+    exit()
 
     x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
