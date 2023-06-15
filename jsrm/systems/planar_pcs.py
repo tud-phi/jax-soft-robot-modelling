@@ -9,7 +9,8 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
 
-from .utils import compute_strain_basis
+from .utils import compute_strain_basis, compute_planar_stiffness_matrix
+from jsrm.math_utils import blk_diag
 
 
 def factory(
@@ -60,11 +61,6 @@ def factory(
                     params_for_lambdify.append(param)
         return params_for_lambdify
 
-    # symbols of state variables
-    state_syms = sym_exps["state_syms"]
-    # symbolic expressions
-    exps = sym_exps["exps"]
-
     # concatenate the robot params symbols
     params_syms_cat = []
     for params_key, params_sym in sorted(params_syms.items()):
@@ -114,6 +110,10 @@ def factory(
     )
     G_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax"
+    )
+
+    compute_stiffness_matrix_for_all_segments_fn = vmap(
+        compute_planar_stiffness_matrix, in_axes=(0, 0, 0, 0), out_axes=0
     )
 
     @jit
@@ -206,21 +206,16 @@ def factory(
 
         # cross-sectional area and second moment of area
         A = jnp.pi * params["r"] ** 2
-        I = A**2 / (4 * jnp.pi)
+        Ib = A**2 / (4 * jnp.pi)
 
-        # volumetric mass density
-        rho = params["rho"]
         # elastic and shear modulus
         E, G = params["E"], params["G"]
 
-        # stiffness matrix of shape (num_segments, 3)
-        S = jnp.zeros((num_segments, 3))
-        S = S.at[:, 0].set(E * I)  # bending stiffness
-        S = S.at[:, 1].set(G * A)  # shear stiffness
-        S = S.at[:, 2].set(E * A)  # axial stiffness
+        # stiffness matrix of shape (num_segments, 3, 3)
+        S = compute_stiffness_matrix_for_all_segments_fn(A, Ib, E, G)
 
         # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
-        K = jnp.diag(S.flatten())
+        K = blk_diag(S)
 
         # dissipative matrix from the parameters
         D = params.get("D", jnp.zeros((n_xi, n_xi)))

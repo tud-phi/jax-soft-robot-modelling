@@ -28,8 +28,8 @@ rho = 1070 * jnp.ones((num_segments,))  # Volumetric density of Dragon Skin 20 [
 D = 1e-5 * jnp.diag(jnp.array([1e0, 1e3, 1e3, 1e0, 1e3, 1e3]))  # Damping coefficient
 params = {
     "rho": rho,
-    "l": jnp.array([1e-1, 1e-1]),
-    "r": jnp.array([2e-2, 2e-2]),
+    "l": 1e-1 * jnp.ones((num_segments,)),
+    "r": 2e-2 * jnp.ones((num_segments,)),
     "g": jnp.array([0.0, -9.81]),
     "E": 1e4 * jnp.ones((num_segments,)),  # Elastic modulus [Pa]
     "G": 1e3 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
