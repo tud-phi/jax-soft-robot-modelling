@@ -246,7 +246,7 @@ def factory(
 
         chir_lambda_sms_idx = segment_idx*num_rods_per_segment + rod_idx
         chir = lax.switch(
-            chir_lambda_sms_idx, chiv_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
+            chir_lambda_sms_idx, chir_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
         ).squeeze()
 
         return chir
