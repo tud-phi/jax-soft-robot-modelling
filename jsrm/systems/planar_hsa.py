@@ -367,7 +367,7 @@ def factory(
         # we define the elastic matrix of the physical rods of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
         vK = vmap(  # vmap over the segments
             vmap(  # vmap over the rods of each segment
-                lambda _J_beta, _S, _pxi, _pxi_eq: _J_beta @ _S @ (_pxi - _pxi_eq),
+                lambda _J_beta, _S, _pxi, _pxi_eq: _J_beta.T @ _S @ (_pxi - _pxi_eq),
                 in_axes=(0, 0, 0, 0),
                 out_axes=0,
             ),
@@ -381,7 +381,7 @@ def factory(
         zeta = params.get("zeta", jnp.zeros((num_segments, num_rods_per_segment, 3)))
         vD = vmap(  # vmap over the segments
             vmap(  # vmap over the rods of each segment
-                lambda _J_beta, _zeta: _J_beta @ jnp.diag(_zeta),
+                lambda _J_beta, _zeta: _J_beta.T @ jnp.diag(_zeta) @ _J_beta,
                 in_axes=(0, 0),
                 out_axes=0,
             ),
