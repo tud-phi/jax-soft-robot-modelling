@@ -61,7 +61,7 @@ params = {
 strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
 
 # define initial configuration
-q0 = jnp.array([0.0, 0.0, 0.0])
+q0 = jnp.array([jnp.pi, 0.0, 0.0])
 
 # set simulation parameters
 dt = 1e-4  # time step
@@ -75,7 +75,9 @@ video_path = Path(__file__).parent / "videos" / "planar_hsa.mp4"
 
 
 def draw_robot(
-    batched_forward_kinematics_fn: Callable,
+    batched_forward_kinematics_virtual_backbone_fn: Callable,
+    forward_kinematics_rod_fn: Callable,
+    forward_kinematics_platform_fn: Callable,
     params: Dict[str, Array],
     q: Array,
     width: int,
@@ -85,27 +87,60 @@ def draw_robot(
     # plotting in OpenCV
     h, w = height, width  # img height and width
     ppm = h / (2.0 * jnp.sum(params["l"]))  # pixel per meter
-    base_color = (0, 0, 0)  # black robot_color in BGR
-    robot_color = (255, 0, 0)  # black robot_color in BGR
+    base_color = (0, 0, 0)  # black base color in BGR
+    backbone_color = (255, 0, 0)  # blue robot color in BGR
+    rod_color = (0, 255, 0)  # green rod color in BGR
+    platform_color = (0, 0, 255)  # red platform color in BGR
 
     # we use for plotting N points along the length of the robot
     s_ps = jnp.linspace(0, jnp.sum(params["l"]), num_points)
 
     # poses along the robot of shape (3, N)
-    chi_ps = batched_forward_kinematics_fn(params, q, s_ps)
+    chiv_ps = batched_forward_kinematics_virtual_backbone_fn(params, q, s_ps)  # poses of virtual backbone
+    chiL_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 0)  # poses of left rod
+    chiR_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 1)  # poses of left rod
+    # poses of the platforms
+    chip_ps = forward_kinematics_platform_fn(params, q, jnp.arange(0, num_segments))
 
     img = 255 * onp.ones((w, h, 3), dtype=jnp.uint8)  # initialize background to white
-    curve_origin = onp.array(
-        [w // 2, 0.1 * h], dtype=onp.int32
+    uv_robot_origin = onp.array(
+        [w // 2, 0.1 * h], dtype=jnp.int32
     )  # in x-y pixel coordinates
+
+    def chi2u(chi: Array) -> Array:
+        """
+        Map Cartesian coordinates to pixel coordinates.
+        Args:
+            chi: Cartesian poses of shape (3)
+
+        Returns:
+            uv: pixel coordinates of shape (2)
+        """
+        uv = jnp.array((uv_robot_origin + chi[:2] * ppm), dtype=jnp.int32)
+        # invert the v pixel coordinate
+        uv = uv.at[1].set(h - uv[1])
+        return uv
+
+    batched_chi2u = vmap(chi2u, in_axes=-1, out_axes=0)
+
     # draw base
-    cv2.rectangle(img, (0, h - curve_origin[1]), (w, h), color=base_color, thickness=-1)
-    # transform robot poses to pixel coordinates
-    # should be of shape (N, 2)
-    curve = onp.array((curve_origin + chi_ps[:2, :].T * ppm), dtype=onp.int32)
-    # invert the v pixel coordinate
-    curve[:, 1] = h - curve[:, 1]
-    cv2.polylines(img, [curve], isClosed=False, color=robot_color, thickness=10)
+    cv2.rectangle(img, (0, h - uv_robot_origin[1]), (w, h), color=base_color, thickness=-1)
+
+    # draw the virtual backbone
+    curve_virtual_backbone = onp.array(batched_chi2u(chiv_ps))
+    cv2.polylines(img, [curve_virtual_backbone], isClosed=False, color=backbone_color, thickness=5)
+
+    # draw the rods
+    curve_rod_left = onp.array(batched_chi2u(chiL_ps))
+    cv2.polylines(img, [curve_rod_left], isClosed=False, color=rod_color, thickness=10)
+    curve_rod_right = onp.array(batched_chi2u(chiR_ps))
+    cv2.polylines(img, [curve_rod_right], isClosed=False, color=rod_color, thickness=10)
+
+    # draw the platform
+    for j in chip_ps.shape[0]:
+        # iterate over the platforms
+        pass
+        # cv2.rectangle(img, chi2u(), (w, h), color=platform_color, thickness=-1)
 
     return img
 
@@ -121,21 +156,32 @@ if __name__ == "__main__":
     batched_forward_kinematics_virtual_backbone_fn = vmap(
         forward_kinematics_virtual_backbone_fn, in_axes=(None, None, 0), out_axes=-1
     )
+    batched_forward_kinematics_rod_fn = vmap(
+        forward_kinematics_rod_fn, in_axes=(None, None, 0, None), out_axes=-1
+    )
+    batched_forward_kinematics_platform_fn = vmap(
+        forward_kinematics_platform_fn, in_axes=(None, None, 0), out_axes=0
+    )
 
     s_ps = jnp.linspace(0, jnp.sum(params["l"]), 100)
     chi_ps = batched_forward_kinematics_virtual_backbone_fn(params, q0, s_ps)
 
-    import matplotlib.pyplot as plt
-    plt.plot(chi_ps[0, :], chi_ps[1, :])
-    plt.axis("equal")
-    plt.grid(True)
-    plt.xlabel("x [m]")
-    plt.ylabel("y [m]")
-    plt.show()
+    # import matplotlib.pyplot as plt
+    # plt.plot(chi_ps[0, :], chi_ps[1, :])
+    # plt.axis("equal")
+    # plt.grid(True)
+    # plt.xlabel("x [m]")
+    # plt.ylabel("y [m]")
+    # plt.show()
 
     # Displaying the image
     window_name = f"Planar HSA with {num_segments} segments"
-    img = draw_robot(batched_forward_kinematics_virtual_backbone_fn, params, q0, video_width, video_height)
+    img = draw_robot(
+        batched_forward_kinematics_virtual_backbone_fn,
+        batched_forward_kinematics_rod_fn,
+        batched_forward_kinematics_platform_fn,
+        params, q0, video_width, video_height
+    )
     cv2.namedWindow(window_name)
     cv2.imshow(window_name, img)
     cv2.waitKey()
@@ -168,6 +214,8 @@ if __name__ == "__main__":
         x = sol.ys[time_idx]
         img = draw_robot(
             batched_forward_kinematics_virtual_backbone_fn,
+            batched_forward_kinematics_rod_fn,
+            batched_forward_kinematics_platform_fn,
             params,
             x[: (x.shape[0] // 2)],
             video_width,
