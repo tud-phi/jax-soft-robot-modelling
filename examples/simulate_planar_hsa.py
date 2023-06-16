@@ -210,6 +210,7 @@ if __name__ == "__main__":
     x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
     phi = jnp.zeros((2, ))  # motor actuation angles
+    phi = jnp.array([jnp.pi / 2, 0])
 
     ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params, phi)
     term = ODETerm(ode_fn)
