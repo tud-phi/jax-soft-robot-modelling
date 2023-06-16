@@ -21,9 +21,14 @@ def factory(
     Callable[[Dict[str, Array], Array, Array], Array],
     Callable[[Dict[str, Array], Array, Array, Array], Array],
     Callable[[Dict[str, Array], Array, Array], Array],
+    Callable[[Dict[str, Array], Array], Array],
     Callable[
         [Dict[str, Array], Array, Array],
         Tuple[Array, Array, Array, Array, Array, Array],
+    ],
+    Callable[
+        [Dict[str, Array], Array, Array, Array, Array],
+        Tuple[Array, Array, Array],
     ],
 ]:
     """
@@ -42,7 +47,10 @@ def factory(
             positions and orientations of the rod
         forward_kinematics_platform_fn: function that returns the chi vector of shape (3, n_q) with the positions
             and orientations of the platform
+        forward_kinematics_end_effector_fn: function that returns the pose of the end effector of shape (3, )
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and alpha matrices
+        operational_space_dynamical_matrices_fn: function that returns Lambda, nu, and JB_pinv describing
+            the dynamics in operational space
     """
     # load saved symbolic data
     sym_exps = dill.load(open(str(filepath), "rb"))
@@ -331,7 +339,7 @@ def factory(
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
         params_for_lambdify = select_params_for_lambdify(params)
         # evaluate the symbolic expression
-        chiee = chiee_lambda(**params_for_lambdify, *xi_epsed)
+        chiee = chiee_lambda(*params_for_lambdify, *xi_epsed)
 
         return chiee
 
@@ -539,12 +547,63 @@ def factory(
 
         return B, C, G, K, D, tau_q
 
+    def operational_space_dynamical_matrices_fn(
+            params: Dict[str, Array],
+            q: Array,
+            q_d: Array,
+            B: Array,
+            C: Array
+    ):
+        """
+        Compute the dynamics in operational space. We define the operational as the end-effector position.
+        Therefore, n_x = 2.
+        The implementation is based on Chapter 7.8 of "Modelling, Planning and Control of Robotics" by
+        Siciliano, Sciavicco, Villani, Oriolo.
+        Args:
+            params: dictionary of parameters
+            q: generalized coordinates of shape (n_q,)
+            q_d: generalized velocities of shape (n_q,)
+            B: inertia matrix in the generalized coordinates of shape (n_q, n_q)
+            C: coriolis matrix derived with Christoffer symbols in the generalized coordinates of shape (n_q, n_q)
+
+        Returns:
+            Lambda: inertia matrix in the operational space of shape (n_x, n_x)
+            nu: coriolis vector in the operational space of shape (n_x, )
+            JB_pinv: Dynamically-consistent pseudo-inverse of the Jacobian. Allows the mapping of torques
+                from the generalized coordinates to the operational space: f = JB_pinv.T @ tau_q
+                Shape (n_q, n_x)
+        """
+        # map the configuration to the strains
+        xi = xi_eq + B_xi @ q
+        xi_d = B_xi @ q_d
+        # add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+
+        # convert the dictionary of parameters to a list, which we can pass to the lambda function
+        params_for_lambdify = select_params_for_lambdify(params)
+
+        # end-effector Jacobian and its time-derivative
+        Jee = Jee_lambda(*params_for_lambdify, *xi_epsed)
+        Jee_d = Jee_d_lambda(*params_for_lambdify, *xi_epsed, *xi_d)
+
+        # inverse of the inertia matrix in the configuration space
+        B_inv = jnp.linalg.inv(B)
+
+        Lambda = jnp.linalg.inv(Jee @ B @ Jee.T)
+        nu = Lambda @ (Jee @ B_inv @ C - Jee_d) @ q_d
+
+        JB_pinv = B_inv @ Jee.T @ Lambda
+
+        return Lambda, nu, JB_pinv
+
     return (
         B_xi,
         forward_kinematics_virtual_backbone_fn,
         forward_kinematics_rod_fn,
         forward_kinematics_platform_fn,
+        forward_kinematics_end_effector_fn,
         dynamical_matrices_fn,
+        operational_space_dynamical_matrices_fn,
     )
 
 

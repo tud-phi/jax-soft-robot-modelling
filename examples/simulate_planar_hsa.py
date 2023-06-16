@@ -201,7 +201,9 @@ if __name__ == "__main__":
         forward_kinematics_virtual_backbone_fn,
         forward_kinematics_rod_fn,
         forward_kinematics_platform_fn,
+        forward_kinematics_end_effector_fn,
         dynamical_matrices_fn,
+        _
     ) = planar_hsa.factory(sym_exp_filepath, strain_selector)
     batched_forward_kinematics_virtual_backbone_fn = vmap(
         forward_kinematics_virtual_backbone_fn, in_axes=(None, None, 0), out_axes=-1
