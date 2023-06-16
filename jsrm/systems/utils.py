@@ -64,3 +64,21 @@ def compute_strain_basis(
         if strain_selector[i].item() is True:
             strain_basis = strain_basis.at[i, j].set(1)
     return strain_basis
+
+
+@jit
+def compute_planar_stiffness_matrix(A: Array, Ib: Array, E: Array, G: Array) -> Array:
+    """
+    Compute the stiffness matrix of the system.
+    Args:
+        A: cross-sectional area of shape ()
+        Ib: second moment of area of shape ()
+        E: Elastic modulus of shape ()
+        G: Shear modulus of shape ()
+
+    Returns:
+        S: stiffness matrix of shape (3, 3)
+    """
+    S = jnp.diag(jnp.stack([Ib * E, 4 / 3 * A * G, A * E], axis=0))
+
+    return S

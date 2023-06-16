@@ -26,6 +26,7 @@ def symbolically_derive_planar_pcs_model(
         3 * num_segments
     )  # we allow for 3 strains for each segment (bending, shear, elongation)
 
+    th0 = sp.Symbol("th0", real=True)  # initial angle of the robot
     rho_syms = list(
         sp.symbols(f"rho1:{num_segments + 1}", nonnegative=True)
     )  # volumetric mass density [kg/m^3]
@@ -68,7 +69,7 @@ def symbolically_derive_planar_pcs_model(
     s = sp.symbols("s", real=True, nonnegative=True)
 
     # initialize
-    th_prev = 0.0
+    th_prev = th0
     p_prev = sp.Matrix([0, 0])
     for i in range(num_segments):
         # bending strain
@@ -150,9 +151,10 @@ def symbolically_derive_planar_pcs_model(
     # dictionary with expressions
     sym_exps = {
         "params_syms": {
-            "rho": rho_syms,
+            "th0": th0,
             "l": l_syms,
             "r": r_syms,
+            "rho": rho_syms,
             "g": g_syms,
         },
         "state_syms": {

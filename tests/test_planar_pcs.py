@@ -14,14 +14,13 @@ from jsrm.utils import Tolerance
 
 def test_planar_pcs_one_segment():
     sym_exp_filepath = (
-        Path(__file__).parent.parent
-        / "symbolic_expressions"
-        / "planar_pcs_one_segment.dill"
+        Path(__file__).parent.parent / "symbolic_expressions" / "planar_pcs_ns-1.dill"
     )
     params = {
-        "rho": 1000 * jnp.ones((1,)),
+        "th0": jnp.array(0.0),  # initial orientation angle [rad]
         "l": jnp.array([1e-1]),
         "r": jnp.array([2e-2]),
+        "rho": 1000 * jnp.ones((1,)),
         "g": jnp.array([0.0, -9.81]),
         "E": 1e7 * jnp.ones((1,)),  # Elastic modulus [Pa]
         "G": 1e6 * jnp.ones((1,)),  # Shear modulus [Pa]

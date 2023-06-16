@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Callable, Dict
 
 from jsrm.integration import ode_factory
-from jsrm.systems import euler_lagrangian
 from jsrm.systems import planar_pcs
 
 num_segments = 2
@@ -20,16 +19,17 @@ num_segments = 2
 sym_exp_filepath = (
     Path(__file__).parent.parent
     / "symbolic_expressions"
-    / "planar_pcs_two_segments.dill"
+    / f"planar_pcs_ns-{num_segments}.dill"
 )
 
 # set parameters
 rho = 1070 * jnp.ones((num_segments,))  # Volumetric density of Dragon Skin 20 [kg/m^3]
 D = 1e-5 * jnp.diag(jnp.array([1e0, 1e3, 1e3, 1e0, 1e3, 1e3]))  # Damping coefficient
 params = {
+    "th0": jnp.array(0.0),  # initial orientation angle [rad]
+    "l": 1e-1 * jnp.ones((num_segments,)),
+    "r": 2e-2 * jnp.ones((num_segments,)),
     "rho": rho,
-    "l": jnp.array([1e-1, 1e-1]),
-    "r": jnp.array([2e-2, 2e-2]),
     "g": jnp.array([0.0, -9.81]),
     "E": 1e4 * jnp.ones((num_segments,)),  # Elastic modulus [Pa]
     "G": 1e3 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
@@ -121,7 +121,14 @@ if __name__ == "__main__":
     term = ODETerm(ode_fn)
 
     sol = diffeqsolve(
-        term, solver=Euler(), t0=ts[0], t1=ts[-1], dt0=dt, y0=x0, max_steps=None, saveat=SaveAt(ts=video_ts)
+        term,
+        solver=Euler(),
+        t0=ts[0],
+        t1=ts[-1],
+        dt0=dt,
+        y0=x0,
+        max_steps=None,
+        saveat=SaveAt(ts=video_ts),
     )
 
     print("sol.ys =\n", sol.ys)
