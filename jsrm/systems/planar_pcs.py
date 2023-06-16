@@ -45,6 +45,8 @@ def factory(
     # symbols for robot parameters
     params_syms = sym_exps["params_syms"]
 
+    num_segments = len(params_syms["l"])
+
     @jit
     def select_params_for_lambdify(params: Dict[str, Array]) -> List[Array]:
         """
@@ -200,9 +202,6 @@ def factory(
 
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains(xi, 1e4 * eps)
-
-        # number of segments
-        num_segments = params["r"].shape[0]
 
         # cross-sectional area and second moment of area
         A = jnp.pi * params["r"] ** 2
