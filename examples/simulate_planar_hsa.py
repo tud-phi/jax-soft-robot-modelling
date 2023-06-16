@@ -75,8 +75,8 @@ video_path = Path(__file__).parent / "videos" / "planar_hsa.mp4"
 
 def draw_robot(
     batched_forward_kinematics_virtual_backbone_fn: Callable,
-    forward_kinematics_rod_fn: Callable,
-    forward_kinematics_platform_fn: Callable,
+    batched_forward_kinematics_rod_fn: Callable,
+    batched_forward_kinematics_platform_fn: Callable,
     params: Dict[str, Array],
     q: Array,
     width: int,
@@ -99,7 +99,7 @@ def draw_robot(
     chiL_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 0)  # poses of left rod
     chiR_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 1)  # poses of left rod
     # poses of the platforms
-    chip_ps = forward_kinematics_platform_fn(params, q, jnp.arange(0, num_segments))
+    chip_ps = batched_forward_kinematics_platform_fn(params, q, jnp.arange(0, num_segments))
 
     img = 255 * onp.ones((w, h, 3), dtype=jnp.uint8)  # initialize background to white
     uv_robot_origin = onp.array(

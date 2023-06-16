@@ -1,7 +1,4 @@
 import dill
-from jax import config as jax_config
-
-jax_config.update("jax_enable_x64", True)  # double precision
 import jax
 from jax import Array, debug, jit, lax, vmap
 from jax import numpy as jnp
@@ -45,8 +42,6 @@ def factory(
     # symbols for robot parameters
     params_syms = sym_exps["params_syms"]
 
-    num_segments = len(params_syms["l"])
-
     @jit
     def select_params_for_lambdify(params: Dict[str, Array]) -> List[Array]:
         """
@@ -66,7 +61,10 @@ def factory(
     # concatenate the robot params symbols
     params_syms_cat = []
     for params_key, params_sym in sorted(params_syms.items()):
-        params_syms_cat += params_sym
+        if type(params_sym) in [list, tuple]:
+            params_syms_cat += params_sym
+        else:
+            params_syms_cat.append(params_sym)
 
     # number of degrees of freedom
     n_xi = len(sym_exps["state_syms"]["xi"])
