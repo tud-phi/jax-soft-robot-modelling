@@ -57,8 +57,12 @@ def symbolically_derive_planar_hsa_model(
 
     # construct the symbolic matrices
     l = sp.Matrix(l_syms)  # length of each segment
-    rout = sp.Matrix(rout_syms).reshape(num_segments, num_rods_per_segment)  # outside radius of each rod
-    rin = sp.Matrix(rin_syms).reshape(num_segments, num_rods_per_segment)  # inside radius of each rod
+    rout = sp.Matrix(rout_syms).reshape(
+        num_segments, num_rods_per_segment
+    )  # outside radius of each rod
+    rin = sp.Matrix(rin_syms).reshape(
+        num_segments, num_rods_per_segment
+    )  # inside radius of each rod
     # radial offset of each rod from the centerline
     roff = sp.Matrix(roff_syms).reshape(num_segments, num_rods_per_segment)
     # dimensions of platform cuboid consisting of [width, height, depth] [m]
@@ -124,8 +128,7 @@ def symbolically_derive_planar_hsa_model(
         chiv_sms.append(chiv)
 
         # positional Jacobian as a function of the point s
-        Jvp = sp.simplify(p.jacobian(xi))\
-        # orientation Jacobian
+        Jvp = sp.simplify(p.jacobian(xi))  # orientation Jacobian
         Jvo = sp.simplify(sp.Matrix([[th]]).jacobian(xi))
 
         # combine positional and orientation Jacobian
@@ -197,11 +200,15 @@ def symbolically_derive_planar_hsa_model(
     # end-effector pose
     chi_last = chiv_sms[-1].subs(s, l[-1])
     thee = chi_last[-1, 0]  # orientation of end-effector
-    chiee = chi_last + sp.Matrix([
-        [sp.cos(thee), sp.sin(thee), 0.0],
-        [-sp.sin(thee), sp.cos(thee), 0.0],
-        [0.0, 0.0, 0.0]
-    ]) @ sp.Matrix([[0.0], [pcudim[-1, 1]], [0.0]])  # add the height of the platform
+    chiee = chi_last + sp.Matrix(
+        [
+            [sp.cos(thee), sp.sin(thee), 0.0],
+            [-sp.sin(thee), sp.cos(thee), 0.0],
+            [0.0, 0.0, 0.0],
+        ]
+    ) @ sp.Matrix(
+        [[0.0], [pcudim[-1, 1]], [0.0]]
+    )  # add the height of the platform
     print("chiee =\n", chiee)
 
     # simplify mass matrix

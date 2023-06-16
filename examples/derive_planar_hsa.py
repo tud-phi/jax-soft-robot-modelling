@@ -11,5 +11,7 @@ if __name__ == "__main__":
         / f"planar_hsa_ns-{NUM_SEGMENTS}_nrs-{NUM_RODS_PER_SEGMENT}.dill"
     )
     symbolically_derive_planar_hsa_model(
-        num_segments=NUM_SEGMENTS, filepath=sym_exp_filepath, num_rods_per_segment=NUM_RODS_PER_SEGMENT
+        num_segments=NUM_SEGMENTS,
+        filepath=sym_exp_filepath,
+        num_rods_per_segment=NUM_RODS_PER_SEGMENT,
     )

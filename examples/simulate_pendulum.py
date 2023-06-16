@@ -23,7 +23,9 @@ num_links_to_sym_exp_filepath_map = {
 }
 
 sym_exp_filepath = (
-    Path(__file__).parent.parent / "symbolic_expressions" / num_links_to_sym_exp_filepath_map[num_links]
+    Path(__file__).parent.parent
+    / "symbolic_expressions"
+    / num_links_to_sym_exp_filepath_map[num_links]
 )
 params = {
     "m": jnp.array([10.0, 6.0]),
@@ -34,7 +36,7 @@ params = {
 }
 
 # define initial configuration
-q0 = jnp.zeros((num_links, ))
+q0 = jnp.zeros((num_links,))
 
 # set simulation parameters
 dt = 1e-4  # time step
@@ -62,7 +64,9 @@ def draw_robot(
     # poses along the robot of shape (3, N)
     link_indices = jnp.arange(params["l"].shape[0], dtype=jnp.int32)
     chi_ls = jnp.zeros((3, link_indices.shape[0] + 1))
-    chi_ls = chi_ls.at[:, 1:].set(batched_forward_kinematics_fn(params, q, link_indices))
+    chi_ls = chi_ls.at[:, 1:].set(
+        batched_forward_kinematics_fn(params, q, link_indices)
+    )
 
     img = 255 * onp.ones((w, h, 3), dtype=jnp.uint8)  # initialize background to white
     curve_origin = onp.array(
@@ -92,7 +96,14 @@ if __name__ == "__main__":
     term = ODETerm(ode_fn)
 
     sol = diffeqsolve(
-        term, solver=Dopri5(), t0=ts[0], t1=ts[-1], dt0=dt, y0=x0, max_steps=None, saveat=SaveAt(ts=video_ts)
+        term,
+        solver=Dopri5(),
+        t0=ts[0],
+        t1=ts[-1],
+        dt0=dt,
+        y0=x0,
+        max_steps=None,
+        saveat=SaveAt(ts=video_ts),
     )
     print("sol.ys =\n", sol.ys)
 

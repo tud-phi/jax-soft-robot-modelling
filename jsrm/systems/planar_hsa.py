@@ -129,8 +129,7 @@ def factory(
     # iterate through symbolic expressions for each segment
     for chip_exp in sym_exps["exps"]["chip_sms"]:
         chip_lambda = sp.lambdify(
-            params_syms_cat
-            + sym_exps["state_syms"]["xi"],
+            params_syms_cat + sym_exps["state_syms"]["xi"],
             chip_exp,
             "jax",
         )
@@ -147,7 +146,9 @@ def factory(
     )
 
     compute_stiffness_matrix_for_all_rods_fn = vmap(
-        vmap(compute_planar_stiffness_matrix, in_axes=(0, 0, 0, 0), out_axes=0), in_axes=(0, 0, 0, 0), out_axes=0
+        vmap(compute_planar_stiffness_matrix, in_axes=(0, 0, 0, 0), out_axes=0),
+        in_axes=(0, 0, 0, 0),
+        out_axes=0,
     )
 
     @jit
@@ -170,7 +171,9 @@ def factory(
         return xi_epsed
 
     @jit
-    def forward_kinematics_virtual_backbone_fn(params: Dict[str, Array], q: Array, s: Array) -> Array:
+    def forward_kinematics_virtual_backbone_fn(
+        params: Dict[str, Array], q: Array, s: Array
+    ) -> Array:
         """
         Evaluate the forward kinematics the virtual backbone
         Args:
@@ -211,7 +214,9 @@ def factory(
         return chi
 
     @jit
-    def forward_kinematics_rod_fn(params: Dict[str, Array], q: Array, s: Array, rod_idx: Array) -> Array:
+    def forward_kinematics_rod_fn(
+        params: Dict[str, Array], q: Array, s: Array, rod_idx: Array
+    ) -> Array:
         """
         Evaluate the forward kinematics of the physical rods
         Args:
@@ -238,7 +243,7 @@ def factory(
         # determine in which segment the point is located
         # use argmax to find the last index where the condition is true
         segment_idx = (
-                l_cum.shape[0] - 1 - jnp.argmax((s >= l_cum_padded[:-1])[::-1]).astype(int)
+            l_cum.shape[0] - 1 - jnp.argmax((s >= l_cum_padded[:-1])[::-1]).astype(int)
         )
         # point coordinate along the segment in the interval [0, l_segment]
         s_segment = s - l_cum_padded[segment_idx]
@@ -246,15 +251,21 @@ def factory(
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
         params_for_lambdify = select_params_for_lambdify(params)
 
-        chir_lambda_sms_idx = segment_idx*num_rods_per_segment + rod_idx
+        chir_lambda_sms_idx = segment_idx * num_rods_per_segment + rod_idx
         chir = lax.switch(
-            chir_lambda_sms_idx, chir_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
+            chir_lambda_sms_idx,
+            chir_lambda_sms,
+            *params_for_lambdify,
+            *xi_epsed,
+            s_segment,
         ).squeeze()
 
         return chir
 
     @jit
-    def forward_kinematics_platform_fn(params: Dict[str, Array], q: Array, segment_idx: Array) -> Array:
+    def forward_kinematics_platform_fn(
+        params: Dict[str, Array], q: Array, segment_idx: Array
+    ) -> Array:
         """
         Evaluate the forward kinematics the platform
         Args:
@@ -282,7 +293,6 @@ def factory(
 
         return chip
 
-
     @jit
     def beta_fn(params: Dict[str, Array], vxi: Array) -> Array:
         """
@@ -297,15 +307,20 @@ def factory(
         vxi = vxi.reshape((num_segments, 1, -1))
 
         pxi = jnp.repeat(vxi, num_rods_per_segment, axis=1)
-        psigma_a = pxi[:, :, 2] + params["roff"] * jnp.repeat(vxi, num_rods_per_segment, axis=1)[..., 0]
+        psigma_a = (
+            pxi[:, :, 2]
+            + params["roff"] * jnp.repeat(vxi, num_rods_per_segment, axis=1)[..., 0]
+        )
         pxi = pxi.at[:, :, 2].set(psigma_a)
 
         return pxi
 
     @jit
     def dynamical_matrices_fn(
-        params: Dict[str, Array], q: Array, q_d: Array,
-        phi: Array = jnp.zeros((num_segments * num_rods_per_segment, ))
+        params: Dict[str, Array],
+        q: Array,
+        q_d: Array,
+        phi: Array = jnp.zeros((num_segments * num_rods_per_segment,)),
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
         Compute the dynamical matrices of the system.
@@ -346,7 +361,9 @@ def factory(
 
         # reshape phi and l to be of shape (num_segments, num_rods_per_segment)
         phi_per_rod = phi.reshape(num_segments, num_rods_per_segment)
-        l_per_rod = jnp.repeat(l.reshape(num_segments, 1), axis=1, repeats=num_rods_per_segment)
+        l_per_rod = jnp.repeat(
+            l.reshape(num_segments, 1), axis=1, repeats=num_rods_per_segment
+        )
 
         # change in the rest length
         varepsilon = params["C_varepsilon"] * h / l_per_rod * phi_per_rod
@@ -386,7 +403,9 @@ def factory(
             ),
             in_axes=(0, 0, 0, 0),
             out_axes=0,
-        )(J_beta, Shat, pxi, pxi_eq)  # shape (num_segments, num_rods_per_segment, 3)
+        )(
+            J_beta, Shat, pxi, pxi_eq
+        )  # shape (num_segments, num_rods_per_segment, 3)
         # sum the elastic forces over all rods of each segment
         K = jnp.sum(vK, axis=1).flatten()  # shape (n_xi, )
 
@@ -400,7 +419,9 @@ def factory(
             ),
             in_axes=(0, 0),
             out_axes=0,
-        )(J_beta, zeta)  # shape (num_segments, num_rods_per_segment, 3, 3)
+        )(
+            J_beta, zeta
+        )  # shape (num_segments, num_rods_per_segment, 3, 3)
         # dissipative matrix
         D = blk_diag(jnp.sum(vD, axis=1))  # shape (n_xi, n_xi)
 
@@ -412,14 +433,19 @@ def factory(
         # compute the actuation torque on the strain of the virtual backbone
         tau_xi = vmap(
             vmap(
-                lambda _J_beta, _S, _Sdelta, _pxi, _pxi_eq, _xiphi: _J_beta.T @ (-_Sdelta @ (_pxi - _pxi_eq) + _S @ _xiphi),
+                lambda _J_beta, _S, _Sdelta, _pxi, _pxi_eq, _xiphi: _J_beta.T
+                @ (-_Sdelta @ (_pxi - _pxi_eq) + _S @ _xiphi),
                 in_axes=(0, 0, 0, 0, 0, 0),
                 out_axes=0,
             ),
             in_axes=(0, 0, 0, 0, 0, 0),
             out_axes=0,
-        )(J_beta, S, Sdelta, pxi, pxi_eq, xiphi)  # shape (num_segments, num_rods_per_segment, 3)
-        tau_xi = tau_xi.sum(axis=1).flatten()  # sum over all the rods and then flatten over all the segments
+        )(
+            J_beta, S, Sdelta, pxi, pxi_eq, xiphi
+        )  # shape (num_segments, num_rods_per_segment, 3)
+        tau_xi = tau_xi.sum(
+            axis=1
+        ).flatten()  # sum over all the rods and then flatten over all the segments
 
         # apply the strain basis
         params_for_lambdify = select_params_for_lambdify(params)
@@ -473,8 +499,10 @@ def factory(
 
     return (
         B_xi,
-        forward_kinematics_virtual_backbone_fn, forward_kinematics_rod_fn, forward_kinematics_platform_fn,
-        dynamical_matrices_fn
+        forward_kinematics_virtual_backbone_fn,
+        forward_kinematics_rod_fn,
+        forward_kinematics_platform_fn,
+        dynamical_matrices_fn,
     )
 
 

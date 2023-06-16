@@ -16,9 +16,7 @@ num_segments = 1
 
 # filepath to symbolic expressions
 sym_exp_filepath = (
-    Path(__file__).parent.parent
-    / "symbolic_expressions"
-    / "planar_hsa_ns-1_nrs-2.dill"
+    Path(__file__).parent.parent / "symbolic_expressions" / "planar_hsa_ns-1_nrs-2.dill"
 )
 
 # set parameters
@@ -26,29 +24,37 @@ rods_per_segment = 2
 # Damping coefficient
 zeta = 1e-4 * jnp.repeat(
     jnp.repeat(
-        jnp.array([1e0, 1e2, 1e2]).reshape((1, 1, 3)),
-        axis=1, repeats=rods_per_segment
+        jnp.array([1e0, 1e2, 1e2]).reshape((1, 1, 3)), axis=1, repeats=rods_per_segment
     ),
-    axis=0, repeats=num_segments
+    axis=0,
+    repeats=num_segments,
 )
 params = {
     "th0": jnp.array(0.0),  # initial orientation angle [rad]
-    "l": 1e-1 * jnp.ones((num_segments, )),  # length of each rod [m]
+    "l": 1e-1 * jnp.ones((num_segments,)),  # length of each rod [m]
     "C_varepsilon": 1e-2,  # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
     # outside radius of each rod [m]. The rows correspond to the segments.
     "rout": 25.4e-3 / 2 * jnp.ones((num_segments, rods_per_segment)),
     # inside radius of each rod [m]. The rows correspond to the segments.
-    "rin": (25.4e-3 / 2-2.43e-3) * jnp.ones((num_segments, rods_per_segment)),
+    "rin": (25.4e-3 / 2 - 2.43e-3) * jnp.ones((num_segments, rods_per_segment)),
     # handedness of each rod. The rows correspond to the segments.
     "h": jnp.ones((num_segments, rods_per_segment)),
     # offset [m] of each rod from the centerline. The rows correspond to the segments.
     "roff": jnp.array([[-24e-3, 24e-3]]),
-    "pcudim": jnp.array([[95e-3, 3e-3, 95e-3]]),  # width, height, depth of the platform [m]
-    "rhor": 1.05e3 * jnp.ones((num_segments, rods_per_segment)),  # Volumetric density of rods [kg/m^3],
-    "rhop": 0.7e3 * jnp.ones((num_segments, )),  # Volumetric density of platform [kg/m^3],
+    "pcudim": jnp.array(
+        [[95e-3, 3e-3, 95e-3]]
+    ),  # width, height, depth of the platform [m]
+    "rhor": 1.05e3
+    * jnp.ones(
+        (num_segments, rods_per_segment)
+    ),  # Volumetric density of rods [kg/m^3],
+    "rhop": 0.7e3
+    * jnp.ones((num_segments,)),  # Volumetric density of platform [kg/m^3],
     "g": jnp.array([0.0, -9.81]),
-    "E": 1e4 * jnp.ones((num_segments, rods_per_segment)),  # Elastic modulus of each rod [Pa]
-    "G": 1e3 * jnp.ones((num_segments, rods_per_segment)),  # Shear modulus of each rod [Pa]
+    "E": 1e4
+    * jnp.ones((num_segments, rods_per_segment)),  # Elastic modulus of each rod [Pa]
+    "G": 1e3
+    * jnp.ones((num_segments, rods_per_segment)),  # Shear modulus of each rod [Pa]
     # Constant to scale the Elastic modulus linearly with the twist strain [Pa/(rad/m)]
     "C_E": 0e0 * jnp.ones((num_segments, rods_per_segment)),
     # Constant to scale the Shear modulus linearly with the twist strain [Pa/(rad/m)]
@@ -95,11 +101,15 @@ def draw_robot(
     s_ps = jnp.linspace(0, jnp.sum(params["l"]), num_points)
 
     # poses along the robot of shape (3, N)
-    chiv_ps = batched_forward_kinematics_virtual_backbone_fn(params, q, s_ps)  # poses of virtual backbone
+    chiv_ps = batched_forward_kinematics_virtual_backbone_fn(
+        params, q, s_ps
+    )  # poses of virtual backbone
     chiL_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 0)  # poses of left rod
     chiR_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 1)  # poses of left rod
     # poses of the platforms
-    chip_ps = batched_forward_kinematics_platform_fn(params, q, jnp.arange(0, num_segments))
+    chip_ps = batched_forward_kinematics_platform_fn(
+        params, q, jnp.arange(0, num_segments)
+    )
 
     img = 255 * onp.ones((w, h, 3), dtype=jnp.uint8)  # initialize background to white
     uv_robot_origin = onp.array(
@@ -123,11 +133,15 @@ def draw_robot(
     batched_chi2u = vmap(chi2u, in_axes=-1, out_axes=0)
 
     # draw base
-    cv2.rectangle(img, (0, h - uv_robot_origin[1]), (w, h), color=base_color, thickness=-1)
+    cv2.rectangle(
+        img, (0, h - uv_robot_origin[1]), (w, h), color=base_color, thickness=-1
+    )
 
     # draw the virtual backbone
     curve_virtual_backbone = onp.array(batched_chi2u(chiv_ps))
-    cv2.polylines(img, [curve_virtual_backbone], isClosed=False, color=backbone_color, thickness=5)
+    cv2.polylines(
+        img, [curve_virtual_backbone], isClosed=False, color=backbone_color, thickness=5
+    )
 
     # draw the rods
     curve_rod_left = onp.array(batched_chi2u(chiL_ps))
@@ -138,29 +152,44 @@ def draw_robot(
     # draw the platform
     for i in range(chip_ps.shape[0]):
         # iterate over the platforms
-        platform_R = jnp.array([
-            [jnp.cos(chip_ps[i, 2]), -jnp.sin(chip_ps[i, 2])],
-            [jnp.sin(chip_ps[i, 2]), jnp.cos(chip_ps[i, 2])]
-        ])  # rotation matrix for the platform
-        platform_llc = chip_ps[i, :2] + platform_R @ jnp.array([
-            -params["pcudim"][i, 0] / 2,  # go half the width to the left
-            -params["pcudim"][i, 1] / 2,  # go half the height down
-        ])  # lower left corner of the platform
-        platform_ulc = chip_ps[i, :2] + platform_R @ jnp.array([
-            -params["pcudim"][i, 0] / 2,  # go half the width to the left
-            +params["pcudim"][i, 1] / 2,  # go half the height down
-        ])  # upper left corner of the platform
-        platform_urc = chip_ps[i, :2] + platform_R @ jnp.array([
-            +params["pcudim"][i, 0] / 2,  # go half the width to the left
-            +params["pcudim"][i, 1] / 2,  # go half the height down
-        ])  # upper right corner of the platform
-        platform_lrc = chip_ps[i, :2] + platform_R @ jnp.array([
-            +params["pcudim"][i, 0] / 2,  # go half the width to the left
-            -params["pcudim"][i, 1] / 2,  # go half the height down
-        ])  # lower right corner of the platform
-        platform_curve = jnp.stack([platform_llc, platform_ulc, platform_urc, platform_lrc, platform_llc], axis=1)
+        platform_R = jnp.array(
+            [
+                [jnp.cos(chip_ps[i, 2]), -jnp.sin(chip_ps[i, 2])],
+                [jnp.sin(chip_ps[i, 2]), jnp.cos(chip_ps[i, 2])],
+            ]
+        )  # rotation matrix for the platform
+        platform_llc = chip_ps[i, :2] + platform_R @ jnp.array(
+            [
+                -params["pcudim"][i, 0] / 2,  # go half the width to the left
+                -params["pcudim"][i, 1] / 2,  # go half the height down
+            ]
+        )  # lower left corner of the platform
+        platform_ulc = chip_ps[i, :2] + platform_R @ jnp.array(
+            [
+                -params["pcudim"][i, 0] / 2,  # go half the width to the left
+                +params["pcudim"][i, 1] / 2,  # go half the height down
+            ]
+        )  # upper left corner of the platform
+        platform_urc = chip_ps[i, :2] + platform_R @ jnp.array(
+            [
+                +params["pcudim"][i, 0] / 2,  # go half the width to the left
+                +params["pcudim"][i, 1] / 2,  # go half the height down
+            ]
+        )  # upper right corner of the platform
+        platform_lrc = chip_ps[i, :2] + platform_R @ jnp.array(
+            [
+                +params["pcudim"][i, 0] / 2,  # go half the width to the left
+                -params["pcudim"][i, 1] / 2,  # go half the height down
+            ]
+        )  # lower right corner of the platform
+        platform_curve = jnp.stack(
+            [platform_llc, platform_ulc, platform_urc, platform_lrc, platform_llc],
+            axis=1,
+        )
         # cv2.polylines(img, [onp.array(batched_chi2u(platform_curve))], isClosed=True, color=platform_color, thickness=5)
-        cv2.fillPoly(img, [onp.array(batched_chi2u(platform_curve))], color=platform_color)
+        cv2.fillPoly(
+            img, [onp.array(batched_chi2u(platform_curve))], color=platform_color
+        )
 
     return img
 
@@ -168,11 +197,11 @@ def draw_robot(
 if __name__ == "__main__":
     (
         strain_basis,
-        forward_kinematics_virtual_backbone_fn, forward_kinematics_rod_fn, forward_kinematics_platform_fn,
-        dynamical_matrices_fn
-    ) = planar_hsa.factory(
-        sym_exp_filepath, strain_selector
-    )
+        forward_kinematics_virtual_backbone_fn,
+        forward_kinematics_rod_fn,
+        forward_kinematics_platform_fn,
+        dynamical_matrices_fn,
+    ) = planar_hsa.factory(sym_exp_filepath, strain_selector)
     batched_forward_kinematics_virtual_backbone_fn = vmap(
         forward_kinematics_virtual_backbone_fn, in_axes=(None, None, 0), out_axes=-1
     )
@@ -200,7 +229,10 @@ if __name__ == "__main__":
         batched_forward_kinematics_virtual_backbone_fn,
         batched_forward_kinematics_rod_fn,
         batched_forward_kinematics_platform_fn,
-        params, q0, video_width, video_height
+        params,
+        q0,
+        video_width,
+        video_height,
     )
     cv2.namedWindow(window_name)
     cv2.imshow(window_name, img)
@@ -209,14 +241,21 @@ if __name__ == "__main__":
 
     x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
-    phi = jnp.zeros((2, ))  # motor actuation angles
+    phi = jnp.zeros((2,))  # motor actuation angles
     phi = jnp.array([jnp.pi / 2, 0])
 
     ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params, phi)
     term = ODETerm(ode_fn)
 
     sol = diffeqsolve(
-        term, solver=Euler(), t0=ts[0], t1=ts[-1], dt0=dt, y0=x0, max_steps=None, saveat=SaveAt(ts=video_ts)
+        term,
+        solver=Euler(),
+        t0=ts[0],
+        t1=ts[-1],
+        dt0=dt,
+        y0=x0,
+        max_steps=None,
+        saveat=SaveAt(ts=video_ts),
     )
 
     print("sol.ys =\n", sol.ys)
