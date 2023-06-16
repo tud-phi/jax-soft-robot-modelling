@@ -36,3 +36,11 @@ def compute_coriolis_matrix(B: sp.Matrix, q: sp.Matrix, q_d: sp.Matrix) -> sp.Ma
     C = sp.simplify(C, rational=True)
 
     return C
+
+def compute_dAdt(A: sp.Matrix, x: sp.Matrix, xdot: sp.Matrix) -> sp.Matrix:
+    dAdt = sp.zeros(A.shape[0], A.shape[1])
+    for j in range(A.shape[1]):
+        # iterate through columns
+        dAdt[:, j] = A[:, j].jacobian(x) @ xdot
+
+    return dAdt

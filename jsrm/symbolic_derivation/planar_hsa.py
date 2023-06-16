@@ -3,7 +3,7 @@ from pathlib import Path
 import sympy as sp
 from typing import Callable, Dict, Tuple, Union
 
-from .symbolic_utils import compute_coriolis_matrix
+from .symbolic_utils import compute_coriolis_matrix, compute_dAdt
 
 
 def symbolically_derive_planar_hsa_model(
@@ -210,6 +210,8 @@ def symbolically_derive_planar_hsa_model(
         [[0.0], [pcudim[-1, 1]], [0.0]]
     )  # add the height of the platform
     print("chiee =\n", chiee)
+    Jee = chiee.jacobian(xi)  # Jacobian of the end-effector
+    Jee_d = compute_dAdt(Jee, xi, xi_d)  # time derivative of the end-effector Jacobian
 
     # simplify mass matrix
     B = sp.simplify(B)
@@ -250,7 +252,8 @@ def symbolically_derive_planar_hsa_model(
             "Jv_sms": Jv_sms,  # list of the Jacobians of the virtual backbone of each segment
             "Jr_sms": Jr_sms,  # list of the Jacobians of the centerline of each rod
             "Jp_sms": Jp_sms,  # list of the platform Jacobians
-            "Jee": chiee.jacobian(xi),  # Jacobian of the end-effector
+            "Jee": Jee,  # Jacobian of the end-effector
+            "Jee_d": Jee_d,  # time derivative of the Jacobian of the end-effector
             "B": B,
             "C": C,
             "G": G,

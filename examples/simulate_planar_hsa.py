@@ -16,7 +16,7 @@ num_segments = 1
 
 # filepath to symbolic expressions
 sym_exp_filepath = (
-    Path(__file__).parent.parent / "symbolic_expressions" / "planar_hsa_ns-1_nrs-2.dill"
+    Path(__file__).parent.parent / "symbolic_expressions" / f"planar_hsa_ns-{num_segments}_nrs-2.dill"
 )
 
 # set parameters
@@ -67,6 +67,7 @@ strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
 
 # define initial configuration
 q0 = jnp.array([jnp.pi, 0.0, 0.0])
+phi = jnp.array([jnp.pi / 2, 0])  # motor actuation angles
 
 # set simulation parameters
 dt = 1e-4  # time step
@@ -241,8 +242,6 @@ if __name__ == "__main__":
 
     x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
-    phi = jnp.zeros((2,))  # motor actuation angles
-    phi = jnp.array([jnp.pi / 2, 0])
 
     ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params, phi)
     term = ODETerm(ode_fn)

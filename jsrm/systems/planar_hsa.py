@@ -135,6 +135,23 @@ def factory(
         )
         chip_lambda_sms.append(chip_lambda)
 
+    # end-effector kinematics
+    chiee_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["xi"],
+        sym_exps["exps"]["chiee"],
+        "jax",
+    )
+    Jee_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["xi"],
+        sym_exps["exps"]["Jee"],
+        "jax",
+    )
+    Jee_d_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["xi_d"],
+        sym_exps["exps"]["Jee_d"],
+        "jax",
+    )
+
     B_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["B"], "jax"
     )
@@ -292,6 +309,31 @@ def factory(
         ).squeeze()
 
         return chip
+
+    @jit
+    def forward_kinematics_end_effector_fn(params: Dict[str, Array], q: Array) -> Array:
+        """
+        Evaluate the forward kinematics of the end-effector
+        Args:
+            params: Dictionary of robot parameters
+            q: generalized coordinates of shape (n_q, )
+        Returns:
+            chiee: pose of the end-effector in Cartesian-space of shape (3, )
+                Consists of [p_x, p_y, theta]
+                where p_x is the x-position, p_y is the y-position,
+                and theta is the planar orientation with respect to the x-axis
+        """
+        # map the configuration to the strains
+        xi = xi_eq + B_xi @ q
+        # add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+
+        # convert the dictionary of parameters to a list, which we can pass to the lambda function
+        params_for_lambdify = select_params_for_lambdify(params)
+        # evaluate the symbolic expression
+        chiee = chiee_lambda(**params_for_lambdify, *xi_epsed)
+
+        return chiee
 
     @jit
     def beta_fn(params: Dict[str, Array], vxi: Array) -> Array:
