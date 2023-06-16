@@ -16,7 +16,6 @@ def symbolically_derive_planar_hsa_model(
         num_segments: number of constant strain segments
         filepath: path to save the derived model
         num_rods_per_segment: number of HSA rods per segment
-        th0: initial angle of the robot
     Returns:
         sym_exps: dictionary with entries
             params_syms: dictionary of robot parameters
