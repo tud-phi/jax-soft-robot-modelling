@@ -613,7 +613,7 @@ def factory(
         # inverse of the inertia matrix in the configuration space
         B_inv = jnp.linalg.inv(B)
 
-        Lambda = jnp.linalg.inv(Jee @ B @ Jee.T)
+        Lambda = jnp.linalg.inv(Jee @ B_inv @ Jee.T)
         nu = Lambda @ (Jee @ B_inv @ C - Jee_d) @ q_d
 
         JB_pinv = B_inv @ Jee.T @ Lambda
