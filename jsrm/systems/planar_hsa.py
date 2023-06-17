@@ -341,7 +341,7 @@ def factory(
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
         params_for_lambdify = select_params_for_lambdify(params)
         # evaluate the symbolic expression
-        chiee = chiee_lambda(*params_for_lambdify, *xi_epsed)
+        chiee = chiee_lambda(*params_for_lambdify, *xi_epsed).squeeze()
 
         return chiee
 
@@ -580,8 +580,7 @@ def factory(
             C: Array
     ):
         """
-        Compute the dynamics in operational space. We define the operational as the end-effector position.
-        Therefore, n_x = 2.
+        Compute the dynamics in operational space.
         The implementation is based on Chapter 7.8 of "Modelling, Planning and Control of Robotics" by
         Siciliano, Sciavicco, Villani, Oriolo.
         Args:
