@@ -245,11 +245,11 @@ if __name__ == "__main__":
     x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
 
-    ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params, phi)
-    term = ODETerm(ode_fn)
+    ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params)
+    ode_term = ODETerm(partial(ode_fn, phi=phi))
 
     sol = diffeqsolve(
-        term,
+        ode_term,
         solver=Euler(),
         t0=ts[0],
         t1=ts[-1],

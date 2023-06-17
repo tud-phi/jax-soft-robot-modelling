@@ -608,7 +608,7 @@ def factory(
 
 
 def ode_factory(
-    dynamical_matrices_fn: Callable, params: Dict[str, Array], phi: Array
+    dynamical_matrices_fn: Callable, params: Dict[str, Array]
 ) -> Callable[[float, Array], Array]:
     """
     Make an ODE function of the form ode_fn(t, x) -> x_dot.
@@ -625,19 +625,19 @@ def ode_factory(
             alpha_fn is a function to compute the actuation vector of shape (n_q). It has the following signature:
                 alpha_fn(phi) -> tau_q where phi is the twist angle vector of shape (n_phi, )
         params: Dictionary with robot parameters
-        phi: array of shape (n_phi) with motor positions / twist angles of the proximal end of the rods
     Returns:
         ode_fn: ODE function of the form ode_fn(t, x) -> x_dot
     """
 
     @jit
-    def ode_fn(t: float, x: Array, *args) -> Array:
+    def ode_fn(t: float, x: Array, *args, phi: Array) -> Array:
         """
         ODE of the dynamical Lagrangian system.
         Args:
             t: time
             x: state vector of shape (2 * n_q, )
             args: additional arguments
+            phi: array of shape (n_phi) with motor positions / twist angles of the proximal end of the rods
         Returns:
             x_d: time-derivative of the state vector of shape (2 * n_q, )
         """
