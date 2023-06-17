@@ -202,6 +202,7 @@ if __name__ == "__main__":
         forward_kinematics_rod_fn,
         forward_kinematics_platform_fn,
         forward_kinematics_end_effector_fn,
+        jacobian_end_effector_fn,
         dynamical_matrices_fn,
         _
     ) = planar_hsa.factory(sym_exp_filepath, strain_selector)

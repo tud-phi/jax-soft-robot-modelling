@@ -22,6 +22,7 @@ def factory(
     Callable[[Dict[str, Array], Array, Array, Array], Array],
     Callable[[Dict[str, Array], Array, Array], Array],
     Callable[[Dict[str, Array], Array], Array],
+    Callable[[Dict[str, Array], Array], Array],
     Callable[
         [Dict[str, Array], Array, Array],
         Tuple[Array, Array, Array, Array, Array, Array],
@@ -48,6 +49,7 @@ def factory(
         forward_kinematics_platform_fn: function that returns the chi vector of shape (3, n_q) with the positions
             and orientations of the platform
         forward_kinematics_end_effector_fn: function that returns the pose of the end effector of shape (3, )
+        jacobian_end_effector_fn: function that returns the Jacobian of the end effector of shape (3, n_q)
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and alpha matrices
         operational_space_dynamical_matrices_fn: function that returns Lambda, nu, and JB_pinv describing
             the dynamics in operational space
@@ -344,6 +346,29 @@ def factory(
         return chiee
 
     @jit
+    def jacobian_end_effector_fn(params: Dict[str, Array], q: Array) -> Array:
+        """
+        Evaluate the Jacobian of the end-effector
+        Args:
+           params: Dictionary of robot parameters
+           q: generalized coordinates of shape (n_q, )
+        Returns:
+           Jee: the Jacobian of the end-effector pose with respect to the generalized coordinates.
+                Jee is an array of shape (3, n_q).
+        """
+        # map the configuration to the strains
+        xi = xi_eq + B_xi @ q
+        # add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+
+        # convert the dictionary of parameters to a list, which we can pass to the lambda function
+        params_for_lambdify = select_params_for_lambdify(params)
+        # evaluate the symbolic expression
+        Jee = Jee_lambda(*params_for_lambdify, *xi_epsed)
+
+        return Jee
+
+    @jit
     def beta_fn(params: Dict[str, Array], vxi: Array) -> Array:
         """
         Map the generalized coordinates to the strains in the physical rods
@@ -602,6 +627,7 @@ def factory(
         forward_kinematics_rod_fn,
         forward_kinematics_platform_fn,
         forward_kinematics_end_effector_fn,
+        jacobian_end_effector_fn,
         dynamical_matrices_fn,
         operational_space_dynamical_matrices_fn,
     )
