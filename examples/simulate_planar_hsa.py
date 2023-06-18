@@ -208,9 +208,6 @@ if __name__ == "__main__":
         _
     ) = planar_hsa.factory(sym_exp_filepath, strain_selector)
 
-    q = inverse_kinematics_end_effector_fn(params, jnp.array([0.0, 0.15, 0.0]))
-    print("q", q)
-
     batched_forward_kinematics_virtual_backbone_fn = vmap(
         forward_kinematics_virtual_backbone_fn, in_axes=(None, None, 0), out_axes=-1
     )
