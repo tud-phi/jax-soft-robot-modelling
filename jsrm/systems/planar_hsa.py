@@ -633,7 +633,7 @@ def factory(
 
 
 def ode_factory(
-    dynamical_matrices_fn: Callable, params: Dict[str, Array]
+    dynamical_matrices_fn: Callable, params: Dict[str, Array], consider_underactuation_model: bool = True
 ) -> Callable[[float, Array], Array]:
     """
     Make an ODE function of the form ode_fn(t, x) -> x_dot.
@@ -650,26 +650,38 @@ def ode_factory(
             alpha_fn is a function to compute the actuation vector of shape (n_q). It has the following signature:
                 alpha_fn(phi) -> tau_q where phi is the twist angle vector of shape (n_phi, )
         params: Dictionary with robot parameters
+        consider_underactuation_model: If True, the underactuation model is considered. Otherwise, the fully-actuated
+            model is considered with the identity matrix as the actuation matrix.
     Returns:
         ode_fn: ODE function of the form ode_fn(t, x) -> x_dot
     """
+    num_rods = params["rout"].shape[0] * params["rout"].shape[1]
 
     @jit
-    def ode_fn(t: float, x: Array, *args, phi: Array) -> Array:
+    def ode_fn(t: float, x: Array, *args, u: Array) -> Array:
         """
         ODE of the dynamical Lagrangian system.
         Args:
             t: time
             x: state vector of shape (2 * n_q, )
             args: additional arguments
-            phi: array of shape (n_phi) with motor positions / twist angles of the proximal end of the rods
+            u: input to the system.
+                - if consider_underactuation_model is True, then this is an array of shape (n_phi) with
+                    motor positions / twist angles of the proximal end of the rods
+                - if consider_underactuation_model is False, then this is an array of shape (n_q) with
+                    the generalized torques
         Returns:
             x_d: time-derivative of the state vector of shape (2 * n_q, )
         """
         n_q = x.shape[0] // 2
         q, q_d = x[:n_q], x[n_q:]
 
-        B, C, G, K, D, tau_q = dynamical_matrices_fn(params, q, q_d, phi)
+        if consider_underactuation_model is True:
+            phi = u
+            B, C, G, K, D, tau_q = dynamical_matrices_fn(params, q, q_d, phi)
+        else:
+            B, C, G, K, D, _ = dynamical_matrices_fn(params, q, q_d, jnp.zeros((num_rods,)))
+            tau_q = u
 
         # inverse of B
         B_inv = jnp.linalg.inv(B)
