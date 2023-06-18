@@ -23,6 +23,7 @@ def factory(
     Callable[[Dict[str, Array], Array, Array], Array],
     Callable[[Dict[str, Array], Array], Array],
     Callable[[Dict[str, Array], Array], Array],
+    Callable[[Dict[str, Array], Array], Array],
     Callable[
         [Dict[str, Array], Array, Array],
         Tuple[Array, Array, Array, Array, Array, Array],
@@ -50,6 +51,7 @@ def factory(
             and orientations of the platform
         forward_kinematics_end_effector_fn: function that returns the pose of the end effector of shape (3, )
         jacobian_end_effector_fn: function that returns the Jacobian of the end effector of shape (3, n_q)
+        inverse_kinematics_end_effector_fn: function that returns the generalized coordinates for a given end-effector pose
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and alpha matrices
         operational_space_dynamical_matrices_fn: function that returns Lambda, nu, and JB_pinv describing
             the dynamics in operational space
@@ -369,6 +371,45 @@ def factory(
         return Jee
 
     @jit
+    def inverse_kinematics_end_effector_fn(params: Dict[str, Array], chiee: Array) -> Array:
+        """
+        Evaluates the inverse kinematics for a given end-effector pose.
+            Important: only works for one segment!
+        Args:
+           params: Dictionary of robot parameters
+           chiee: pose of the end-effector in Cartesian-space of shape (3, )
+        Returns:
+           q: generalized coordinates of shape (n_q, )
+        """
+        assert num_segments == 1, "Inverse kinematics only works for one segment!"
+
+        # height of platform
+        hp = params["pcudim"][0, 1]
+
+        # compute the pose of the distal end of the virtual backbone
+        vchi_de = chiee + jnp.array([jnp.sin(chiee[2]) * hp, -jnp.cos(chiee[2]) * hp, 0.0])
+        px, py, th = vchi_de[0], vchi_de[1], vchi_de[2]
+
+        # add small eps for numerical stability
+        th_sign = jnp.sign(th)
+        # set zero sign to 1 (i.e. positive)
+        th_sign = jnp.where(th_sign == 0, 1, th_sign)
+        # add eps to the bending strain (i.e. the first column)
+        th_epsed = th + th_sign * eps
+
+        # compute the inverse kinematics for the virtual backbone
+        vxi = th_epsed / (2*params["l"].sum()) * jnp.array([
+            2,
+            py - (px*jnp.sin(th_epsed))/(jnp.cos(th_epsed) - 1),
+            -px - (py*jnp.sin(th_epsed))/(jnp.cos(th_epsed) - 1)
+        ])
+
+        # map the strains to the generalized coordinates
+        q = jnp.linalg.pinv(B_xi) @ (vxi - xi_eq)
+
+        return q
+
+    @jit
     def beta_fn(params: Dict[str, Array], vxi: Array) -> Array:
         """
         Map the generalized coordinates to the strains in the physical rods
@@ -627,6 +668,7 @@ def factory(
         forward_kinematics_platform_fn,
         forward_kinematics_end_effector_fn,
         jacobian_end_effector_fn,
+        inverse_kinematics_end_effector_fn,
         dynamical_matrices_fn,
         operational_space_dynamical_matrices_fn,
     )

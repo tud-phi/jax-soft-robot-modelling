@@ -203,9 +203,14 @@ if __name__ == "__main__":
         forward_kinematics_platform_fn,
         forward_kinematics_end_effector_fn,
         jacobian_end_effector_fn,
+        inverse_kinematics_end_effector_fn,
         dynamical_matrices_fn,
         _
     ) = planar_hsa.factory(sym_exp_filepath, strain_selector)
+
+    q = inverse_kinematics_end_effector_fn(params, jnp.array([0.0, 0.15, 0.0]))
+    print("q", q)
+
     batched_forward_kinematics_virtual_backbone_fn = vmap(
         forward_kinematics_virtual_backbone_fn, in_axes=(None, None, 0), out_axes=-1
     )
@@ -247,7 +252,7 @@ if __name__ == "__main__":
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
 
     ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params)
-    ode_term = ODETerm(partial(ode_fn, phi=phi))
+    ode_term = ODETerm(partial(ode_fn, u=phi))
 
     sol = diffeqsolve(
         ode_term,

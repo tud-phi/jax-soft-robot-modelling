@@ -57,12 +57,12 @@ def compute_strain_basis(
             and n_xi is the number of strains
     """
     n_q = strain_selector.sum().item()
-    strain_basis = jnp.zeros((strain_selector.shape[0], n_q), dtype=int)
+    strain_basis = jnp.zeros((strain_selector.shape[0], n_q))
     strain_basis_cumsum = jnp.cumsum(strain_selector)
     for i in range(strain_selector.shape[0]):
         j = int(strain_basis_cumsum[i].item()) - 1
         if strain_selector[i].item() is True:
-            strain_basis = strain_basis.at[i, j].set(1)
+            strain_basis = strain_basis.at[i, j].set(1.0)
     return strain_basis
 
 

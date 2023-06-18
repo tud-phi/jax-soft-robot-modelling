@@ -204,7 +204,7 @@ def symbolically_derive_planar_hsa_model(
         [
             [sp.cos(thee), sp.sin(thee), 0.0],
             [-sp.sin(thee), sp.cos(thee), 0.0],
-            [0.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
         ]
     ) @ sp.Matrix(
         [[0.0], [pcudim[-1, 1]], [0.0]]
