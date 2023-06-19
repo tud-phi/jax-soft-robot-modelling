@@ -29,36 +29,40 @@ zeta = 1e-4 * jnp.repeat(
     axis=0,
     repeats=num_segments,
 )
+ones_rod = jnp.ones(
+    (num_segments, rods_per_segment)
+)
+# length of rigid end-pieces: top 14 mm and bottom 25mm
+# mass of rigid end-pieces: 9g
 params = {
     "th0": jnp.array(0.0),  # initial orientation angle [rad]
     "l": 1e-1 * jnp.ones((num_segments,)),  # length of each rod [m]
     "C_varepsilon": 1e-2,  # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
     # outside radius of each rod [m]. The rows correspond to the segments.
-    "rout": 25.4e-3 / 2 * jnp.ones((num_segments, rods_per_segment)),
+    "rout": 25.4e-3 / 2 * ones_rod,  # this is for FPU rods
     # inside radius of each rod [m]. The rows correspond to the segments.
-    "rin": (25.4e-3 / 2 - 2.43e-3) * jnp.ones((num_segments, rods_per_segment)),
+    "rin": (25.4e-3 / 2 - 2.43e-3) * ones_rod,  # this is for FPU rods
     # handedness of each rod. The rows correspond to the segments.
-    "h": jnp.ones((num_segments, rods_per_segment)),
+    "h": ones_rod,
     # offset [m] of each rod from the centerline. The rows correspond to the segments.
     "roff": jnp.array([[-24e-3, 24e-3]]),
     "pcudim": jnp.array(
-        [[95e-3, 3e-3, 95e-3]]
+        [[80e-3, 12e-3, 80e-3]]
     ),  # width, height, depth of the platform [m]
-    "rhor": 1.05e3
-    * jnp.ones(
-        (num_segments, rods_per_segment)
-    ),  # Volumetric density of rods [kg/m^3],
-    "rhop": 0.7e3
-    * jnp.ones((num_segments,)),  # Volumetric density of platform [kg/m^3],
+    # mass of FPU rod: 14 g, mass of EPU rod: 26 g
+    # For FPU, this corresponds to a measure volume of 0000175355 m^3 --> rho = 798.38 kg/m^3
+    "rhor": 798.38 * ones_rod,  # Volumetric density of rods [kg/m^3],
+    # Volumetric density of platform [kg/m^3],
+    # weight of platform + marker holder + cylinder top piece: 0.107 kg
+    # this corresponds to a measure volume of 0.0000943929 m^3 --> rho = 1133 kg/m^3
+    "rhop": 1133 * jnp.ones((num_segments,)),
     "g": jnp.array([0.0, -9.81]),
-    "E": 1e4
-    * jnp.ones((num_segments, rods_per_segment)),  # Elastic modulus of each rod [Pa]
-    "G": 1e3
-    * jnp.ones((num_segments, rods_per_segment)),  # Shear modulus of each rod [Pa]
+    "E": 1e4 * ones_rod,  # Elastic modulus of each rod [Pa]
+    "G": 1e3 * ones_rod,  # Shear modulus of each rod [Pa]
     # Constant to scale the Elastic modulus linearly with the twist strain [Pa/(rad/m)]
-    "C_E": 0e0 * jnp.ones((num_segments, rods_per_segment)),
+    "C_E": 0e0 * ones_rod,
     # Constant to scale the Shear modulus linearly with the twist strain [Pa/(rad/m)]
-    "C_G": 0e0 * jnp.ones((num_segments, rods_per_segment)),
+    "C_G": 0e0 * ones_rod,
     "zeta": zeta,  # damping coefficient of shape (num_segments, rods_per_segment, 3, 3)
 }
 
