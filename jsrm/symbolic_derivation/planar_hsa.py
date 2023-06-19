@@ -202,8 +202,8 @@ def symbolically_derive_planar_hsa_model(
     thee = chi_last[-1, 0]  # orientation of end-effector
     chiee = chi_last + sp.Matrix(
         [
-            [sp.cos(thee), sp.sin(thee), 0.0],
-            [-sp.sin(thee), sp.cos(thee), 0.0],
+            [sp.cos(thee), -sp.sin(thee), 0.0],
+            [sp.sin(thee), sp.cos(thee), 0.0],
             [0.0, 0.0, 1.0],
         ]
     ) @ sp.Matrix(
