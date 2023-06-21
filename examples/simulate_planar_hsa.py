@@ -33,11 +33,12 @@ ones_rod = jnp.ones(
     (num_segments, rods_per_segment)
 )
 # length of rigid end-pieces: top 14 mm and bottom 25mm
-# mass of rigid end-pieces: 9g
+# mass of bottom rigid end-piece: 9g
 params = {
     "th0": jnp.array(0.0),  # initial orientation angle [rad]
     "l": 1e-1 * jnp.ones((num_segments,)),  # length of each rod [m]
-    "C_varepsilon": 1e-2,  # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
+    # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
+    "C_varepsilon": 9.1e-3,  # Average: 0.009118994, Std: 0.000696435
     # outside radius of each rod [m]. The rows correspond to the segments.
     "rout": 25.4e-3 / 2 * ones_rod,  # this is for FPU rods
     # inside radius of each rod [m]. The rows correspond to the segments.
