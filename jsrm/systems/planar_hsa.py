@@ -385,10 +385,20 @@ def factory(
 
         # height of platform
         hp = params["pcudim"][0, 1]
+        # length of the proximal rod caps
+        lpc = params["lpc"][0]
+        # length of the distal rod caps
+        ldc = params["ldc"][0]
+
+        # compute the pose of the proximal end of the virtual backbone
+        vchi_pe = jnp.array([0, lpc, 0.0])
 
         # compute the pose of the distal end of the virtual backbone
-        vchi_de = chiee + jnp.array([jnp.sin(chiee[2]) * hp, -jnp.cos(chiee[2]) * hp, 0.0])
-        px, py, th = vchi_de[0], vchi_de[1], vchi_de[2]
+        vchi_de = chiee + jnp.array([jnp.sin(chiee[2]) * (ldc + hp), -jnp.cos(chiee[2]) * (ldc + hp), 0.0])
+
+        # offset the pose of the distal end of the virtual backbone by the pose of the proximal end
+        vchi_pe_to_de = vchi_de - vchi_pe
+        px, py, th = vchi_pe_to_de[0], vchi_pe_to_de[1], vchi_pe_to_de[2]
 
         # add small eps for numerical stability
         th_sign = jnp.sign(th)

@@ -7,7 +7,7 @@ from .symbolic_utils import compute_coriolis_matrix, compute_dAdt
 
 
 def symbolically_derive_planar_hsa_model(
-    num_segments: int, filepath: Union[str, Path] = None, num_rods_per_segment: int = 2
+    num_segments: int, filepath: Union[str, Path] = None, num_rods_per_segment: int = 2, simplify: bool = True
 ) -> Dict:
     """
     Symbolically derive the kinematics and dynamics of a planar hsa robot modelled with
@@ -31,6 +31,12 @@ def symbolically_derive_planar_hsa_model(
     l_syms = list(
         sp.symbols(f"l1:{num_segments + 1}", nonnegative=True, nonzero=True)
     )  # length of each segment [m]
+    lpc_syms = list(
+        sp.symbols(f"lpc1:{num_segments + 1}", nonnegative=True, nonzero=True)
+    )  # length of the rigid proximal caps of the rods connecting to the base [m]
+    ldc_syms = list(
+        sp.symbols(f"ldc1:{num_segments + 1}", nonnegative=True, nonzero=True)
+    )  # length of the rigid distal caps of the rods connecting to the platform [m]
     rout_syms = list(
         sp.symbols(f"rout1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
     )  # outside radius of each segment [m]
@@ -49,6 +55,9 @@ def symbolically_derive_planar_hsa_model(
     rhop_syms = list(
         sp.symbols(f"rhop1:{num_segments + 1}", nonnegative=True)
     )  # volumetric mass density of the platform [kg/m^3]
+    rhoec_syms = list(
+        sp.symbols(f"rhoec1:{num_segments + 1}", nonnegative=True)
+    )  # volumetric mass density of the rod end caps (both at the proximal and distal ends) [kg/m^3]
     g_syms = list(sp.symbols(f"g1:3"))  # gravity vector
 
     # planar strains and their derivatives
@@ -57,6 +66,8 @@ def symbolically_derive_planar_hsa_model(
 
     # construct the symbolic matrices
     l = sp.Matrix(l_syms)  # length of each segment
+    lpc = sp.Matrix([lpc_syms])  # length of the rigid proximal caps of the rods connecting to the base
+    ldc = sp.Matrix([ldc_syms])  # length of the rigid distal end caps of the rods connecting to the platform
     rout = sp.Matrix(rout_syms).reshape(
         num_segments, num_rods_per_segment
     )  # outside radius of each rod
@@ -71,6 +82,8 @@ def symbolically_derive_planar_hsa_model(
     rhor = sp.Matrix(rhor_syms).reshape(num_segments, num_rods_per_segment)
     # volumetric mass density of the platform [kg/m^3]
     rhop = sp.Matrix(rhop_syms)
+    # volumetric mass density of the rod end caps (both at the proximal and distal ends) [kg/m^3]
+    rhoec = sp.Matrix(rhoec_syms)
     g = sp.Matrix(g_syms)  # gravity vector
 
     # configuration variables and their derivatives
@@ -119,7 +132,7 @@ def symbolically_derive_planar_hsa_model(
         dp_ds = R @ sp.Matrix([sigma_sh, sigma_a])
 
         # position along the virtual center rod as a function of the point s
-        p = p_prev + sp.integrate(dp_ds, (s, 0.0, s))
+        p = p_prev + sp.Matrix([0, lpc[i]]) + sp.integrate(dp_ds, (s, 0.0, s))
 
         # symbolic expression for the pose of the virtual rod at the centerline as a function of the point s
         chiv = sp.zeros(3, 1)
@@ -160,7 +173,9 @@ def symbolically_derive_planar_hsa_model(
                 + rhor[i, j] * Ir[i, j] * Jvo.T @ Jvo
             )
             # mass matrix of the current rod
-            Br_ij = sp.simplify(sp.integrate(dBr_ds, (s, 0, l[i])))
+            Br_ij = sp.integrate(dBr_ds, (s, 0, l[i]))
+            if simplify:
+                Br_ij = sp.simplify(Br_ij)
             # add the mass matrix
             B = B + Br_ij
 
@@ -171,57 +186,123 @@ def symbolically_derive_planar_hsa_model(
             # add potential energy of segment to previous segments
             U = U + U_ij
 
-        # mass and inertia of the platform
-        mp = rhop[i, 0] * pcudim[i, 0] * pcudim[i, 1] * pcudim[i, 2]
-        Ip = mp / 12 * (pcudim[i, 0] ** 2 + pcudim[i, 1] ** 2)
-        # position of the platform
-        pp = p.subs(s, l[i]) + R.subs(s, l[i]) @ sp.Matrix([0.0, pcudim[i, 1] / 2])
+        # mass of the platform itself
+        mp_itself = rhop[i, 0] * pcudim[i, 0] * pcudim[i, 1] * pcudim[i, 2]
+        # inertia of the platform itself about its own CoG
+        Ip_itself = mp_itself / 12 * (pcudim[i, 0] ** 2 + pcudim[i, 1] ** 2)
+
+        # contributions of the distal caps
+        mdc_sum = 0
+        Idc_sum = 0
+        for j in range(num_rods_per_segment):
+            # mass of the distal cap
+            mdc = rhoec[i, 0] * ldc[i, 0] * rout[i, j] ** 2
+            mdc_sum += mdc
+
+            # moment of inertia of distal cap about its own CoG
+            Idc = 1 / 12 * mdc * (3 * rout[i, j] ** 2 + ldc[i, 0] ** 2)
+            Idc_sum += Idc
+
+        # contributions of the proximal caps
+        mpc_sum = 0
+        Ipc_sum = 0
+        if i < num_segments - 1:
+            for j in range(num_rods_per_segment):
+                # mass of the proximal cap
+                mpc = rhoec[i+1, 0] * lpc[i+1, 0] * rout[i+1, j] ** 2
+                mpc_sum += mpc
+
+                # moment of inertia of distal cap about its own CoG
+                Ipc = 1 / 12 * mpc * (3 * rout[i+1, j] ** 2 + lpc[i+1, 0] ** 2)
+                Ipc_sum += Ipc
+
+        # total mass of the platform including the distal caps
+        mp = mp_itself + mdc_sum + mpc_sum
+
+        # position of the CoG with respect to the distal end of the rods
+        _contrib_dc_pc = mdc_sum * ldc[i, 0] / 2 + mp_itself * (ldc[i, 0] + pcudim[i, 1] / 2)
+        if i < num_segments - 1:
+            relCoGp = sp.Matrix([
+                0.0,  # TODO: fix in case the rods are not symmetric
+                _contrib_dc_pc + mpc_sum * (ldc[i, 0] + pcudim[i, 1] + lpc[i+1, 0] / 2)
+            ]) / mp
+        else:
+            relCoGp = sp.Matrix([
+                0.0,  # TODO: fix in case the rods are not symmetric
+                _contrib_dc_pc
+            ]) / mp
+
+        # relative offsets
+        doffCoGdc = sp.Matrix([0.0, ldc[i, 0] / 2]) - relCoGp
+        doffCoGdc_norm = sp.sqrt(doffCoGdc[0] ** 2 + doffCoGdc[1] ** 2)
+        doffCoGp = sp.Matrix([0.0, ldc[i, 0] + pcudim[i, 1] / 2]) - relCoGp
+        doffCoGp_norm = sp.sqrt(doffCoGp[0] ** 2 + doffCoGp[1] ** 2)
+        if i < num_segments - 1:
+            doffCoGpc = sp.Matrix([0.0, lpc[i+1, 0] / 2]) - relCoGp
+        else:
+            doffCoGpc = sp.Matrix([0.0, 0.0])
+        doffCoGpc_norm = sp.sqrt(doffCoGpc[0] ** 2 + doffCoGpc[1] ** 2)
+
+        # total inertia with respect to the CoG
+        Ip = sp.simplify(
+            Idc_sum + Ip_itself + Ipc_sum + mdc_sum * doffCoGdc_norm ** 2 + mp_itself * doffCoGp_norm ** 2 + mpc_sum * doffCoGpc_norm ** 2
+        )
+
+        # rotation of the platform
+        Rp = R.subs(s, l[i])
+        # position of the center of the platform
+        pp = p.subs(s, l[i]) + Rp @ sp.Matrix([0.0, ldc[i, 0] + pcudim[i, 1] / 2])
+        # pose of the platform
         chip = sp.zeros(3, 1)
         chip[:2, 0] = pp  # the x and y position
         chip[2, 0] = th.subs(s, l[i])  # the orientation angle theta
         chip_sms.append(chip)
-        # Jacobians of the platform
-        Jp = chip.jacobian(xi)
-        Jpp = pp.jacobian(xi)  # positional Jacobian of the platform
-        Jpo = sp.simplify(sp.Matrix([[chip[2, 0]]]).jacobian(xi))
+        # position of the CoG of the platform
+        pCoGp = p.subs(s, l[i]) + Rp @ relCoGp
+        # pose of the CoG of the platform
+        chiCoGp = sp.zeros(3, 1)
+        chiCoGp[:2, 0] = pCoGp  # the x and y position
+        chiCoGp[2, 0] = th.subs(s, l[i])  # the orientation angle theta
+        # Jacobians of the CoG of the platform
+        JCoGp = chiCoGp.jacobian(xi)
+        JpCoGp = pCoGp.jacobian(xi)  # positional Jacobian of the platform
+        JpCoGo = sp.simplify(sp.Matrix([[chiCoGp[2, 0]]]).jacobian(xi))
         # mass matrix of the platform
-        Bp = sp.simplify(mp * Jpp.T @ Jpp + Ip * Jpo.T @ Jpo)
+        Bp = mp * JpCoGp.T @ JpCoGp + Ip * JpCoGo.T @ JpCoGo
+        if simplify:
+            Bp = sp.simplify(Bp)
         B = B + Bp
         # potential energy of the platform
-        Up = sp.simplify(mp * g.T @ pp)
+        Up = sp.simplify(mp * g.T @ pCoGp)
         U = U + Up
 
         # update the orientation for the next segment
         th_prev = th.subs(s, l[i])
 
-        # update the position for the next segment and add the height of the platform
-        p_prev = p.subs(s, l[i]) + R @ sp.Matrix([0.0, pcudim[i, 1]])
+        # update the position for the next segment
+        # add the length of the distal caps and the height of the platform
+        p_prev = p.subs(s, l[i]) + Rp @ sp.Matrix([0.0, ldc[i, 0] + pcudim[i, 1]])
 
     # end-effector pose
-    chi_last = chiv_sms[-1].subs(s, l[-1])
-    thee = chi_last[-1, 0]  # orientation of end-effector
-    chiee = chi_last + sp.Matrix(
-        [
-            [sp.cos(thee), -sp.sin(thee), 0.0],
-            [sp.sin(thee), sp.cos(thee), 0.0],
-            [0.0, 0.0, 1.0],
-        ]
-    ) @ sp.Matrix(
-        [[0.0], [pcudim[-1, 1]], [0.0]]
-    )  # add the height of the platform
+    chiee = sp.Matrix([p_prev[0], p_prev[1], th_prev])
     print("chiee =\n", chiee)
     Jee = chiee.jacobian(xi)  # Jacobian of the end-effector
+    print("Jee =\n", Jee)
     Jee_d = compute_dAdt(Jee, xi, xi_d)  # time derivative of the end-effector Jacobian
+    print("Jee_d =\n", Jee_d)
 
     # simplify mass matrix
-    B = sp.simplify(B)
+    if simplify:
+        B = sp.simplify(B)
     print("B =\n", B)
 
-    C = compute_coriolis_matrix(B, xi, xi_d)
+    C = compute_coriolis_matrix(B, xi, xi_d, simplify=simplify)
     print("C =\n", C)
 
     # compute the gravity force vector
-    G = sp.simplify(-U.jacobian(xi).transpose())
+    G = -U.jacobian(xi).transpose()
+    if simplify:
+        G = sp.simplify(G)
     print("G =\n", G)
 
     # dictionary with expressions
@@ -229,12 +310,15 @@ def symbolically_derive_planar_hsa_model(
         "params_syms": {
             "th0": th0,
             "l": l_syms,
+            "lpc": lpc_syms,
+            "ldc": ldc_syms,
             "rout": rout_syms,
             "rin": rin_syms,
             "roff": roff_syms,
             "pcudim": pcudim_syms,
             "rhor": rhor_syms,
             "rhop": rhop_syms,
+            "rhoec": rhoec_syms,
             "g": g_syms,
         },
         "state_syms": {
