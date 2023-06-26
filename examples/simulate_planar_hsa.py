@@ -13,25 +13,25 @@ from typing import Callable, Dict
 from jsrm.systems import planar_hsa
 
 num_segments = 1
-rods_per_segment = 2
+num_rods_per_segment = 2
 
 # filepath to symbolic expressions
 sym_exp_filepath = (
     Path(__file__).parent.parent
     / "symbolic_expressions"
-    / f"planar_hsa_ns-{num_segments}_nrs-{rods_per_segment}.dill"
+    / f"planar_hsa_ns-{num_segments}_nrs-{num_rods_per_segment}.dill"
 )
 
 # set parameters
 # Damping coefficient
 zeta = 1e-4 * jnp.repeat(
     jnp.repeat(
-        jnp.array([1e0, 1e2, 1e2]).reshape((1, 1, 3)), axis=1, repeats=rods_per_segment
+        jnp.array([1e0, 1e2, 1e2]).reshape((1, 1, 3)), axis=1, repeats=num_rods_per_segment
     ),
     axis=0,
     repeats=num_segments,
 )
-ones_rod = jnp.ones((num_segments, rods_per_segment))
+ones_rod = jnp.ones((num_segments, num_rods_per_segment))
 params = {
     "th0": jnp.array(0.0),  # initial orientation angle [rad]
     "l": 59e-3 * jnp.ones((num_segments,)),  # length of each rod [m]
@@ -74,7 +74,7 @@ params = {
     "C_E": 0e0 * ones_rod,
     # Constant to scale the Shear modulus linearly with the twist strain [Pa/(rad/m)]
     "C_G": 0e0 * ones_rod,
-    "zeta": zeta,  # damping coefficient of shape (num_segments, rods_per_segment, 3, 3)
+    "zeta": zeta,  # damping coefficient of shape (num_segments, rods_per_segment, 3)
 }
 
 # activate all strains (i.e. bending, shear, and axial)
