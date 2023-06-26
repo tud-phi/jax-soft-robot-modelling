@@ -176,8 +176,7 @@ def symbolically_derive_planar_hsa_model(
 
             # integrate mass matrix of each rod
             dBr_ds = rhor[i, j] * sp.simplify(
-                Ar[i, j] * Jrp.T @ Jrp
-                + Ir[i, j] * Jvo.T @ Jvo
+                Ar[i, j] * Jrp.T @ Jrp + Ir[i, j] * Jvo.T @ Jvo
             )
             # mass matrix of the current rod
             Br_ij = sp.integrate(dBr_ds, (s, 0, l[i]))
