@@ -28,10 +28,7 @@ def factory(
         [Dict[str, Array], Array, Array],
         Tuple[Array, Array, Array, Array, Array, Array],
     ],
-    Callable[
-        [Dict[str, Array], Array, Array, Array, Array],
-        Tuple[Array, Array, Array],
-    ],
+    Dict,
 ]:
     """
     Create jax functions from file containing symbolic expressions.
@@ -53,8 +50,9 @@ def factory(
         jacobian_end_effector_fn: function that returns the Jacobian of the end effector of shape (3, n_q)
         inverse_kinematics_end_effector_fn: function that returns the generalized coordinates for a given end-effector pose
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and alpha matrices
-        operational_space_dynamical_matrices_fn: function that returns Lambda, nu, and JB_pinv describing
-            the dynamics in operational space
+        sys_helpers: dictionary of helper functions / variables. Includes for examples:
+            operational_space_dynamical_matrices_fn: function that returns Lambda, nu, and JB_pinv describing
+                the dynamics in operational space
     """
     # load saved symbolic data
     sym_exps = dill.load(open(str(filepath), "rb"))
@@ -678,6 +676,12 @@ def factory(
 
         return Lambda, nu, JB_pinv
 
+    sys_helpers = {
+        "B_xi": B_xi,
+        "xi_eq": xi_eq,
+        "operational_space_dynamical_matrices_fn": operational_space_dynamical_matrices_fn,
+    }
+
     return (
         B_xi,
         forward_kinematics_virtual_backbone_fn,
@@ -687,7 +691,7 @@ def factory(
         jacobian_end_effector_fn,
         inverse_kinematics_end_effector_fn,
         dynamical_matrices_fn,
-        operational_space_dynamical_matrices_fn,
+        sys_helpers,
     )
 
 
