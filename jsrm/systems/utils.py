@@ -1,7 +1,8 @@
-import dill
+from copy import deepcopy
 import jax
 from jax import Array, jit, vmap
 from jax import numpy as jnp
+import sympy as sp
 from typing import Callable, Dict, Iterable, Sequence, Tuple, Union
 
 
@@ -24,25 +25,34 @@ def substitute_symbolic_expressions(
     """
     # symbols for robot parameters
     params_syms = sym_exps["params_syms"]
-    # symbols of state variables
-    state_syms = sym_exps["state_syms"]
     # symbolic expressions
-    exps = sym_exps["exps"]
+    exps = deepcopy(sym_exps["exps"])
 
-    for exp_key in exps.keys():
-        for param_key, param_sym in params_syms.items():
-            if issubclass(type(param_sym), Iterable):
-                for idx, param_sym_item in enumerate(param_sym):
-                    exps[exp_key] = exps[exp_key].subs(
-                        param_sym_item, params[param_key][idx]
+    for exp_key, exp_val in exps.items():
+        if issubclass(type(exp_val), list):
+            for exp_item_idx, exp_item_val in enumerate(exp_val):
+                exps[exp_key][exp_item_idx] = substitute_symbolic_expression(exp_item_val, params_syms, params)
+        else:
+            exps[exp_key] = substitute_symbolic_expression(exp_val, params_syms, params)
+
+    return exps
+
+
+def substitute_symbolic_expression(
+    sym_exp: sp.Expr, params_syms, params: Dict[str, jnp.array]
+) -> sp.Expr:
+    for param_key, param_sym in params_syms.items():
+        if issubclass(type(param_sym), list):
+            for idx, param_sym_item in enumerate(param_sym):
+                if param_sym_item in sym_exp.free_symbols:
+                    sym_exp = sym_exp.subs(
+                        param_sym_item, params[param_key].flatten()[idx]
                     )
-            else:
-                exps[exp_key] = exps[exp_key].subs(param_sym, params[param_key])
-            exps[exp_key] = exps[exp_key].subs(
-                params_syms[param_key], params[param_key]
-            )
+        else:
+            if param_sym in sym_exp.free_symbols:
+                sym_exp = sym_exp.subs(param_sym, params[param_key])
 
-    return sym_exps
+    return sym_exp
 
 
 def compute_strain_basis(

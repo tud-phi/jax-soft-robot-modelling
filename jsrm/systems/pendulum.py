@@ -6,8 +6,6 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
 
-from .utils import substitute_symbolic_expressions
-
 
 def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
     """
