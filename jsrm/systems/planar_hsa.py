@@ -508,7 +508,6 @@ def factory(
         A = jnp.pi * (params["rout"] ** 2 - params["rin"] ** 2)
         Ib = jnp.pi / 4 * (params["rout"] ** 4 - params["rin"] ** 4)
 
-        # volumetric mass density
         # nominal elastic and shear modulus
         Ehat, Ghat = params["E"], params["G"]
         # difference between the current modulus and the nominal modulus
@@ -533,7 +532,7 @@ def factory(
         # we define the elastic matrix of the physical rods of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
         vK = vmap(  # vmap over the segments
             vmap(  # vmap over the rods of each segment
-                lambda _J_beta, _S, _pxi, _pxi_eq: _J_beta.T @ _S @ (_pxi - _pxi_eq),
+                lambda _J_beta, _Shat, _pxi, _pxi_eq: _J_beta.T @ _Shat @ (_pxi - _pxi_eq),
                 in_axes=(0, 0, 0, 0),
                 out_axes=0,
             ),

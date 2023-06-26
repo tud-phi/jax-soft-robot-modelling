@@ -40,7 +40,7 @@ params = {
     # length of the rigid distal caps of the rods connecting to the platform [m]
     "ldc": 14e-3 * jnp.ones((num_segments,)),
     # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
-    "C_varepsilon": 9.1e-3,  # Average: 0.009118994, Std: 0.000696435
+    "C_varepsilon": 9.1e-3 * ones_rod,  # Average: 0.009118994, Std: 0.000696435
     # outside radius of each rod [m]. The rows correspond to the segments.
     "rout": 25.4e-3 / 2 * ones_rod,  # this is for FPU rods
     # inside radius of each rod [m]. The rows correspond to the segments.
