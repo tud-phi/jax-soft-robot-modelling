@@ -175,9 +175,9 @@ def symbolically_derive_planar_hsa_model(
             Jr_sms.append(Jr)
 
             # integrate mass matrix of each rod
-            dBr_ds = sp.simplify(
-                rhor[i, j] * Ar[i, j] * Jrp.T @ Jrp
-                + rhor[i, j] * Ir[i, j] * Jvo.T @ Jvo
+            dBr_ds = rhor[i, j] * sp.simplify(
+                Ar[i, j] * Jrp.T @ Jrp
+                + Ir[i, j] * Jvo.T @ Jvo
             )
             # mass matrix of the current rod
             Br_ij = sp.integrate(dBr_ds, (s, 0, l[i]))
@@ -352,6 +352,8 @@ def symbolically_derive_planar_hsa_model(
             "s": s,
         },
         "exps": {
+            "Ar": Ar,  # cross-sectional area of the rods
+            "Ir": Ir,  # second area moment of inertia for bending of each rod
             "chiv_sms": chiv_sms,  # list of pose expressions (for the virtual rod along the centerline of each segment)
             # list of pose expressions (for the centerline of each rod).
             # Total length is n_segments * num_rods_per_segment
