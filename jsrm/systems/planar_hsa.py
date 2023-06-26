@@ -371,7 +371,9 @@ def factory(
         return Jee
 
     @jit
-    def inverse_kinematics_end_effector_fn(params: Dict[str, Array], chiee: Array) -> Array:
+    def inverse_kinematics_end_effector_fn(
+        params: Dict[str, Array], chiee: Array
+    ) -> Array:
         """
         Evaluates the inverse kinematics for a given end-effector pose.
             Important: only works for one segment!
@@ -394,7 +396,9 @@ def factory(
         vchi_pe = jnp.array([0, lpc, 0.0])
 
         # compute the pose of the distal end of the virtual backbone
-        vchi_de = chiee + jnp.array([jnp.sin(chiee[2]) * (ldc + hp), -jnp.cos(chiee[2]) * (ldc + hp), 0.0])
+        vchi_de = chiee + jnp.array(
+            [jnp.sin(chiee[2]) * (ldc + hp), -jnp.cos(chiee[2]) * (ldc + hp), 0.0]
+        )
 
         # offset the pose of the distal end of the virtual backbone by the pose of the proximal end
         vchi_pe_to_de = vchi_de - vchi_pe
@@ -408,11 +412,17 @@ def factory(
         th_epsed = th + th_sign * eps
 
         # compute the inverse kinematics for the virtual backbone
-        vxi = th_epsed / (2*params["l"].sum()) * jnp.array([
-            2,
-            py - (px*jnp.sin(th_epsed))/(jnp.cos(th_epsed) - 1),
-            -px - (py*jnp.sin(th_epsed))/(jnp.cos(th_epsed) - 1)
-        ])
+        vxi = (
+            th_epsed
+            / (2 * params["l"].sum())
+            * jnp.array(
+                [
+                    2,
+                    py - (px * jnp.sin(th_epsed)) / (jnp.cos(th_epsed) - 1),
+                    -px - (py * jnp.sin(th_epsed)) / (jnp.cos(th_epsed) - 1),
+                ]
+            )
+        )
 
         # map the strains to the generalized coordinates
         q = jnp.linalg.pinv(B_xi) @ (vxi - xi_eq)
@@ -624,11 +634,7 @@ def factory(
         return B, C, G, K, D, tau_q
 
     def operational_space_dynamical_matrices_fn(
-            params: Dict[str, Array],
-            q: Array,
-            q_d: Array,
-            B: Array,
-            C: Array
+        params: Dict[str, Array], q: Array, q_d: Array, B: Array, C: Array
     ):
         """
         Compute the dynamics in operational space.
@@ -685,7 +691,9 @@ def factory(
 
 
 def ode_factory(
-    dynamical_matrices_fn: Callable, params: Dict[str, Array], consider_underactuation_model: bool = True
+    dynamical_matrices_fn: Callable,
+    params: Dict[str, Array],
+    consider_underactuation_model: bool = True,
 ) -> Callable[[float, Array], Array]:
     """
     Make an ODE function of the form ode_fn(t, x) -> x_dot.
@@ -732,7 +740,9 @@ def ode_factory(
             phi = u
             B, C, G, K, D, tau_q = dynamical_matrices_fn(params, q, q_d, phi)
         else:
-            B, C, G, K, D, _ = dynamical_matrices_fn(params, q, q_d, jnp.zeros((num_rods,)))
+            B, C, G, K, D, _ = dynamical_matrices_fn(
+                params, q, q_d, jnp.zeros((num_rods,))
+            )
             tau_q = u
 
         # inverse of B

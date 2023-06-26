@@ -14,5 +14,5 @@ if __name__ == "__main__":
         num_segments=NUM_SEGMENTS,
         filepath=sym_exp_filepath,
         num_rods_per_segment=NUM_RODS_PER_SEGMENT,
-        simplify=False
+        simplify=False,
     )

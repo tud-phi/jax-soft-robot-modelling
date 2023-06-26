@@ -16,7 +16,9 @@ num_segments = 1
 
 # filepath to symbolic expressions
 sym_exp_filepath = (
-    Path(__file__).parent.parent / "symbolic_expressions" / f"planar_hsa_ns-{num_segments}_nrs-2.dill"
+    Path(__file__).parent.parent
+    / "symbolic_expressions"
+    / f"planar_hsa_ns-{num_segments}_nrs-2.dill"
 )
 
 # set parameters
@@ -29,9 +31,7 @@ zeta = 1e-4 * jnp.repeat(
     axis=0,
     repeats=num_segments,
 )
-ones_rod = jnp.ones(
-    (num_segments, rods_per_segment)
-)
+ones_rod = jnp.ones((num_segments, rods_per_segment))
 params = {
     "th0": jnp.array(0.0),  # initial orientation angle [rad]
     "l": 59e-3 * jnp.ones((num_segments,)),  # length of each rod [m]
@@ -107,7 +107,9 @@ def draw_robot(
 ) -> onp.ndarray:
     # plotting in OpenCV
     h, w = height, width  # img height and width
-    ppm = h / (2.0 * jnp.sum(params["lpc"] + params["l"] + params["ldc"]))  # pixel per meter
+    ppm = h / (
+        2.0 * jnp.sum(params["lpc"] + params["l"] + params["ldc"])
+    )  # pixel per meter
     base_color = (0, 0, 0)  # black base color in BGR
     backbone_color = (255, 0, 0)  # blue robot color in BGR
     rod_color = (0, 255, 0)  # green rod color in BGR
@@ -129,7 +131,7 @@ def draw_robot(
 
     img = 255 * onp.ones((w, h, 3), dtype=jnp.uint8)  # initialize background to white
     uv_robot_origin = onp.array(
-        [w // 2, h*(1-0.1)], dtype=jnp.int32
+        [w // 2, h * (1 - 0.1)], dtype=jnp.int32
     )  # in x-y pixel coordinates
 
     @jit
@@ -152,21 +154,27 @@ def draw_robot(
     batched_chi2u = vmap(chi2u, in_axes=-1, out_axes=0)
 
     # draw base
-    cv2.rectangle(
-        img, (0, uv_robot_origin[1]), (w, h), color=base_color, thickness=-1
-    )
+    cv2.rectangle(img, (0, uv_robot_origin[1]), (w, h), color=base_color, thickness=-1)
 
     # draw the virtual backbone
     # add the first point of the proximal cap and the last point of the distal cap
-    chiv_ps = jnp.concatenate([
-        (chiv_ps[:, 0] - jnp.array([0.0, params["lpc"][0], 0.0])).reshape(3, 1),
-        chiv_ps,
-        (chiv_ps[:, -1] + jnp.array([
-            -jnp.sin(chiv_ps[2, -1]) * params["ldc"][-1],
-            jnp.cos(chiv_ps[2, -1]) * params["ldc"][-1],
-            chiv_ps[2, -1]
-        ])).reshape(3, 1),
-    ], axis=1)
+    chiv_ps = jnp.concatenate(
+        [
+            (chiv_ps[:, 0] - jnp.array([0.0, params["lpc"][0], 0.0])).reshape(3, 1),
+            chiv_ps,
+            (
+                chiv_ps[:, -1]
+                + jnp.array(
+                    [
+                        -jnp.sin(chiv_ps[2, -1]) * params["ldc"][-1],
+                        jnp.cos(chiv_ps[2, -1]) * params["ldc"][-1],
+                        chiv_ps[2, -1],
+                    ]
+                )
+            ).reshape(3, 1),
+        ],
+        axis=1,
+    )
     curve_virtual_backbone = onp.array(batched_chi2u(chiv_ps))
     cv2.polylines(
         img, [curve_virtual_backbone], isClosed=False, color=backbone_color, thickness=5
@@ -174,15 +182,23 @@ def draw_robot(
 
     # draw the rods
     # add the first point of the proximal cap and the last point of the distal cap
-    chiL_ps = jnp.concatenate([
-        (chiL_ps[:, 0] - jnp.array([0.0, params["lpc"][0], 0.0])).reshape(3, 1),
-        chiL_ps,
-        (chiL_ps[:, -1] + jnp.array([
-            -jnp.sin(chiL_ps[2, -1]) * params["ldc"][-1],
-            jnp.cos(chiL_ps[2, -1]) * params["ldc"][-1],
-            chiL_ps[2, -1]
-        ])).reshape(3, 1),
-    ], axis=1)
+    chiL_ps = jnp.concatenate(
+        [
+            (chiL_ps[:, 0] - jnp.array([0.0, params["lpc"][0], 0.0])).reshape(3, 1),
+            chiL_ps,
+            (
+                chiL_ps[:, -1]
+                + jnp.array(
+                    [
+                        -jnp.sin(chiL_ps[2, -1]) * params["ldc"][-1],
+                        jnp.cos(chiL_ps[2, -1]) * params["ldc"][-1],
+                        chiL_ps[2, -1],
+                    ]
+                )
+            ).reshape(3, 1),
+        ],
+        axis=1,
+    )
     curve_rod_left = onp.array(batched_chi2u(chiL_ps))
     cv2.polylines(
         img,
@@ -193,15 +209,23 @@ def draw_robot(
         # thickness=2*int(ppm * params["rout"].mean(axis=0)[0])
     )
     # add the first point of the proximal cap and the last point of the distal cap
-    chiR_ps = jnp.concatenate([
-        (chiR_ps[:, 0] - jnp.array([0.0, params["lpc"][0], 0.0])).reshape(3, 1),
-        chiR_ps,
-        (chiR_ps[:, -1] + jnp.array([
-            -jnp.sin(chiR_ps[2, -1]) * params["ldc"][-1],
-            jnp.cos(chiR_ps[2, -1]) * params["ldc"][-1],
-            chiR_ps[2, -1]
-        ])).reshape(3, 1),
-    ], axis=1)
+    chiR_ps = jnp.concatenate(
+        [
+            (chiR_ps[:, 0] - jnp.array([0.0, params["lpc"][0], 0.0])).reshape(3, 1),
+            chiR_ps,
+            (
+                chiR_ps[:, -1]
+                + jnp.array(
+                    [
+                        -jnp.sin(chiR_ps[2, -1]) * params["ldc"][-1],
+                        jnp.cos(chiR_ps[2, -1]) * params["ldc"][-1],
+                        chiR_ps[2, -1],
+                    ]
+                )
+            ).reshape(3, 1),
+        ],
+        axis=1,
+    )
     curve_rod_right = onp.array(batched_chi2u(chiR_ps))
     cv2.polylines(img, [curve_rod_right], isClosed=False, color=rod_color, thickness=10)
 
@@ -270,7 +294,7 @@ if __name__ == "__main__":
         jacobian_end_effector_fn,
         inverse_kinematics_end_effector_fn,
         dynamical_matrices_fn,
-        _
+        _,
     ) = planar_hsa.factory(sym_exp_filepath, strain_selector)
 
     batched_forward_kinematics_virtual_backbone_fn = vmap(

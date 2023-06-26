@@ -1,7 +1,9 @@
 import sympy as sp
 
 
-def compute_coriolis_matrix(B: sp.Matrix, q: sp.Matrix, q_d: sp.Matrix, simplify: bool = True) -> sp.Matrix:
+def compute_coriolis_matrix(
+    B: sp.Matrix, q: sp.Matrix, q_d: sp.Matrix, simplify: bool = True
+) -> sp.Matrix:
     """
     Compute the matrix C(q, q_d) containing the coriolis and centrifugal terms using Christoffel symbols.
     Args:
@@ -40,6 +42,7 @@ def compute_coriolis_matrix(B: sp.Matrix, q: sp.Matrix, q_d: sp.Matrix, simplify
         C = sp.simplify(C)
 
     return C
+
 
 def compute_dAdt(A: sp.Matrix, x: sp.Matrix, xdot: sp.Matrix) -> sp.Matrix:
     dAdt = sp.zeros(A.shape[0], A.shape[1])

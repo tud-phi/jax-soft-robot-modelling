@@ -7,7 +7,10 @@ from .symbolic_utils import compute_coriolis_matrix, compute_dAdt
 
 
 def symbolically_derive_planar_hsa_model(
-    num_segments: int, filepath: Union[str, Path] = None, num_rods_per_segment: int = 2, simplify: bool = True
+    num_segments: int,
+    filepath: Union[str, Path] = None,
+    num_rods_per_segment: int = 2,
+    simplify: bool = True,
 ) -> Dict:
     """
     Symbolically derive the kinematics and dynamics of a planar hsa robot modelled with
@@ -66,8 +69,12 @@ def symbolically_derive_planar_hsa_model(
 
     # construct the symbolic matrices
     l = sp.Matrix(l_syms)  # length of each segment
-    lpc = sp.Matrix([lpc_syms])  # length of the rigid proximal caps of the rods connecting to the base
-    ldc = sp.Matrix([ldc_syms])  # length of the rigid distal end caps of the rods connecting to the platform
+    lpc = sp.Matrix(
+        [lpc_syms]
+    )  # length of the rigid proximal caps of the rods connecting to the base
+    ldc = sp.Matrix(
+        [ldc_syms]
+    )  # length of the rigid distal end caps of the rods connecting to the platform
     rout = sp.Matrix(rout_syms).reshape(
         num_segments, num_rods_per_segment
     )  # outside radius of each rod
@@ -209,28 +216,41 @@ def symbolically_derive_planar_hsa_model(
         if i < num_segments - 1:
             for j in range(num_rods_per_segment):
                 # mass of the proximal cap
-                mpc = rhoec[i+1, 0] * lpc[i+1, 0] * rout[i+1, j] ** 2
+                mpc = rhoec[i + 1, 0] * lpc[i + 1, 0] * rout[i + 1, j] ** 2
                 mpc_sum += mpc
 
                 # moment of inertia of distal cap about its own CoG
-                Ipc = 1 / 12 * mpc * (3 * rout[i+1, j] ** 2 + lpc[i+1, 0] ** 2)
+                Ipc = 1 / 12 * mpc * (3 * rout[i + 1, j] ** 2 + lpc[i + 1, 0] ** 2)
                 Ipc_sum += Ipc
 
         # total mass of the platform including the distal caps
         mp = mp_itself + mdc_sum + mpc_sum
 
         # position of the CoG with respect to the distal end of the rods
-        _contrib_dc_pc = mdc_sum * ldc[i, 0] / 2 + mp_itself * (ldc[i, 0] + pcudim[i, 1] / 2)
+        _contrib_dc_pc = mdc_sum * ldc[i, 0] / 2 + mp_itself * (
+            ldc[i, 0] + pcudim[i, 1] / 2
+        )
         if i < num_segments - 1:
-            relCoGp = sp.Matrix([
-                0.0,  # TODO: fix in case the rods are not symmetric
-                _contrib_dc_pc + mpc_sum * (ldc[i, 0] + pcudim[i, 1] + lpc[i+1, 0] / 2)
-            ]) / mp
+            relCoGp = (
+                sp.Matrix(
+                    [
+                        0.0,  # TODO: fix in case the rods are not symmetric
+                        _contrib_dc_pc
+                        + mpc_sum * (ldc[i, 0] + pcudim[i, 1] + lpc[i + 1, 0] / 2),
+                    ]
+                )
+                / mp
+            )
         else:
-            relCoGp = sp.Matrix([
-                0.0,  # TODO: fix in case the rods are not symmetric
-                _contrib_dc_pc
-            ]) / mp
+            relCoGp = (
+                sp.Matrix(
+                    [
+                        0.0,  # TODO: fix in case the rods are not symmetric
+                        _contrib_dc_pc,
+                    ]
+                )
+                / mp
+            )
 
         # relative offsets
         doffCoGdc = sp.Matrix([0.0, ldc[i, 0] / 2]) - relCoGp
@@ -238,14 +258,19 @@ def symbolically_derive_planar_hsa_model(
         doffCoGp = sp.Matrix([0.0, ldc[i, 0] + pcudim[i, 1] / 2]) - relCoGp
         doffCoGp_norm = sp.sqrt(doffCoGp[0] ** 2 + doffCoGp[1] ** 2)
         if i < num_segments - 1:
-            doffCoGpc = sp.Matrix([0.0, lpc[i+1, 0] / 2]) - relCoGp
+            doffCoGpc = sp.Matrix([0.0, lpc[i + 1, 0] / 2]) - relCoGp
         else:
             doffCoGpc = sp.Matrix([0.0, 0.0])
         doffCoGpc_norm = sp.sqrt(doffCoGpc[0] ** 2 + doffCoGpc[1] ** 2)
 
         # total inertia with respect to the CoG
         Ip = sp.simplify(
-            Idc_sum + Ip_itself + Ipc_sum + mdc_sum * doffCoGdc_norm ** 2 + mp_itself * doffCoGp_norm ** 2 + mpc_sum * doffCoGpc_norm ** 2
+            Idc_sum
+            + Ip_itself
+            + Ipc_sum
+            + mdc_sum * doffCoGdc_norm**2
+            + mp_itself * doffCoGp_norm**2
+            + mpc_sum * doffCoGpc_norm**2
         )
 
         # rotation of the platform
