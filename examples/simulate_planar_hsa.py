@@ -13,16 +13,16 @@ from typing import Callable, Dict
 from jsrm.systems import planar_hsa
 
 num_segments = 1
+rods_per_segment = 2
 
 # filepath to symbolic expressions
 sym_exp_filepath = (
     Path(__file__).parent.parent
     / "symbolic_expressions"
-    / f"planar_hsa_ns-{num_segments}_nrs-2.dill"
+    / f"planar_hsa_ns-{num_segments}_nrs-{rods_per_segment}.dill"
 )
 
 # set parameters
-rods_per_segment = 2
 # Damping coefficient
 zeta = 1e-4 * jnp.repeat(
     jnp.repeat(
