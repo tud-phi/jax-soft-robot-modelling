@@ -23,14 +23,6 @@ sym_exp_filepath = (
 )
 
 # set parameters
-# Damping coefficient
-zeta = 1e-4 * jnp.repeat(
-    jnp.repeat(
-        jnp.array([1e0, 1e2, 1e2]).reshape((1, 1, 3)), axis=1, repeats=num_rods_per_segment
-    ),
-    axis=0,
-    repeats=num_segments,
-)
 ones_rod = jnp.ones((num_segments, num_rods_per_segment))
 params = {
     "th0": jnp.array(0.0),  # initial orientation angle [rad]
@@ -68,13 +60,20 @@ params = {
     # --> rho = 710.4 kg/m^3
     "rhoec": 710.4 * jnp.ones((num_segments,)),
     "g": jnp.array([0.0, -9.81]),
-    "E": 1e4 * ones_rod,  # Elastic modulus of each rod [Pa]
-    "G": 1e3 * ones_rod,  # Shear modulus of each rod [Pa]
+    "Ehat": 1e4 * ones_rod,  # Elastic modulus of each rod [Pa]
+    "Ghat": 1e3 * ones_rod,  # Shear modulus of each rod [Pa]
     # Constant to scale the Elastic modulus linearly with the twist strain [Pa/(rad/m)]
     "C_E": 0e0 * ones_rod,
     # Constant to scale the Shear modulus linearly with the twist strain [Pa/(rad/m)]
     "C_G": 0e0 * ones_rod,
-    "zeta": zeta,  # damping coefficient of shape (num_segments, rods_per_segment, 3)
+    # damping coefficient of shape (num_segments, rods_per_segment, 3)
+    "zeta": 1e-4 * jnp.repeat(
+        jnp.repeat(
+            jnp.array([1e0, 1e2, 1e2]).reshape((1, 1, 3)), axis=1, repeats=num_rods_per_segment
+        ),
+        axis=0,
+        repeats=num_segments,
+    ),
 }
 
 # activate all strains (i.e. bending, shear, and axial)

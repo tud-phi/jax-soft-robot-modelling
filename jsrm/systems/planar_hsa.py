@@ -507,7 +507,7 @@ def factory(
         Ib = jnp.pi / 4 * (params["rout"] ** 4 - params["rin"] ** 4)
 
         # nominal elastic and shear modulus
-        Ehat, Ghat = params["E"], params["G"]
+        Ehat, Ghat = params["Ehat"], params["Ghat"]
         # difference between the current modulus and the nominal modulus
         Edelta = params["C_E"] * h / l_per_rod * phi_per_rod
         Gdelta = params["C_G"] * h / l_per_rod * phi_per_rod

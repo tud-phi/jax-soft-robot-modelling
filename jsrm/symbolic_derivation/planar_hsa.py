@@ -40,6 +40,7 @@ def symbolically_derive_planar_hsa_model(
     ldc_syms = list(
         sp.symbols(f"ldc1:{num_segments + 1}", nonnegative=True, nonzero=True)
     )  # length of the rigid distal caps of the rods connecting to the platform [m]
+    h_syms = list(sp.symbols(f"h1:{num_segments * num_rods_per_segment + 1}"))
     rout_syms = list(
         sp.symbols(f"rout1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
     )  # outside radius of each segment [m]
@@ -49,6 +50,9 @@ def symbolically_derive_planar_hsa_model(
     roff_syms = list(
         sp.symbols(f"roff1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
     )  # radial offset of each rod from the centerline
+    C_varepsilon_syms = list(
+        sp.symbols(f"C_varepsilon1:{num_segments * num_rods_per_segment + 1}")
+    )
     pcudim_syms = list(
         sp.symbols(f"pcudim1:{3*num_segments + 1}", nonnegative=True)
     )  # dimensions of platform cuboid consisting of [width, height, depth] [m]
@@ -62,10 +66,26 @@ def symbolically_derive_planar_hsa_model(
         sp.symbols(f"rhoec1:{num_segments + 1}", nonnegative=True)
     )  # volumetric mass density of the rod end caps (both at the proximal and distal ends) [kg/m^3]
     g_syms = list(sp.symbols(f"g1:3"))  # gravity vector
+    Ehat_syms = list(
+        sp.symbols(f"Ehat1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+    )  # elastic modulus of each rod [Pa]
+    Ghat_syms = list(
+        sp.symbols(f"Ghat1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+    )  # shear modulus of each rod [Pa]
+    C_E_syms = list(
+        sp.symbols(f"C_E1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+    )  # elastic modulus of each rod [Pa]
+    C_G_syms = list(
+        sp.symbols(f"C_G1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+    )  # shear modulus of each rod [Pa]
+    zeta_syms = list(
+        sp.symbols(f"zeta1:{3 * num_segments * num_rods_per_segment + 1}", nonnegative=True)
+    )  # damping coefficients of each rod
 
     # planar strains and their derivatives
     xi_syms = list(sp.symbols(f"xi1:{num_dof + 1}", nonzero=True))  # strains
     xi_d_syms = list(sp.symbols(f"xi_d1:{num_dof + 1}"))  # strain time derivatives
+    phi_syms = list(sp.symbols(f"phi1:{num_segments * num_rods_per_segment + 1}"))  # twist angles
 
     # construct the symbolic matrices
     l = sp.Matrix(l_syms)  # length of each segment
@@ -75,6 +95,7 @@ def symbolically_derive_planar_hsa_model(
     ldc = sp.Matrix(
         [ldc_syms]
     )  # length of the rigid distal end caps of the rods connecting to the platform
+    h = sp.Matrix(h_syms).reshape(num_segments, num_rods_per_segment)  # handedness
     rout = sp.Matrix(rout_syms).reshape(
         num_segments, num_rods_per_segment
     )  # outside radius of each rod
@@ -83,6 +104,9 @@ def symbolically_derive_planar_hsa_model(
     )  # inside radius of each rod
     # radial offset of each rod from the centerline
     roff = sp.Matrix(roff_syms).reshape(num_segments, num_rods_per_segment)
+    C_varepsilon = sp.Matrix(C_varepsilon_syms).reshape(
+        num_segments, num_rods_per_segment
+    )  # elongation factor
     # dimensions of platform cuboid consisting of [width, height, depth] [m]
     pcudim = sp.Matrix(pcudim_syms).reshape(num_segments, 3)
     # volumetric mass density of the rods [kg/m^3]
@@ -92,10 +116,16 @@ def symbolically_derive_planar_hsa_model(
     # volumetric mass density of the rod end caps (both at the proximal and distal ends) [kg/m^3]
     rhoec = sp.Matrix(rhoec_syms)
     g = sp.Matrix(g_syms)  # gravity vector
+    Ehat = sp.Matrix(Ehat_syms).reshape(num_segments, num_rods_per_segment)  # nominal elastic modulus of each rod [Pa]
+    Ghat = sp.Matrix(Ghat_syms).reshape(num_segments, num_rods_per_segment)  # nominal shear modulus of each rod [Pa]
+    C_E = sp.Matrix(C_E_syms).reshape(num_segments, num_rods_per_segment)  # constant for scaling E of each rod [Pa]
+    C_G = sp.Matrix(C_G_syms).reshape(num_segments, num_rods_per_segment)  # constant for scaling G of each rod [Pa]
 
     # configuration variables and their derivatives
     xi = sp.Matrix(xi_syms)  # strains
     xi_d = sp.Matrix(xi_d_syms)  # strain time derivatives
+    # twist angle of rods
+    phi = sp.Matrix(phi_syms)
 
     # matrix with symbolic expressions to derive the poses along the centerline of each segment
     chiv_sms = []
@@ -114,6 +144,15 @@ def symbolically_derive_planar_hsa_model(
     B = sp.zeros(num_dof, num_dof)
     # potential energy
     U = sp.Matrix([[0]])
+    # elastic vector
+    K = sp.zeros(3 * num_segments, 1)
+    # damping matrix
+    D = sp.zeros(3 * num_segments, 3 * num_segments)
+    # actuation vector
+    alpha = sp.zeros(3 * num_segments, 1)
+
+    # define the equilbrium strain of the virtual backbone
+    vxi_eq = sp.Matrix([[0], [0], [1]])  # equilibrium strain
 
     # symbol for the point coordinate
     s = sp.symbols("s", real=True, nonnegative=True)
@@ -122,15 +161,14 @@ def symbolically_derive_planar_hsa_model(
     th_prev = th0
     p_prev = sp.Matrix([0, 0])
     for i in range(num_segments):
-        # bending strain
-        kappa = xi[3 * i]
-        # shear strain
-        sigma_sh = xi[3 * i + 1]
-        # axial strain
-        sigma_a = xi[3 * i + 2]
+        # strains in current virtual backbone
+        vxi = xi[i * 3: (i + 1) * 3, :]
+
+        # bending, shear and axial strains
+        kappa_b, sigma_sh, sigma_a = vxi[0], vxi[1], vxi[2]
 
         # planar orientation of robot as a function of the point s
-        th = th_prev + s * kappa
+        th = th_prev + s * kappa_b
 
         # absolute rotation of link
         R = sp.Matrix([[sp.cos(th), -sp.sin(th)], [sp.sin(th), sp.cos(th)]])
@@ -191,6 +229,50 @@ def symbolically_derive_planar_hsa_model(
             U_ij = sp.simplify(sp.integrate(dUr_ds, (s, 0, l[i])))
             # add potential energy of segment to previous segments
             U = U + U_ij
+
+            # strains in physical HSA rod
+            pxir = _sym_beta_fn(vxi, roff[i, j])
+            pxi_eqr = _sym_beta_fn(vxi_eq, roff[i, j])
+            # twist angle of the current rod
+            phir = phi[i * num_rods_per_segment + j]
+
+            # elongation of the rest length of the current rod
+            varepsilonr = C_varepsilon[i, j] * h[i, j] / l[i] * phir
+
+            # define elastic and shear moduli
+            # difference between the current modulus and the nominal modulus
+            Edeltar = C_E[i, j] * h[i, j] / l[i]* phi[i * num_rods_per_segment + j]
+            Gdeltar = C_G[i, j] * h[i, j] / l[i] * phi[i * num_rods_per_segment + j]
+            # current elastic and shear modulus
+            Ehatr = Ehat[i, j] + Edeltar
+            Ghatr = Ghat[i, j] + Gdeltar
+
+            Shatr = _sym_compute_planar_stiffness_matrix(
+                A=Ar[i, j], Ib=Ir[i, j], E=Ehatr, G=Ghatr
+            )
+            Sdeltar = _sym_compute_planar_stiffness_matrix(
+                A=Ar[i, j], Ib=Ir[i, j], E=Edeltar, G=Gdeltar
+            )
+            Sr = Shatr + Sdeltar
+
+            # Jacobian of the strain of the physical HSA rods with respect to the configuration variables
+            J_betar = sp.Matrix([[1, 0, 0], [0, 1, 0], [roff[i, j], 0, 1]])
+
+            vKr = J_betar.T @ Shatr @ (pxir - pxi_eqr)
+            # add contribution of elasticity vector
+            K[3 * i: 3 * (i + 1), 0] += vKr
+
+            # damping coefficient of the current rod
+            zetar = zeta_syms[3*(i * num_rods_per_segment + j): 3*(i * num_rods_per_segment + j + 1)]
+            vDr = J_betar.T @ sp.diag(*zetar) @ J_betar
+            # add contribution of damping matrix
+            D[3 * i: 3 * (i + 1), 3 * i: 3 * (i + 1)] += vDr
+
+            # actuation strain of the current rod
+            pxiphir = sp.Matrix([[0.0], [0.0], [varepsilonr]])
+            # actuation force of the current rod on the strain of the virtual backbone
+            valphar = J_betar.T @ (-Sdeltar @ (pxir - pxi_eqr) + Sr @ pxiphir)
+            alpha[3 * i: 3 * (i + 1), 0] += valphar
 
         # mass of the platform itself
         mp_itself = rhop[i, 0] * pcudim[i, 0] * pcudim[i, 1] * pcudim[i, 2]
@@ -329,6 +411,13 @@ def symbolically_derive_planar_hsa_model(
         G = sp.simplify(G)
     print("G =\n", G)
 
+    K = sp.simplify(K)
+    print("K =\n", K)
+    D = sp.simplify(D)
+    print("D =\n", D)
+    alpha = sp.simplify(alpha)
+    print("alpha =\n", alpha)
+
     # dictionary with expressions
     sym_exps = {
         "params_syms": {
@@ -344,10 +433,16 @@ def symbolically_derive_planar_hsa_model(
             "rhop": rhop_syms,
             "rhoec": rhoec_syms,
             "g": g_syms,
+            "Ehat": Ehat_syms,
+            "Ghat": Ghat_syms,
+            "C_E": C_E_syms,
+            "C_G": C_G_syms,
+            "zeta": zeta_syms,
         },
         "state_syms": {
             "xi": xi_syms,
             "xi_d": xi_d_syms,
+            "phi": phi_syms,
             "s": s,
         },
         "exps": {
@@ -367,6 +462,9 @@ def symbolically_derive_planar_hsa_model(
             "B": B,
             "C": C,
             "G": G,
+            "K": K,
+            "D": D,
+            "alpha": alpha,
         },
     }
 
@@ -381,3 +479,35 @@ def symbolically_derive_planar_hsa_model(
             dill.dump(sym_exps, f)
 
     return sym_exps
+
+
+def _sym_beta_fn(vxi: sp.Matrix, roff: sp.Expr) -> sp.Matrix:
+    """
+    Symbolically map the generalized coordinates to the strains in the physical rods
+    Args:
+        vxi: strains of the virtual backbone of shape (3, )
+    Returns:
+        pxi: strains in the physical rods of shape (3, )
+    """
+    pxi = vxi.copy()
+    pxi[2] = pxi[2] + roff * vxi[0]
+    return pxi
+
+
+def _sym_compute_planar_stiffness_matrix(
+    A: sp.Expr, Ib: sp.Expr, E: sp.Expr, G: sp.Expr
+) -> sp.Matrix:
+    """
+    Symbolically compute the stiffness matrix of the system.
+    Args:
+        A: cross-sectional area of shape ()
+        Ib: second moment of area of shape ()
+        E: Elastic modulus of shape ()
+        G: Shear modulus of shape ()
+
+    Returns:
+        S: stiffness matrix of shape (3, 3)
+    """
+    S = sp.diag(Ib * E, 4 / 3 * A * G, A * E)
+
+    return S
