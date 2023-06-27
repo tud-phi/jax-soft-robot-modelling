@@ -12,7 +12,7 @@ from jsrm.systems import euler_lagrangian
 
 
 def factory(
-    filepath: Union[str, Path],
+    sym_exp_filepath: Union[str, Path],
     strain_selector: Array = None,
     xi_eq: Array = None,
     eps: float = 1e-6,
@@ -33,7 +33,7 @@ def factory(
     """
     Create jax functions from file containing symbolic expressions.
     Args:
-        filepath: path to file containing symbolic expressions
+        sym_exp_filepath: path to file containing symbolic expressions
         strain_selector: array of shape (3, ) with boolean values indicating which components of the
                 strain are active / non-zero
         xi_eq: array of shape (3 * num_segments) with the rest strains of the rod
@@ -55,7 +55,7 @@ def factory(
                 the dynamics in operational space
     """
     # load saved symbolic data
-    sym_exps = dill.load(open(str(filepath), "rb"))
+    sym_exps = dill.load(open(str(sym_exp_filepath), "rb"))
 
     # symbols for robot parameters
     params_syms = sym_exps["params_syms"]
@@ -679,6 +679,7 @@ def factory(
     sys_helpers = {
         "B_xi": B_xi,
         "xi_eq": xi_eq,
+        "apply_eps_to_bend_strains_fn": apply_eps_to_bend_strains,
         "operational_space_dynamical_matrices_fn": operational_space_dynamical_matrices_fn,
     }
 

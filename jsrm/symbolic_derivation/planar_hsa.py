@@ -244,11 +244,11 @@ def symbolically_derive_planar_hsa_model(
             Edeltar = C_E[i, j] * h[i, j] / l[i]* phi[i * num_rods_per_segment + j]
             Gdeltar = C_G[i, j] * h[i, j] / l[i] * phi[i * num_rods_per_segment + j]
             # current elastic and shear modulus
-            Ehatr = Ehat[i, j] + Edeltar
-            Ghatr = Ghat[i, j] + Gdeltar
+            Er = Ehat[i, j] + Edeltar
+            Gr = Ghat[i, j] + Gdeltar
 
             Shatr = _sym_compute_planar_stiffness_matrix(
-                A=Ar[i, j], Ib=Ir[i, j], E=Ehatr, G=Ghatr
+                A=Ar[i, j], Ib=Ir[i, j], E=Ehat[i, j], G=Ghat[i, j]
             )
             Sdeltar = _sym_compute_planar_stiffness_matrix(
                 A=Ar[i, j], Ib=Ir[i, j], E=Edeltar, G=Gdeltar
@@ -425,9 +425,11 @@ def symbolically_derive_planar_hsa_model(
             "l": l_syms,
             "lpc": lpc_syms,
             "ldc": ldc_syms,
+            "h": h_syms,
             "rout": rout_syms,
             "rin": rin_syms,
             "roff": roff_syms,
+            "C_varepsilon": C_varepsilon_syms,
             "pcudim": pcudim_syms,
             "rhor": rhor_syms,
             "rhop": rhop_syms,
