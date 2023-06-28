@@ -9,7 +9,7 @@ import sympy as sp
 from typing import Callable, Dict, Tuple
 
 from jsrm.systems import planar_hsa
-from jsrm.systems.utils import substitute_symbolic_expressions
+from jsrm.systems.utils import substitute_params_into_all_symbolic_expressions
 
 num_segments = 1
 num_rods_per_segment = 2
@@ -94,7 +94,7 @@ def test_symbolic_and_numeric_implementation(seed: int = 0):
     B_xi = sys_helpers["B_xi"]
     xi_eq = sys_helpers["xi_eq"]
 
-    exps_subs = substitute_symbolic_expressions(sym_exps, params)
+    exps_subs = substitute_params_into_all_symbolic_expressions(sym_exps, params)
     state_syms = sym_exps["state_syms"]
 
     K_lambda = sp.lambdify(
