@@ -1,13 +1,13 @@
 from pathlib import Path
 
+import jsrm
 from jsrm.symbolic_derivation.pendulum import symbolically_derive_pendulum_model
 
 NUM_LINKS = 2
 
 if __name__ == "__main__":
     sym_exp_filepath = (
-        Path(__file__).parent.parent
-        / "jsrm"
+        Path(jsrm.__file__).parent
         / "symbolic_expressions"
         / f"pendulum_nl-{NUM_LINKS}.dill"
     )

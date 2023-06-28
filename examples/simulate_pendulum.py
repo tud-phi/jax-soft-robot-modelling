@@ -11,14 +11,14 @@ import numpy as onp
 from pathlib import Path
 from typing import Callable, Dict, Tuple, Union
 
+import jsrm
 from jsrm.integration import ode_factory
 from jsrm.systems import euler_lagrangian, pendulum
 
 num_links = 2
 
 sym_exp_filepath = (
-    Path(__file__).parent.parent
-    / "jsrm"
+    Path(jsrm.__file__).parent
     / "symbolic_expressions"
     / f"pendulum_nl-{num_links}.dill"
 )

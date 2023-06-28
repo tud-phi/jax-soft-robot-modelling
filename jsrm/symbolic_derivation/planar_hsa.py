@@ -79,19 +79,27 @@ def symbolically_derive_planar_hsa_model(
         sp.symbols(f"C_G1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
     )  # shear modulus of each rod [Pa]
     zetab_syms = list(
-        sp.symbols(f"zetab1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+        sp.symbols(
+            f"zetab1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
+        )
     )  # damping coefficient for bending of each rod
     zetash_syms = list(
-        sp.symbols(f"zetash1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+        sp.symbols(
+            f"zetash1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
+        )
     )  # damping coefficient for shearing of each rod
     zetaa_syms = list(
-        sp.symbols(f"zetaa1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+        sp.symbols(
+            f"zetaa1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
+        )
     )  # damping coefficient for elongation of each rod
 
     # planar strains and their derivatives
     xi_syms = list(sp.symbols(f"xi1:{num_dof + 1}", nonzero=True))  # strains
     xi_d_syms = list(sp.symbols(f"xi_d1:{num_dof + 1}"))  # strain time derivatives
-    phi_syms = list(sp.symbols(f"phi1:{num_segments * num_rods_per_segment + 1}"))  # twist angles
+    phi_syms = list(
+        sp.symbols(f"phi1:{num_segments * num_rods_per_segment + 1}")
+    )  # twist angles
 
     # construct the symbolic matrices
     l = sp.Matrix(l_syms)  # length of each segment
@@ -122,10 +130,18 @@ def symbolically_derive_planar_hsa_model(
     # volumetric mass density of the rod end caps (both at the proximal and distal ends) [kg/m^3]
     rhoec = sp.Matrix(rhoec_syms)
     g = sp.Matrix(g_syms)  # gravity vector
-    Ehat = sp.Matrix(Ehat_syms).reshape(num_segments, num_rods_per_segment)  # nominal elastic modulus of each rod [Pa]
-    Ghat = sp.Matrix(Ghat_syms).reshape(num_segments, num_rods_per_segment)  # nominal shear modulus of each rod [Pa]
-    C_E = sp.Matrix(C_E_syms).reshape(num_segments, num_rods_per_segment)  # constant for scaling E of each rod [Pa]
-    C_G = sp.Matrix(C_G_syms).reshape(num_segments, num_rods_per_segment)  # constant for scaling G of each rod [Pa]
+    Ehat = sp.Matrix(Ehat_syms).reshape(
+        num_segments, num_rods_per_segment
+    )  # nominal elastic modulus of each rod [Pa]
+    Ghat = sp.Matrix(Ghat_syms).reshape(
+        num_segments, num_rods_per_segment
+    )  # nominal shear modulus of each rod [Pa]
+    C_E = sp.Matrix(C_E_syms).reshape(
+        num_segments, num_rods_per_segment
+    )  # constant for scaling E of each rod [Pa]
+    C_G = sp.Matrix(C_G_syms).reshape(
+        num_segments, num_rods_per_segment
+    )  # constant for scaling G of each rod [Pa]
     # damping coefficient for bending of each rod
     zetab = sp.Matrix(zetab_syms).reshape(num_segments, num_rods_per_segment)
     # damping coefficient for shearing of each rod
@@ -174,7 +190,7 @@ def symbolically_derive_planar_hsa_model(
     p_prev = sp.Matrix([0, 0])
     for i in range(num_segments):
         # strains in current virtual backbone
-        vxi = xi[i * 3: (i + 1) * 3, :]
+        vxi = xi[i * 3 : (i + 1) * 3, :]
 
         # bending, shear and axial strains
         kappa_b, sigma_sh, sigma_a = vxi[0], vxi[1], vxi[2]
@@ -253,7 +269,7 @@ def symbolically_derive_planar_hsa_model(
 
             # define elastic and shear moduli
             # difference between the current modulus and the nominal modulus
-            Edeltar = C_E[i, j] * h[i, j] / l[i]* phi[i * num_rods_per_segment + j]
+            Edeltar = C_E[i, j] * h[i, j] / l[i] * phi[i * num_rods_per_segment + j]
             Gdeltar = C_G[i, j] * h[i, j] / l[i] * phi[i * num_rods_per_segment + j]
             # current elastic and shear modulus
             Er = Ehat[i, j] + Edeltar
@@ -272,18 +288,18 @@ def symbolically_derive_planar_hsa_model(
 
             vKr = J_betar.T @ Shatr @ (pxir - pxi_eqr)
             # add contribution of elasticity vector
-            K[3 * i: 3 * (i + 1), 0] += vKr
+            K[3 * i : 3 * (i + 1), 0] += vKr
 
             # damping coefficient of the current rod
             vDr = J_betar.T @ sp.diag(zetab[i, j], zetash[i, j], zetaa[i, j]) @ J_betar
             # add contribution of damping matrix
-            D[3 * i: 3 * (i + 1), 3 * i: 3 * (i + 1)] += vDr
+            D[3 * i : 3 * (i + 1), 3 * i : 3 * (i + 1)] += vDr
 
             # actuation strain of the current rod
             pxiphir = sp.Matrix([[0.0], [0.0], [varepsilonr]])
             # actuation force of the current rod on the strain of the virtual backbone
             valphar = J_betar.T @ (-Sdeltar @ (pxir - pxi_eqr) + Sr @ pxiphir)
-            alpha[3 * i: 3 * (i + 1), 0] += valphar
+            alpha[3 * i : 3 * (i + 1), 0] += valphar
 
         # mass of the platform itself
         mp_itself = rhop[i, 0] * pcudim[i, 0] * pcudim[i, 1] * pcudim[i, 2]

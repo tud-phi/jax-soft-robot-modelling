@@ -10,6 +10,7 @@ import numpy as onp
 from pathlib import Path
 from typing import Callable, Dict
 
+import jsrm
 from jsrm.systems import planar_hsa
 
 num_segments = 1
@@ -17,8 +18,7 @@ num_rods_per_segment = 2
 
 # filepath to symbolic expressions
 sym_exp_filepath = (
-    Path(__file__).parent.parent
-    / "jsrm"
+    Path(jsrm.__file__).parent
     / "symbolic_expressions"
     / f"planar_hsa_ns-{num_segments}_nrs-{num_rods_per_segment}.dill"
 )

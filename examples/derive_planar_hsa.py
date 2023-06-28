@@ -1,13 +1,13 @@
 from pathlib import Path
 
+import jsrm
 from jsrm.symbolic_derivation.planar_hsa import symbolically_derive_planar_hsa_model
 
 NUM_SEGMENTS = 1
 NUM_RODS_PER_SEGMENT = 2
 if __name__ == "__main__":
     sym_exp_filepath = (
-        Path(__file__).parent.parent
-        / "jsrm"
+        Path(jsrm.__file__).parent
         / "symbolic_expressions"
         / f"planar_hsa_ns-{NUM_SEGMENTS}_nrs-{NUM_RODS_PER_SEGMENT}.dill"
     )

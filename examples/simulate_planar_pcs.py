@@ -10,6 +10,7 @@ import numpy as onp
 from pathlib import Path
 from typing import Callable, Dict
 
+import jsrm
 from jsrm.integration import ode_factory
 from jsrm.systems import planar_pcs
 
@@ -17,8 +18,7 @@ num_segments = 2
 
 # filepath to symbolic expressions
 sym_exp_filepath = (
-    Path(__file__).parent.parent
-    / "jsrm"
+    Path(jsrm.__file__).parent
     / "symbolic_expressions"
     / f"planar_pcs_ns-{num_segments}.dill"
 )

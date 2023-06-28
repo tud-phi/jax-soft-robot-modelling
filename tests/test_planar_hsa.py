@@ -4,6 +4,7 @@ from jax import config as jax_config
 jax_config.update("jax_enable_x64", True)  # double precision
 from jax import Array, debug, jit, random, vmap
 from jax import numpy as jnp
+import jsrm
 from pathlib import Path
 import sympy as sp
 from typing import Callable, Dict, Tuple
@@ -16,8 +17,7 @@ num_rods_per_segment = 2
 
 # filepath to symbolic expressions
 sym_exp_filepath = (
-    Path(__file__).parent.parent
-    / "jsrm"
+    Path(jsrm.__file__).parent
     / "symbolic_expressions"
     / f"planar_hsa_ns-{num_segments}_nrs-{num_rods_per_segment}.dill"
 )
@@ -127,15 +127,17 @@ def test_symbolic_and_numeric_implementation(seed: int = 0):
         rng, subrng1, subrng2, subrng3, subrng4, subrng5 = random.split(rng, 6)
         kappa_b = random.uniform(
             subrng1,
-            (num_segments, ),
+            (num_segments,),
             minval=-jnp.pi / jnp.mean(params["l"]),
-            maxval=jnp.pi / jnp.mean(params["l"])
+            maxval=jnp.pi / jnp.mean(params["l"]),
         )
-        sigma_sh = random.uniform(subrng2, (num_segments, ), minval=-0.2, maxval=0.2)
-        sigma_a = random.uniform(subrng3, (num_segments, ), minval=0.0, maxval=0.5)
+        sigma_sh = random.uniform(subrng2, (num_segments,), minval=-0.2, maxval=0.2)
+        sigma_a = random.uniform(subrng3, (num_segments,), minval=0.0, maxval=0.5)
         q = jnp.concatenate((kappa_b, sigma_sh, sigma_a), axis=0)
-        q_d = random.uniform(subrng4, (3 * num_segments, ), minval=-1.0, maxval=1.0)
-        phi = params["h"].flatten() * random.uniform(subrng5, params["h"].flatten().shape, minval=0.0, maxval=jnp.pi)
+        q_d = random.uniform(subrng4, (3 * num_segments,), minval=-1.0, maxval=1.0)
+        phi = params["h"].flatten() * random.uniform(
+            subrng5, params["h"].flatten().shape, minval=0.0, maxval=jnp.pi
+        )
 
         print(f"q: {q}, q_d: {q_d}, phi: {phi}")
 

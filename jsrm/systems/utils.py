@@ -31,15 +31,23 @@ def substitute_params_into_all_symbolic_expressions(
     for exp_key, exp_val in exps.items():
         if issubclass(type(exp_val), list):
             for exp_item_idx, exp_item_val in enumerate(exp_val):
-                exps[exp_key][exp_item_idx] = substitute_params_into_single_symbolic_expression(exp_item_val, params_syms, params)
+                exps[exp_key][
+                    exp_item_idx
+                ] = substitute_params_into_single_symbolic_expression(
+                    exp_item_val, params_syms, params
+                )
         else:
-            exps[exp_key] = substitute_params_into_single_symbolic_expression(exp_val, params_syms, params)
+            exps[exp_key] = substitute_params_into_single_symbolic_expression(
+                exp_val, params_syms, params
+            )
 
     return exps
 
 
 def substitute_params_into_single_symbolic_expression(
-    sym_exp: sp.Expr, params_syms: Dict[str, List[sp.Symbol]], params: Dict[str, jnp.array]
+    sym_exp: sp.Expr,
+    params_syms: Dict[str, List[sp.Symbol]],
+    params: Dict[str, jnp.array],
 ) -> sp.Expr:
     """
     Substitute robot parameters into a single symbolic expression.
