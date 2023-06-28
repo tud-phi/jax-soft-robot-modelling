@@ -10,14 +10,14 @@
 # There are some restrictions on what makes a valid project name
 # specification here:
 # https://packaging.python.org/specifications/core-metadata/#name
-name = "jax_soft_robot_modelling"  # Required
+name = "jsrm"  # Required
 
 # Versions should comply with PEP 440:
 # https://www.python.org/dev/peps/pep-0440/
 #
 # For a discussion on single-sourcing the version, see
 # https://packaging.python.org/guides/single-sourcing-package-version/
-version = "0.0.1"  # Required
+version = "0.0.2"  # Required
 
 # This is a one-line description or tagline of what your project does. This
 # corresponds to the "Summary" metadata field:
@@ -51,7 +51,7 @@ license = {file = "LICENSE.txt"}
 # Note that this is a list of additional keywords, separated
 # by commas, to be used to assist searching for the distribution in a
 # larger catalog.
-keywords = ["JAX", "Soft Robots", "Kinematics", "Dynamics"]  # Optional
+keywords = ["JAX", "Soft Robotics", "Kinematics", "Dynamics"]  # Optional
 
 # This should be your name or the name of the organization who originally
 # authored the project, and a valid email address corresponding to the name
@@ -159,10 +159,6 @@ test = [
 "Bug Reports" = "https://github.com/tud-cor-sr/jax-soft-robot-modelling/issues"
 "Source" = "https://github.com/tud-cor-sr/jax-soft-robot-modelling"
 
-[tool.setuptools.packages.find]
-# include = ["jsrm"]
-exclude = ["build", "examples", "symbolic_expressions", "tests"]
-
 # The following would provide a command line executable called `sample`
 # which executes the function `main` from this package when invoked.
 [project.scripts]  # Optional
@@ -171,9 +167,14 @@ exclude = ["build", "examples", "symbolic_expressions", "tests"]
 # This is configuration specific to the `setuptools` build backend.
 # If you are using a different build backend, you will need to change this.
 [tool.setuptools]
+# [tool.setuptools.packages.find]
+# exclude = ["build", "examples", "tests"]
+packages = ["jsrm"]
+include-package-data = false
 # If there are data files included in your packages that need to be
 # installed, specify them here.
-# package-data = {"sample" = ["*.dat"]}
+[tool.setuptools.package-data]
+jsrm = ["symbolic_expressions/*.dill"]
 
 [build-system]
 # These are the assumed default build requirements from pip:

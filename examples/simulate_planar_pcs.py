@@ -18,6 +18,7 @@ num_segments = 2
 # filepath to symbolic expressions
 sym_exp_filepath = (
     Path(__file__).parent.parent
+    / "jsrm"
     / "symbolic_expressions"
     / f"planar_pcs_ns-{num_segments}.dill"
 )
@@ -50,7 +51,7 @@ video_ts = ts[::skip_step]  # time steps for video
 
 # video settings
 video_width, video_height = 700, 700  # img height and width
-video_path = Path(__file__).parent / "videos" / "planar_pcs_two_segments.mp4"
+video_path = Path(__file__).parent / "videos" / "planar_pcs_ns-2.mp4"
 
 
 def draw_robot(

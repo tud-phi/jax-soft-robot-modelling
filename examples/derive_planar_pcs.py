@@ -7,6 +7,7 @@ NUM_SEGMENTS = 1
 if __name__ == "__main__":
     sym_exp_filepath = (
         Path(__file__).parent.parent
+        / "jsrm"
         / "symbolic_expressions"
         / f"planar_pcs_ns-{NUM_SEGMENTS}.dill"
     )

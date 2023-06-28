@@ -16,16 +16,11 @@ from jsrm.systems import euler_lagrangian, pendulum
 
 num_links = 2
 
-num_links_to_sym_exp_filepath_map = {
-    1: "single_pendulum.dill",
-    2: "double_pendulum.dill",
-    3: "triple_pendulum.dill",
-}
-
 sym_exp_filepath = (
     Path(__file__).parent.parent
+    / "jsrm"
     / "symbolic_expressions"
-    / num_links_to_sym_exp_filepath_map[num_links]
+    / f"pendulum_nl-{num_links}.dill"
 )
 params = {
     "m": jnp.array([10.0, 6.0]),

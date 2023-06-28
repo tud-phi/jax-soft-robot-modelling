@@ -18,6 +18,7 @@ num_rods_per_segment = 2
 # filepath to symbolic expressions
 sym_exp_filepath = (
     Path(__file__).parent.parent
+    / "jsrm"
     / "symbolic_expressions"
     / f"planar_hsa_ns-{num_segments}_nrs-{num_rods_per_segment}.dill"
 )
