@@ -61,12 +61,14 @@ params = {
     # --> rho = 710.4 kg/m^3
     "rhoec": 710.4 * jnp.ones((num_segments,)),
     "g": jnp.array([0.0, -9.81]),
-    "Ehat": 1e4 * ones_rod,  # Elastic modulus of each rod [Pa]
+    "Ehat": 1e3 * ones_rod,  # Elastic modulus of each rod [Pa]
     "Ghat": 1e3 * ones_rod,  # Shear modulus of each rod [Pa]
     # Constant to scale the Elastic modulus linearly with the twist strain [Pa/(rad/m)]
-    "C_E": 0e0 * ones_rod,
+    # 53 rad / m is roughly the twist strain at 180 deg twist angle
+    "C_E": 1e3 / 53 * ones_rod,
     # Constant to scale the Shear modulus linearly with the twist strain [Pa/(rad/m)]
-    "C_G": 0e0 * ones_rod,
+    # 53 rad / m is roughly the twist strain at 180 deg twist angle
+    "C_G": -5e2 / 53 * ones_rod,
     # damping coefficient for bending of shape (num_segments, rods_per_segment)
     "zetab": 1e-4 * ones_rod,
     # damping coefficient for shear of shape (num_segments, rods_per_segment)
@@ -80,7 +82,7 @@ strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
 
 # define initial configuration
 q0 = jnp.array([jnp.pi, 0.0, 0.0])
-phi = jnp.array([jnp.pi / 2, 0])  # motor actuation angles
+phi = jnp.array([jnp.pi, jnp.pi / 2])  # motor actuation angles
 
 # set simulation parameters
 dt = 1e-4  # time step
