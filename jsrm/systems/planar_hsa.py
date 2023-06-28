@@ -683,8 +683,9 @@ def factory(
         return Lambda, nu, JB_pinv
 
     sys_helpers = {
-        "B_xi": B_xi,
         "xi_eq": xi_eq,
+        "B_xi": B_xi,
+        "eps": eps,
         "apply_eps_to_bend_strains_fn": apply_eps_to_bend_strains,
         "operational_space_dynamical_matrices_fn": operational_space_dynamical_matrices_fn,
     }
