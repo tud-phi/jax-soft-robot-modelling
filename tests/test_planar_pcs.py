@@ -14,7 +14,7 @@ from jsrm.utils import Tolerance
 
 def test_planar_pcs_one_segment():
     sym_exp_filepath = (
-        Path(__file__).parent.parent / "symbolic_expressions" / "planar_pcs_ns-1.dill"
+        Path(__file__).parent.parent / "jsrm" / "symbolic_expressions" / "planar_pcs_ns-1.dill"
     )
     params = {
         "th0": jnp.array(0.0),  # initial orientation angle [rad]
