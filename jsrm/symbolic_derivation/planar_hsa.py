@@ -78,9 +78,15 @@ def symbolically_derive_planar_hsa_model(
     C_G_syms = list(
         sp.symbols(f"C_G1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
     )  # shear modulus of each rod [Pa]
-    zeta_syms = list(
-        sp.symbols(f"zeta1:{3 * num_segments * num_rods_per_segment + 1}", nonnegative=True)
-    )  # damping coefficients of each rod
+    zetab_syms = list(
+        sp.symbols(f"zetab1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+    )  # damping coefficient for bending of each rod
+    zetash_syms = list(
+        sp.symbols(f"zetash1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+    )  # damping coefficient for shearing of each rod
+    zetaa_syms = list(
+        sp.symbols(f"zetaa1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+    )  # damping coefficient for elongation of each rod
 
     # planar strains and their derivatives
     xi_syms = list(sp.symbols(f"xi1:{num_dof + 1}", nonzero=True))  # strains
@@ -120,6 +126,12 @@ def symbolically_derive_planar_hsa_model(
     Ghat = sp.Matrix(Ghat_syms).reshape(num_segments, num_rods_per_segment)  # nominal shear modulus of each rod [Pa]
     C_E = sp.Matrix(C_E_syms).reshape(num_segments, num_rods_per_segment)  # constant for scaling E of each rod [Pa]
     C_G = sp.Matrix(C_G_syms).reshape(num_segments, num_rods_per_segment)  # constant for scaling G of each rod [Pa]
+    # damping coefficient for bending of each rod
+    zetab = sp.Matrix(zetab_syms).reshape(num_segments, num_rods_per_segment)
+    # damping coefficient for shearing of each rod
+    zetash = sp.Matrix(zetash_syms).reshape(num_segments, num_rods_per_segment)
+    # damping coefficient for axial elongation of each rod
+    zetaa = sp.Matrix(zetaa_syms).reshape(num_segments, num_rods_per_segment)
 
     # configuration variables and their derivatives
     xi = sp.Matrix(xi_syms)  # strains
@@ -263,8 +275,7 @@ def symbolically_derive_planar_hsa_model(
             K[3 * i: 3 * (i + 1), 0] += vKr
 
             # damping coefficient of the current rod
-            zetar = zeta_syms[3*(i * num_rods_per_segment + j): 3*(i * num_rods_per_segment + j + 1)]
-            vDr = J_betar.T @ sp.diag(*zetar) @ J_betar
+            vDr = J_betar.T @ sp.diag(zetab[i, j], zetash[i, j], zetaa[i, j]) @ J_betar
             # add contribution of damping matrix
             D[3 * i: 3 * (i + 1), 3 * i: 3 * (i + 1)] += vDr
 
@@ -439,7 +450,9 @@ def symbolically_derive_planar_hsa_model(
             "Ghat": Ghat_syms,
             "C_E": C_E_syms,
             "C_G": C_G_syms,
-            "zeta": zeta_syms,
+            "zetab": zetab_syms,
+            "zetash": zetash_syms,
+            "zetaa": zetaa_syms,
         },
         "state_syms": {
             "xi": xi_syms,

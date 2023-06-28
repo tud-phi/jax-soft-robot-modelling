@@ -544,8 +544,14 @@ def factory(
         # sum the elastic forces over all rods of each segment
         K = jnp.sum(vK, axis=1).flatten()  # shape (n_xi, )
 
-        # damping coefficients of shape (num_segments, num_rods_per_segment, 3)
-        zeta = params.get("zeta", jnp.zeros((num_segments, num_rods_per_segment, 3)))
+        # damping coefficients for bending of shape (num_segments, num_rods_per_segment)
+        zetab = params.get("zetab", jnp.zeros((num_segments, num_rods_per_segment)))
+        # damping coefficients for shearing of shape (num_segments, num_rods_per_segment)
+        zetash = params.get("zetash", jnp.zeros((num_segments, num_rods_per_segment)))
+        # damping coefficients for axial elongation of shape (num_segments, num_rods_per_segment)
+        zetaa = params.get("zetaa", jnp.zeros((num_segments, num_rods_per_segment)))
+        # combined zeta
+        zeta = jnp.stack([zetab, zetash, zetaa], axis=-1)
         vD = vmap(  # vmap over the segments
             vmap(  # vmap over the rods of each segment
                 lambda _J_beta, _zeta: _J_beta.T @ jnp.diag(_zeta) @ _J_beta,

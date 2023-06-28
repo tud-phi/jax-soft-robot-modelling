@@ -66,14 +66,12 @@ params = {
     "C_E": 0e0 * ones_rod,
     # Constant to scale the Shear modulus linearly with the twist strain [Pa/(rad/m)]
     "C_G": 0e0 * ones_rod,
-    # damping coefficient of shape (num_segments, rods_per_segment, 3)
-    "zeta": 1e-4 * jnp.repeat(
-        jnp.repeat(
-            jnp.array([1e0, 1e2, 1e2]).reshape((1, 1, 3)), axis=1, repeats=num_rods_per_segment
-        ),
-        axis=0,
-        repeats=num_segments,
-    ),
+    # damping coefficient for bending of shape (num_segments, rods_per_segment)
+    "zetab": 1e-4 * ones_rod,
+    # damping coefficient for shear of shape (num_segments, rods_per_segment)
+    "zetash": 1e-2 * ones_rod,
+    # damping coefficient for axial elongation of shape (num_segments, rods_per_segment)
+    "zetaa": 1e-2 * ones_rod,
 }
 
 # activate all strains (i.e. bending, shear, and axial)
