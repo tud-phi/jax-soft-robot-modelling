@@ -77,10 +77,7 @@ params = {
 
 def test_symbolic_and_numeric_implementation(seed: int = 0):
     (
-        strain_basis,
         forward_kinematics_virtual_backbone_fn,
-        forward_kinematics_rod_fn,
-        forward_kinematics_platform_fn,
         forward_kinematics_end_effector_fn,
         jacobian_end_effector_fn,
         inverse_kinematics_end_effector_fn,

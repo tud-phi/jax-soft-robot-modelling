@@ -286,25 +286,22 @@ def draw_robot(
 
 if __name__ == "__main__":
     (
-        strain_basis,
         forward_kinematics_virtual_backbone_fn,
-        forward_kinematics_rod_fn,
-        forward_kinematics_platform_fn,
         forward_kinematics_end_effector_fn,
         jacobian_end_effector_fn,
         inverse_kinematics_end_effector_fn,
         dynamical_matrices_fn,
-        _,
+        sys_helpers,
     ) = planar_hsa.factory(sym_exp_filepath, strain_selector)
 
     batched_forward_kinematics_virtual_backbone_fn = vmap(
         forward_kinematics_virtual_backbone_fn, in_axes=(None, None, 0), out_axes=-1
     )
     batched_forward_kinematics_rod_fn = vmap(
-        forward_kinematics_rod_fn, in_axes=(None, None, 0, None), out_axes=-1
+        sys_helpers["forward_kinematics_rod_fn"], in_axes=(None, None, 0, None), out_axes=-1
     )
     batched_forward_kinematics_platform_fn = vmap(
-        forward_kinematics_platform_fn, in_axes=(None, None, 0), out_axes=0
+        sys_helpers["forward_kinematics_platform_fn"], in_axes=(None, None, 0), out_axes=0
     )
 
     s_ps = jnp.linspace(0, jnp.sum(params["l"]), 100)

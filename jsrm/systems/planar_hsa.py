@@ -17,17 +17,11 @@ def factory(
     xi_eq: Array = None,
     eps: float = 1e-6,
 ) -> Tuple[
-    Array,
     Callable[[Dict[str, Array], Array, Array], Array],
-    Callable[[Dict[str, Array], Array, Array, Array], Array],
     Callable[[Dict[str, Array], Array, Array], Array],
     Callable[[Dict[str, Array], Array], Array],
     Callable[[Dict[str, Array], Array], Array],
     Callable[[Dict[str, Array], Array], Array],
-    Callable[
-        [Dict[str, Array], Array, Array],
-        Tuple[Array, Array, Array, Array, Array, Array],
-    ],
     Dict,
 ]:
     """
@@ -39,18 +33,18 @@ def factory(
         xi_eq: array of shape (3 * num_segments) with the rest strains of the rod
         eps: small number to avoid division by zero
     Returns:
-        B_xi: strain basis matrix of shape (3 * num_segments, n_q)
         forward_kinematics_virtual_backbone_fn: function that returns the chi vector of shape (3, n_q) with the
             positions and orientations of the virtual backbone
-        forward_kinematics_rod_fn: function that returns the chi vector of shape (3, n_q) with the
-            positions and orientations of the rod
-        forward_kinematics_platform_fn: function that returns the chi vector of shape (3, n_q) with the positions
-            and orientations of the platform
         forward_kinematics_end_effector_fn: function that returns the pose of the end effector of shape (3, )
         jacobian_end_effector_fn: function that returns the Jacobian of the end effector of shape (3, n_q)
         inverse_kinematics_end_effector_fn: function that returns the generalized coordinates for a given end-effector pose
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and alpha matrices
         sys_helpers: dictionary of helper functions / variables. Includes for examples:
+            B_xi: strain basis matrix of shape (3 * num_segments, n_q)
+            forward_kinematics_rod_fn: function that returns the chi vector of shape (3, n_q) with the
+                positions and orientations of the rod
+            forward_kinematics_platform_fn: function that returns the chi vector of shape (3, n_q) with the positions
+                and orientations of the platform
             operational_space_dynamical_matrices_fn: function that returns Lambda, nu, and JB_pinv describing
                 the dynamics in operational space
     """
@@ -64,7 +58,7 @@ def factory(
     num_rods_per_segment = len(params_syms["rout"]) // num_segments
 
     @jit
-    def select_params_for_lambdify(params: Dict[str, Array]) -> List[Array]:
+    def select_params_for_lambdify_fn(params: Dict[str, Array]) -> List[Array]:
         """
         Select the parameters for lambdify
         Args:
@@ -179,7 +173,7 @@ def factory(
     )
 
     @jit
-    def apply_eps_to_bend_strains(xi: Array, _eps: float) -> Array:
+    def apply_eps_to_bend_strains_fn(xi: Array, _eps: float) -> Array:
         """
         Add a small number to the bending strain to avoid singularities
         """
@@ -217,7 +211,7 @@ def factory(
         xi = xi_eq + B_xi @ q
 
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+        xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
 
         # cumsum of the segment lengths
         l_cum = jnp.cumsum(params["l"])
@@ -232,7 +226,7 @@ def factory(
         s_segment = s - l_cum_padded[segment_idx]
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
-        params_for_lambdify = select_params_for_lambdify(params)
+        params_for_lambdify = select_params_for_lambdify_fn(params)
 
         chi = lax.switch(
             segment_idx, chiv_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
@@ -261,7 +255,7 @@ def factory(
         xi = xi_eq + B_xi @ q
 
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+        xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
 
         # cumsum of the segment lengths
         l_cum = jnp.cumsum(params["l"])
@@ -276,7 +270,7 @@ def factory(
         s_segment = s - l_cum_padded[segment_idx]
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
-        params_for_lambdify = select_params_for_lambdify(params)
+        params_for_lambdify = select_params_for_lambdify_fn(params)
 
         chir_lambda_sms_idx = segment_idx * num_rods_per_segment + rod_idx
         chir = lax.switch(
@@ -309,10 +303,10 @@ def factory(
         xi = xi_eq + B_xi @ q
 
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+        xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
-        params_for_lambdify = select_params_for_lambdify(params)
+        params_for_lambdify = select_params_for_lambdify_fn(params)
 
         chip = lax.switch(
             segment_idx, chip_lambda_sms, *params_for_lambdify, *xi_epsed
@@ -336,10 +330,10 @@ def factory(
         # map the configuration to the strains
         xi = xi_eq + B_xi @ q
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+        xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
-        params_for_lambdify = select_params_for_lambdify(params)
+        params_for_lambdify = select_params_for_lambdify_fn(params)
         # evaluate the symbolic expression
         chiee = chiee_lambda(*params_for_lambdify, *xi_epsed).squeeze()
 
@@ -359,10 +353,10 @@ def factory(
         # map the configuration to the strains
         xi = xi_eq + B_xi @ q
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+        xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
-        params_for_lambdify = select_params_for_lambdify(params)
+        params_for_lambdify = select_params_for_lambdify_fn(params)
         # evaluate the symbolic expression
         Jee = Jee_lambda(*params_for_lambdify, *xi_epsed)
 
@@ -476,7 +470,7 @@ def factory(
         xi_d = B_xi @ q_d
 
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains(xi, 1e4 * eps)
+        xi_epsed = apply_eps_to_bend_strains_fn(xi, 1e4 * eps)
 
         # the strains of the physical rods as array of shape (num_segments, num_rods_per_segment, 3)
         pxi = beta_fn(params, xi_epsed)
@@ -589,7 +583,7 @@ def factory(
         ).flatten()  # sum over all the rods and then flatten over all the segments
 
         # apply the strain basis
-        params_for_lambdify = select_params_for_lambdify(params)
+        params_for_lambdify = select_params_for_lambdify_fn(params)
         B = B_xi.T @ B_lambda(*params_for_lambdify, *xi_epsed) @ B_xi
         C_xi = C_lambda(*params_for_lambdify, *xi_epsed, *xi_d)
         C = B_xi.T @ C_xi @ B_xi
@@ -663,10 +657,10 @@ def factory(
         xi = xi_eq + B_xi @ q
         xi_d = B_xi @ q_d
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+        xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
-        params_for_lambdify = select_params_for_lambdify(params)
+        params_for_lambdify = select_params_for_lambdify_fn(params)
 
         # end-effector Jacobian and its time-derivative
         Jee = Jee_lambda(*params_for_lambdify, *xi_epsed)
@@ -686,15 +680,15 @@ def factory(
         "xi_eq": xi_eq,
         "B_xi": B_xi,
         "eps": eps,
-        "apply_eps_to_bend_strains_fn": apply_eps_to_bend_strains,
+        "select_params_for_lambdify_fn": select_params_for_lambdify_fn,
+        "apply_eps_to_bend_strains_fn": apply_eps_to_bend_strains_fn,
+        "forward_kinematics_rod_fn": forward_kinematics_rod_fn,
+        "forward_kinematics_platform_fn": forward_kinematics_platform_fn,
         "operational_space_dynamical_matrices_fn": operational_space_dynamical_matrices_fn,
     }
 
     return (
-        B_xi,
         forward_kinematics_virtual_backbone_fn,
-        forward_kinematics_rod_fn,
-        forward_kinematics_platform_fn,
         forward_kinematics_end_effector_fn,
         jacobian_end_effector_fn,
         inverse_kinematics_end_effector_fn,
