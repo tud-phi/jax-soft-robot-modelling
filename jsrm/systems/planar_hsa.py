@@ -6,7 +6,7 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
 
-from .utils import compute_strain_basis, compute_planar_stiffness_matrix
+from .utils import concatenate_params_syms, compute_strain_basis, compute_planar_stiffness_matrix
 from jsrm.math_utils import blk_diag
 from jsrm.systems import euler_lagrangian
 
@@ -74,12 +74,7 @@ def factory(
         return params_for_lambdify
 
     # concatenate the robot params symbols
-    params_syms_cat = []
-    for params_key, params_sym in sorted(params_syms.items()):
-        if type(params_sym) in [list, tuple]:
-            params_syms_cat += params_sym
-        else:
-            params_syms_cat.append(params_sym)
+    params_syms_cat = concatenate_params_syms(params_syms)
 
     # number of degrees of freedom
     n_xi = len(sym_exps["state_syms"]["xi"])

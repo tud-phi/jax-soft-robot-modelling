@@ -73,6 +73,17 @@ def substitute_params_into_single_symbolic_expression(
     return sym_exp
 
 
+def concatenate_params_syms(params_syms: Dict[str, Union[sp.Symbol, List[sp.Symbol]]]) -> List[sp.Symbol]:
+    # concatenate the robot params symbols
+    params_syms_cat = []
+    for params_key, params_sym in sorted(params_syms.items()):
+        if type(params_sym) in [list, tuple]:
+            params_syms_cat += params_sym
+        else:
+            params_syms_cat.append(params_sym)
+    return params_syms_cat
+
+
 def compute_strain_basis(
     strain_selector: Array,
 ) -> jnp.ndarray:

@@ -6,6 +6,8 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
 
+from .utils import concatenate_params_syms
+
 
 def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
     """
@@ -44,9 +46,7 @@ def factory(filepath: Union[str, Path]) -> Tuple[Callable, Callable]:
     exps = sym_exps["exps"]
 
     # concatenate the robot params symbols
-    params_syms_cat = []
-    for params_key, params_sym in sorted(params_syms.items()):
-        params_syms_cat += params_sym
+    params_syms_cat = concatenate_params_syms(params_syms)
 
     # number of degrees of freedom
     n_q = len(sym_exps["state_syms"]["q"])
