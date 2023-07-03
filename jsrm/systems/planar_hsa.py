@@ -14,7 +14,6 @@ from jsrm.systems import euler_lagrangian
 def factory(
     sym_exp_filepath: Union[str, Path],
     strain_selector: Array = None,
-    xi_eq: Array = None,
     eps: float = 1e-6,
 ) -> Tuple[
     Callable[[Dict[str, Array], Array, Array], Array],
@@ -30,7 +29,6 @@ def factory(
         sym_exp_filepath: path to file containing symbolic expressions
         strain_selector: array of shape (3, ) with boolean values indicating which components of the
                 strain are active / non-zero
-        xi_eq: array of shape (3 * num_segments) with the rest strains of the rod
         eps: small number to avoid division by zero
     Returns:
         forward_kinematics_virtual_backbone_fn: function that returns the chi vector of shape (3, n_q) with the
@@ -85,16 +83,6 @@ def factory(
     else:
         assert strain_selector.shape == (n_xi,)
     B_xi = compute_strain_basis(strain_selector)
-
-    # initialize the rest strain
-    if xi_eq is None:
-        xi_eq = jnp.zeros((n_xi,))
-        # by default, set the axial rest strain (local y-axis) along the entire rod to 1.0
-        rest_strain_reshaped = xi_eq.reshape((-1, 3))
-        rest_strain_reshaped = rest_strain_reshaped.at[:, -1].set(1.0)
-        xi_eq = rest_strain_reshaped.flatten()
-    else:
-        assert xi_eq.shape == (n_xi,)
 
     # concatenate the list of state symbols
     state_syms_cat = sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["xi_d"]
@@ -168,6 +156,66 @@ def factory(
     )
 
     @jit
+    def beta_fn(params: Dict[str, Array], vxi: Array) -> Array:
+        """
+        Map the generalized coordinates to the strains in the physical rods
+        Args:
+            params: Dictionary of robot parameters
+            vxi: strains of the virtual backbone of shape (n_xi, )
+        Returns:
+            pxi: strains in the physical rods of shape (num_segments, num_rods_per_segment, 3)
+        """
+        # strains of the virtual rod
+        vxi = vxi.reshape((num_segments, 1, -1))
+
+        pxi = jnp.repeat(vxi, num_rods_per_segment, axis=1)
+        psigma_a = (
+                pxi[:, :, 2]
+                + params["roff"] * jnp.repeat(vxi, num_rods_per_segment, axis=1)[..., 0]
+        )
+        pxi = pxi.at[:, :, 2].set(psigma_a)
+
+        return pxi
+
+    @jit
+    def beta_inv_fn(params: Dict[str, Array], pxi: Array) -> Array:
+        """
+        Map the strains in the physical rods to the strains of the virtual backbone
+        Args:
+            params: Dictionary of robot parameters
+            pxi: strains in the physical rods of shape (num_segments, num_rods_per_segment, 3)
+        Returns:
+            vxi: strains of the virtual backbone of shape (n_xi, )
+        """
+        vxi = jnp.mean(pxi, axis=1)
+        vxi = vxi.at[:, 2].set(vxi[:, 2] - jnp.mean(params["roff"] * pxi[..., 0], axis=1))
+        vxi = vxi.flatten()
+
+        return vxi
+
+    @jit
+    def configuration_to_strains_fn(params: Dict[str, Array], q: Array) -> Array:
+        """
+        Map the generalized coordinates to the strains in the virtual backbone
+        Args:
+            params: Dictionary of robot parameters
+            q: generalized coordinates of shape (n_q, )
+        Returns:
+            xi: strains of the virtual backbone of shape (n_xi, )
+        """
+        # rest strains of the physical rods
+        pxi_eq = jnp.zeros((num_segments, num_rods_per_segment, 3))
+        pxi_eq = pxi_eq.at[:, :, 2].set(params["sigma_a_eq"])
+
+        # map the rest strains from the physical rods to the virtual backbone
+        xi_eq = beta_inv_fn(params, pxi_eq)
+
+        # map the configuration to the strains
+        xi = xi_eq + B_xi @ q
+
+        return xi
+
+    @jit
     def apply_eps_to_bend_strains_fn(xi: Array, _eps: float) -> Array:
         """
         Add a small number to the bending strain to avoid singularities
@@ -203,7 +251,7 @@ def factory(
                 and theta is the planar orientation with respect to the x-axis
         """
         # map the configuration to the strains
-        xi = xi_eq + B_xi @ q
+        xi = configuration_to_strains_fn(params, q)
 
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
@@ -247,7 +295,7 @@ def factory(
                 and theta is the planar orientation with respect to the x-axis
         """
         # map the configuration to the strains
-        xi = xi_eq + B_xi @ q
+        xi = configuration_to_strains_fn(params, q)
 
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
@@ -295,7 +343,7 @@ def factory(
                 and theta is the planar orientation with respect to the x-axis
         """
         # map the configuration to the strains
-        xi = xi_eq + B_xi @ q
+        xi = configuration_to_strains_fn(params, q)
 
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
@@ -323,7 +371,7 @@ def factory(
                 and theta is the planar orientation with respect to the x-axis
         """
         # map the configuration to the strains
-        xi = xi_eq + B_xi @ q
+        xi = configuration_to_strains_fn(params, q)
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
 
@@ -346,7 +394,7 @@ def factory(
                 Jee is an array of shape (3, n_q).
         """
         # map the configuration to the strains
-        xi = xi_eq + B_xi @ q
+        xi = configuration_to_strains_fn(params, q)
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
 
@@ -417,28 +465,6 @@ def factory(
         return q
 
     @jit
-    def beta_fn(params: Dict[str, Array], vxi: Array) -> Array:
-        """
-        Map the generalized coordinates to the strains in the physical rods
-        Args:
-            params: Dictionary of robot parameters
-            vxi: strains of the virtual backbone of shape (n_xi, )
-        Returns:
-            pxi: strains in the physical rods of shape (num_segments, num_rods_per_segment, 3)
-        """
-        # strains of the virtual rod
-        vxi = vxi.reshape((num_segments, 1, -1))
-
-        pxi = jnp.repeat(vxi, num_rods_per_segment, axis=1)
-        psigma_a = (
-            pxi[:, :, 2]
-            + params["roff"] * jnp.repeat(vxi, num_rods_per_segment, axis=1)[..., 0]
-        )
-        pxi = pxi.at[:, :, 2].set(psigma_a)
-
-        return pxi
-
-    @jit
     def dynamical_matrices_fn(
         params: Dict[str, Array],
         q: Array,
@@ -461,7 +487,7 @@ def factory(
             tau_q: actuation torque acting on the generalized coordinates of shape (n_q, )
         """
         # map the configuration to the strains
-        xi = xi_eq + B_xi @ q
+        xi = configuration_to_strains_fn(params, q)
         xi_d = B_xi @ q_d
 
         # add a small number to the bending strain to avoid singularities
@@ -469,7 +495,10 @@ def factory(
 
         # the strains of the physical rods as array of shape (num_segments, num_rods_per_segment, 3)
         pxi = beta_fn(params, xi_epsed)
-        pxi_eq = beta_fn(params, xi_eq)  # equilibrium strains of the physical rods
+
+        # rest strains in the physical rods as array of shape (num_segments, num_rods_per_segment, 3)
+        pxi_eq = jnp.zeros_like(pxi)
+        pxi_eq = pxi_eq.at[..., 2].set(params["sigma_a_eq"])
 
         # number of segments
         num_segments = params["rout"].shape[0]
@@ -649,7 +678,7 @@ def factory(
                 Shape (n_q, n_x)
         """
         # map the configuration to the strains
-        xi = xi_eq + B_xi @ q
+        xi = configuration_to_strains_fn(params, q)
         xi_d = B_xi @ q_d
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
@@ -672,10 +701,12 @@ def factory(
         return Lambda, nu, JB_pinv
 
     sys_helpers = {
-        "xi_eq": xi_eq,
         "B_xi": B_xi,
         "eps": eps,
         "select_params_for_lambdify_fn": select_params_for_lambdify_fn,
+        "beta_fn": beta_fn,
+        "beta_inv_fn": beta_inv_fn,
+        "configuration_to_strains_fn": configuration_to_strains_fn,
         "apply_eps_to_bend_strains_fn": apply_eps_to_bend_strains_fn,
         "forward_kinematics_rod_fn": forward_kinematics_rod_fn,
         "forward_kinematics_platform_fn": forward_kinematics_platform_fn,
