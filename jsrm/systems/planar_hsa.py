@@ -194,6 +194,24 @@ def factory(
         return vxi
 
     @jit
+    def rest_strains_fn(params: Dict[str, Array]) -> Array:
+        """
+        Compute the rest strains of the virtual backbone
+        Args:
+            params: Dictionary of robot parameters
+
+        Returns:
+            vxi_eq: rest strains of the virtual backbone of shape (n_xi, )
+        """
+        # rest strains of the physical rods
+        pxi_eq = jnp.zeros((num_segments, num_rods_per_segment, 3))
+        pxi_eq = pxi_eq.at[:, :, 2].set(params["sigma_a_eq"])
+
+        # map the rest strains from the physical rods to the virtual backbone
+        vxi_eq = beta_inv_fn(params, pxi_eq)
+        return vxi_eq
+
+    @jit
     def configuration_to_strains_fn(params: Dict[str, Array], q: Array) -> Array:
         """
         Map the generalized coordinates to the strains in the virtual backbone
@@ -203,12 +221,8 @@ def factory(
         Returns:
             xi: strains of the virtual backbone of shape (n_xi, )
         """
-        # rest strains of the physical rods
-        pxi_eq = jnp.zeros((num_segments, num_rods_per_segment, 3))
-        pxi_eq = pxi_eq.at[:, :, 2].set(params["sigma_a_eq"])
-
-        # map the rest strains from the physical rods to the virtual backbone
-        xi_eq = beta_inv_fn(params, pxi_eq)
+        # rest strains of the virtual backbone
+        xi_eq = rest_strains_fn(params)
 
         # map the configuration to the strains
         xi = xi_eq + B_xi @ q
@@ -459,8 +473,11 @@ def factory(
             )
         )
 
+        # rest strains of the virtual backbone
+        vxi_eq = rest_strains_fn(params)
+
         # map the strains to the generalized coordinates
-        q = jnp.linalg.pinv(B_xi) @ (vxi - xi_eq)
+        q = jnp.linalg.pinv(B_xi) @ (vxi - vxi_eq)
 
         return q
 
@@ -701,11 +718,12 @@ def factory(
         return Lambda, nu, JB_pinv
 
     sys_helpers = {
-        "B_xi": B_xi,
         "eps": eps,
         "select_params_for_lambdify_fn": select_params_for_lambdify_fn,
         "beta_fn": beta_fn,
         "beta_inv_fn": beta_inv_fn,
+        "rest_strains_fn": rest_strains_fn,
+        "B_xi": B_xi,
         "configuration_to_strains_fn": configuration_to_strains_fn,
         "apply_eps_to_bend_strains_fn": apply_eps_to_bend_strains_fn,
         "forward_kinematics_rod_fn": forward_kinematics_rod_fn,
