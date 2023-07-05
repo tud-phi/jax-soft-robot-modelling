@@ -2,12 +2,12 @@ import dill
 from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
-from jax import Array, debug, jit, random, vmap
+from jax import Array, jit, random
 from jax import numpy as jnp
 import jsrm
 from pathlib import Path
 import sympy as sp
-from typing import Callable, Dict, Tuple
+from typing import Tuple
 
 from jsrm.parameters.hsa_params import PARAMS_CONTROL as params
 from jsrm.systems import planar_hsa

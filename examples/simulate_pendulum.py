@@ -3,17 +3,15 @@ from diffrax import diffeqsolve, Dopri5, ODETerm, SaveAt
 from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
-import jax
-from jax import Array, jit, vmap
+from jax import Array, vmap
 from jax import numpy as jnp
-from functools import partial
 import numpy as onp
 from pathlib import Path
-from typing import Callable, Dict, Tuple, Union
+from typing import Callable, Dict
 
 import jsrm
-from jsrm.integration import ode_factory
-from jsrm.systems import euler_lagrangian, pendulum
+from jsrm import ode_factory
+from jsrm.systems import pendulum
 
 num_links = 2
 

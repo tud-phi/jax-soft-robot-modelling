@@ -2,16 +2,15 @@ import cv2  # importing cv2
 from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
-from diffrax import diffeqsolve, Dopri5, Euler, ODETerm, SaveAt
-from jax import Array, jit, vmap
+from diffrax import diffeqsolve, Euler, ODETerm, SaveAt
+from jax import Array, vmap
 from jax import numpy as jnp
-from functools import partial
 import numpy as onp
 from pathlib import Path
 from typing import Callable, Dict
 
 import jsrm
-from jsrm.integration import ode_factory
+from jsrm import ode_factory
 from jsrm.systems import planar_pcs
 
 num_segments = 2

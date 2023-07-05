@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import jsrm
-from jsrm.symbolic_derivation.pendulum import symbolically_derive_pendulum_model
+from jsrm import symbolically_derive_pendulum_model
 
 NUM_LINKS = 2
 

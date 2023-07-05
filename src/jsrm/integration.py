@@ -1,8 +1,5 @@
-from functools import partial
-import jax
-from jax import Array, debug, jit, vmap
-from jax import numpy as jnp
-from typing import Callable, Dict, Generic
+from jax import Array, jit
+from typing import Callable, Dict
 
 from jsrm.systems import euler_lagrangian
 

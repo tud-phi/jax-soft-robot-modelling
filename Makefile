@@ -5,17 +5,17 @@ PYTHONPATH := `pwd`
 .PHONY: black
 black:
 	black --version
-	black --config pyproject.toml examples jsrm tests
+	black --config pyproject.toml examples src tests
 
 .PHONY: black-check
 black-check:
 	black --version
-	black --diff --check --config pyproject.toml examples jsrm tests
+	black --diff --check --config pyproject.toml examples src tests
 
 .PHONY: flake8
 flake8:
 	flake8 --version
-	flake8 jsrm tests
+	flake8 src tests
 
 .PHONY: format-codestyle
 format-codestyle: black flake8
@@ -30,11 +30,11 @@ test:
 
 .PHONY: test_coverage
 test_coverage:
-	pytest --cov=jsrm
+	pytest --cov=src
 
 .PHONY: test_coverage_xml
 test_coverage_xml:
-	pytest --cov=jsrm --cov-report=xml
+	pytest --cov=src --cov-report=xml
 
 .PHONY: check-codestyle
 check-codestyle: black-check flake8
