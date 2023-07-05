@@ -106,7 +106,7 @@ dependencies = [ # Optional
   "jax",
   "numpy",
   "peppercorn",
-  "sympy"
+  "sympy>=1.11"
 ]
 
 # List additional groups of dependencies here (e.g. development
