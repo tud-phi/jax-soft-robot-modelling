@@ -9,6 +9,7 @@ from pathlib import Path
 import sympy as sp
 from typing import Callable, Dict, Tuple
 
+from jsrm.parameters.hsa_params import PARAMS_CONTROL as params
 from jsrm.systems import planar_hsa
 from jsrm.systems.utils import substitute_params_into_all_symbolic_expressions
 
@@ -21,59 +22,6 @@ sym_exp_filepath = (
     / "symbolic_expressions"
     / f"planar_hsa_ns-{num_segments}_nrs-{num_rods_per_segment}.dill"
 )
-
-# set parameters
-ones_rod = jnp.ones((num_segments, num_rods_per_segment))
-params = {
-    "th0": jnp.array(0.0),  # initial orientation angle [rad]
-    "l": 59e-3 * jnp.ones((num_segments,)),  # length of each rod [m]
-    # length of the rigid proximal caps of the rods connecting to the base [m]
-    "lpc": 25e-3 * jnp.ones((num_segments,)),
-    # length of the rigid distal caps of the rods connecting to the platform [m]
-    "ldc": 14e-3 * jnp.ones((num_segments,)),
-    "sigma_a_eq": 1 * ones_rod,  # axial rest strains of each rod
-    # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
-    "C_varepsilon": 9.1e-3 * ones_rod,  # Average: 0.009118994, Std: 0.000696435
-    # outside radius of each rod [m]. The rows correspond to the segments.
-    "rout": 25.4e-3 / 2 * ones_rod,  # this is for FPU rods
-    # inside radius of each rod [m]. The rows correspond to the segments.
-    "rin": (25.4e-3 / 2 - 2.43e-3) * ones_rod,  # this is for FPU rods
-    # handedness of each rod. The rows correspond to the segments.
-    "h": ones_rod,
-    # offset [m] of each rod from the centerline. The rows correspond to the segments.
-    "roff": jnp.array([[-24e-3, 24e-3]]),
-    "pcudim": jnp.array(
-        [[80e-3, 12e-3, 80e-3]]
-    ),  # width, height, depth of the platform [m]
-    # mass of FPU rod: 14 g, mass of EPU rod: 26 g
-    # For FPU, this corresponds to a measure volume of 0000175355 m^3 --> rho = 798.38 kg/m^3
-    "rhor": 798.38 * ones_rod,  # Volumetric density of rods [kg/m^3],
-    # Volumetric density of platform [kg/m^3],
-    # weight of platform + marker holder + cylinder top piece: 0.107 kg
-    # subtracting 4 x 9g for distal cap: 0.071 kg
-    # volume of platform (excluding proximal and distal caps): 0.0000768 m^3
-    # --> rho = 925 kg/m^3
-    "rhop": 925 * jnp.ones((num_segments,)),
-    # volumetric density of the rigid end pieces [kg/m^3]
-    # mass of 3D printed rod (between rin and rout): 8.5g
-    # mass of the rigid end piece (up to rin): 9g
-    # volume: pi*lpc*rout^2 = 0.0000126677 m^3
-    # --> rho = 710.4 kg/m^3
-    "rhoec": 710.4 * jnp.ones((num_segments,)),
-    "g": jnp.array([0.0, -9.81]),
-    "Ehat": 1e4 * ones_rod,  # Elastic modulus of each rod [Pa]
-    "Ghat": 1e3 * ones_rod,  # Shear modulus of each rod [Pa]
-    # Constant to scale the Elastic modulus linearly with the twist strain [Pa/(rad/m)]
-    "C_E": 1e3 * ones_rod,
-    # Constant to scale the Shear modulus linearly with the twist strain [Pa/(rad/m)]
-    "C_G": 1e2 * ones_rod,
-    # damping coefficient for bending of shape (num_segments, rods_per_segment)
-    "zetab": 1e-4 * ones_rod,
-    # damping coefficient for shear of shape (num_segments, rods_per_segment)
-    "zetash": 1e-2 * ones_rod,
-    # damping coefficient for axial elongation of shape (num_segments, rods_per_segment)
-    "zetaa": 1e-2 * ones_rod,
-}
 
 
 def test_end_effector_kinematics(seed: int = 0):
