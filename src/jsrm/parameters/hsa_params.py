@@ -67,6 +67,7 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         "zetash": 5e-3 * ones_rod,
         # damping coefficient for axial elongation of shape (num_segments, rods_per_segment)
         "zetaa": 5e-3 * ones_rod,
+        "phi_max": 180 / 180 * jnp.pi * ones_rod,  # maximum twist angles (positive) [rad]
     }
 
     return params
