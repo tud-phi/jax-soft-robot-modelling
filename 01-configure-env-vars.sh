@@ -8,4 +8,4 @@
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 # add the src folder to the PYTHONPATH
-export PYTHONPATH="${PYTHONPATH}://jsrm"
+export PYTHONPATH="${PYTHONPATH}://src"
