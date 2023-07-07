@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import jsrm
-from jsrm import symbolically_derive_planar_hsa_model
+from jsrm.symbolic_derivation.planar_hsa import symbolically_derive_planar_hsa_model
 
 NUM_SEGMENTS = 1
 NUM_RODS_PER_SEGMENT = 2
