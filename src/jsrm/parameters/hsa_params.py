@@ -53,21 +53,22 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         # --> rho = 710.4 kg/m^3
         "rhoec": 710.4 * jnp.ones((num_segments,)),
         "g": jnp.array([0.0, 9.81]),
-        "Ehat": 1e3 * ones_rod,  # Elastic modulus of each rod [Pa]
-        "Ghat": 5e2 * ones_rod,  # Shear modulus of each rod [Pa]
+        "Ehat": 4.67725384e03 * ones_rod,  # Elastic modulus of each rod [Pa]
+        "Ghat": 4.11478872e03 * ones_rod,  # Shear modulus of each rod [Pa]
         # Constant to scale the Elastic modulus linearly with the twist strain [Pa/(rad/m)]
         # 53 rad / m is roughly the twist strain at 180 deg twist angle
-        "C_E": 5e2 / 53 * ones_rod,
+        "C_E": 67.74549753 * ones_rod,
         # Constant to scale the Shear modulus linearly with the twist strain [Pa/(rad/m)]
         # 53 rad / m is roughly the twist strain at 180 deg twist angle
-        "C_G": -2e2 / 53 * ones_rod,
+        "C_G": -1.64919053e01 * ones_rod,
+        "S_b_sh": 7.56629739e-03 * ones_rod,  # Elastic coupling between bending and shear
         # damping coefficient for bending of shape (num_segments, rods_per_segment)
         "zetab": 5e-5 * ones_rod,
         # damping coefficient for shear of shape (num_segments, rods_per_segment)
         "zetash": 5e-3 * ones_rod,
         # damping coefficient for axial elongation of shape (num_segments, rods_per_segment)
         "zetaa": 5e-3 * ones_rod,
-        "phi_max": 180 / 180 * jnp.pi * ones_rod,  # maximum twist angles (positive) [rad]
+        "phi_max": 210 / 180 * jnp.pi * ones_rod,  # maximum twist angles (positive) [rad]
     }
 
     return params

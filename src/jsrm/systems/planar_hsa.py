@@ -548,8 +548,11 @@ def factory(
         E = Ehat + Edelta
         G = Ghat + Gdelta
 
-        # stiffness matrix of shape (num_segments, 3)
+        # stiffness matrix of shape (num_segments, num_rods_per_segment, 3, 3)
         Shat = compute_stiffness_matrix_for_all_rods_fn(A, Ib, Ehat, Ghat)
+        # add the elastic bending shear contributions for all rods
+        Shat = Shat.at[..., 0, 1].set(params["S_b_sh"])
+        Shat = Shat.at[..., 1, 0].set(params["S_b_sh"])
         Sdelta = compute_stiffness_matrix_for_all_rods_fn(A, Ib, Edelta, Gdelta)
         S = Shat + Sdelta
 

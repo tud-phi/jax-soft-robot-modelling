@@ -81,6 +81,9 @@ def symbolically_derive_planar_hsa_model(
     C_G_syms = list(
         sp.symbols(f"C_G1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
     )  # shear modulus of each rod [Pa]
+    S_b_sh_syms = list(
+        sp.symbols(f"S_b_sh1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+    )  # elastic coupling between bending and shearing of each rod
     zetab_syms = list(
         sp.symbols(
             f"zetab1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
@@ -147,6 +150,9 @@ def symbolically_derive_planar_hsa_model(
     C_G = sp.Matrix(C_G_syms).reshape(
         num_segments, num_rods_per_segment
     )  # constant for scaling G of each rod [Pa]
+    S_b_sh = sp.Matrix(S_b_sh_syms).reshape(
+        num_segments, num_rods_per_segment
+    )  # elastic coupling between bending and shearing of each rod
     # damping coefficient for bending of each rod
     zetab = sp.Matrix(zetab_syms).reshape(num_segments, num_rods_per_segment)
     # damping coefficient for shearing of each rod
@@ -280,6 +286,10 @@ def symbolically_derive_planar_hsa_model(
             Shatr = _sym_compute_planar_stiffness_matrix(
                 A=Ar[i, j], Ib=Ir[i, j], E=Ehat[i, j], G=Ghat[i, j]
             )
+            # add coupling between the bending and shear strains
+            Shatr[0, 1] = S_b_sh[i, j]
+            Shatr[1, 0] = S_b_sh[i, j]
+            # compute the change in stiffness matrix due to the change in elastic and shear modulus
             Sdeltar = _sym_compute_planar_stiffness_matrix(
                 A=Ar[i, j], Ib=Ir[i, j], E=Edeltar, G=Gdeltar
             )
@@ -469,6 +479,7 @@ def symbolically_derive_planar_hsa_model(
             "Ghat": Ghat_syms,
             "C_E": C_E_syms,
             "C_G": C_G_syms,
+            "S_b_sh": S_b_sh_syms,
             "zetab": zetab_syms,
             "zetash": zetash_syms,
             "zetaa": zetaa_syms,
