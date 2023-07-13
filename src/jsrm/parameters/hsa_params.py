@@ -63,11 +63,11 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         "C_G": -1.64919053e01 * ones_rod,
         "S_b_sh": 7.56629739e-03 * ones_rod,  # Elastic coupling between bending and shear
         # damping coefficient for bending of shape (num_segments, rods_per_segment)
-        "zetab": 5e-5 * ones_rod,
+        "zetab": 8e-6 * ones_rod,
         # damping coefficient for shear of shape (num_segments, rods_per_segment)
-        "zetash": 5e-3 * ones_rod,
+        "zetash": 2e-4 * ones_rod,
         # damping coefficient for axial elongation of shape (num_segments, rods_per_segment)
-        "zetaa": 5e-3 * ones_rod,
+        "zetaa": 2e-3 * ones_rod,
         "phi_max": 210 / 180 * jnp.pi * ones_rod,  # maximum twist angles (positive) [rad]
     }
 
