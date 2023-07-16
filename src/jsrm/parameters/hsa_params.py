@@ -53,15 +53,13 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         # --> rho = 710.4 kg/m^3
         "rhoec": 710.4 * jnp.ones((num_segments,)),
         "g": jnp.array([0.0, 9.81]),
-        "Ehat": 4.67725384e03 * ones_rod,  # Elastic modulus of each rod [Pa]
-        "Ghat": 4.11478872e03 * ones_rod,  # Shear modulus of each rod [Pa]
-        # Constant to scale the Elastic modulus linearly with the twist strain [Pa/(rad/m)]
-        # 53 rad / m is roughly the twist strain at 180 deg twist angle
-        "C_E": 67.74549753 * ones_rod,
-        # Constant to scale the Shear modulus linearly with the twist strain [Pa/(rad/m)]
-        # 53 rad / m is roughly the twist strain at 180 deg twist angle
-        "C_G": -1.64919053e01 * ones_rod,
-        "S_b_sh": 7.56629739e-03 * ones_rod,  # Elastic coupling between bending and shear
+        "S_b_hat": 5.4698261027774997e-5 * ones_rod,  # Nominal bending stiffness of each rod [Nm^2]
+        "S_sh_hat": 0.9620376027360 * ones_rod,  # Nominal shear stiffness of each rod [N]
+        "S_a_hat": 0.820156460844 * ones_rod,  # Nominal axial stiffness of each rod [N]
+        "S_b_sh": 7.56629739e-03 * ones_rod,  # Elastic coupling between bending and shear [Nm/rad]
+        "C_S_b": 7.92251400952920015e-7 * ones_rod,  # Scaling of bending stiffness with twist strain [Nm^3/rad]
+        "C_S_sh": -3.85580745914e-3 * ones_rod,  # Scaling of shear stiffness with twist strain [Nm/rad]
+        "C_S_a": 1.18791729918850e-2 * ones_rod,  # Scaling of axial stiffness with twist strain [Nm/rad]
         # damping coefficient for bending of shape (num_segments, rods_per_segment)
         "zetab": 8e-6 * ones_rod,
         # damping coefficient for shear of shape (num_segments, rods_per_segment)
@@ -84,10 +82,13 @@ PARAMS_CONTROL = generate_base_params(num_segments=1, num_rods_per_segment=2)
 PARAMS_CONTROL.update({
     "rhor": 2 * PARAMS_CONTROL["rhor"],
     "rhoec": 2 * PARAMS_CONTROL["rhoec"],
-    "Ehat": 2 * PARAMS_CONTROL["Ehat"],
-    "Ghat": 2 * PARAMS_CONTROL["Ghat"],
-    "C_E": 2 * PARAMS_CONTROL["C_E"],
-    "C_G": 2 * PARAMS_CONTROL["C_G"],
+    "S_b_hat": 2 * PARAMS_CONTROL["S_b_hat"],
+    "S_sh_hat": 2 * PARAMS_CONTROL["S_sh_hat"],
+    "S_a_hat": 2 * PARAMS_CONTROL["S_a_hat"],
+    "S_b_sh": 2 * PARAMS_CONTROL["S_b_sh"],
+    "C_S_b": 2 * PARAMS_CONTROL["C_S_b"],
+    "C_S_sh": 2 * PARAMS_CONTROL["C_S_sh"],
+    "C_S_a": 2 * PARAMS_CONTROL["C_S_a"],
     "zetab": 2 * PARAMS_CONTROL["zetab"],
     "zetash": 2 * PARAMS_CONTROL["zetash"],
     "zetaa": 2 * PARAMS_CONTROL["zetaa"],
