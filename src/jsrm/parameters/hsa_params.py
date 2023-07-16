@@ -88,6 +88,7 @@ PARAMS_CONTROL.update({
     "Ghat": 2 * PARAMS_CONTROL["Ghat"],
     "C_E": 2 * PARAMS_CONTROL["C_E"],
     "C_G": 2 * PARAMS_CONTROL["C_G"],
+    "S_b_sh": 2 * PARAMS_CONTROL["S_b_sh"],
     "zetab": 2 * PARAMS_CONTROL["zetab"],
     "zetash": 2 * PARAMS_CONTROL["zetash"],
     "zetaa": 2 * PARAMS_CONTROL["zetaa"],
