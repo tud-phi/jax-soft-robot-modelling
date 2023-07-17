@@ -13,11 +13,11 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         "l": 59e-3 * jnp.ones((num_segments,)),  # length of each rod [m]
         # length of the rigid proximal caps of the rods connecting to the base [m]
         "lpc": 25e-3 * jnp.ones((num_segments,)),
-        # length of the rigid distal caps of the rods connecting to the platform [m]
+        # length of the rig id distal caps of the rods connecting to the platform [m]
         "ldc": 14e-3 * jnp.ones((num_segments,)),
-        "sigma_a_eq": 9.98051512e-01 * ones_rod,  # axial rest strains of each rod
+        "sigma_a_eq": 1.0 * ones_rod,  # axial rest strains of each rod
         # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
-        "C_varepsilon": 1.12848472e-02 * ones_rod,  # Average: 0.009118994, Std: 0.000696435
+        "C_varepsilon": 0.01032588 * ones_rod,  # Average: 0.009118994, Std: 0.000696435
         # outside radius of each rod [m]. The rows correspond to the segments.
         "rout": 25.4e-3 / 2 * ones_rod,  # this is for FPU rods
         # inside radius of each rod [m]. The rows correspond to the segments.
@@ -53,13 +53,13 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         # --> rho = 710.4 kg/m^3
         "rhoec": 710.4 * jnp.ones((num_segments,)),
         "g": jnp.array([0.0, 9.81]),
-        "S_b_hat": 5.4698261027774997e-5 * ones_rod,  # Nominal bending stiffness of each rod [Nm^2]
-        "S_sh_hat": 0.9620376027360 * ones_rod,  # Nominal shear stiffness of each rod [N]
-        "S_a_hat": 0.820156460844 * ones_rod,  # Nominal axial stiffness of each rod [N]
-        "S_b_sh": 7.56629739e-03 * ones_rod,  # Elastic coupling between bending and shear [Nm/rad]
-        "C_S_b": 7.92251400952920015e-7 * ones_rod,  # Scaling of bending stiffness with twist strain [Nm^3/rad]
-        "C_S_sh": -3.85580745914e-3 * ones_rod,  # Scaling of shear stiffness with twist strain [Nm/rad]
-        "C_S_a": 1.18791729918850e-2 * ones_rod,  # Scaling of axial stiffness with twist strain [Nm/rad]
+        "S_b_hat": 9.37790706e-05 * ones_rod,  # Nominal bending stiffness of each rod [Nm^2]
+        "S_sh_hat": 9.69609493e-01 * ones_rod,  # Nominal shear stiffness of each rod [N]
+        "S_a_hat": 0.79971525 * ones_rod,  # Nominal axial stiffness of each rod [N]
+        "S_b_sh": 7.61903729e-03 * ones_rod,  # Elastic coupling between bending and shear [Nm/rad]
+        "C_S_b": -1.46893066e-07 * ones_rod,  # Scaling of bending stiffness with twist strain [Nm^3/rad]
+        "C_S_sh": -3.89972741e-03 * ones_rod,  # Scaling of shear stiffness with twist strain [Nm/rad]
+        "C_S_a": 0.01019387 * ones_rod,  # Scaling of axial stiffness with twist strain [Nm/rad]
         # damping coefficient for bending of shape (num_segments, rods_per_segment)
         "zetab": 8e-6 * ones_rod,
         # damping coefficient for shear of shape (num_segments, rods_per_segment)
