@@ -5,7 +5,11 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple, Union
 
-from .utils import concatenate_params_syms, compute_strain_basis, compute_planar_stiffness_matrix
+from .utils import (
+    concatenate_params_syms,
+    compute_strain_basis,
+    compute_planar_stiffness_matrix,
+)
 from jsrm.math_utils import blk_diag
 
 

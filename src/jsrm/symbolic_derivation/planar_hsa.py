@@ -70,25 +70,39 @@ def symbolically_derive_planar_hsa_model(
     )  # volumetric mass density of the rod end caps (both at the proximal and distal ends) [kg/m^3]
     g_syms = list(sp.symbols(f"g1:3"))  # gravity vector
     S_b_hat_syms = list(
-        sp.symbols(f"S_b_hat1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+        sp.symbols(
+            f"S_b_hat1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
+        )
     )  # neutral bending stiffness of each rod [Nm^2]
     S_sh_hat_syms = list(
-        sp.symbols(f"S_sh_hat1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+        sp.symbols(
+            f"S_sh_hat1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
+        )
     )  # neutral shear stiffness of each rod [N]
     S_a_hat_syms = list(
-        sp.symbols(f"S_a_hat1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+        sp.symbols(
+            f"S_a_hat1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
+        )
     )  # neutral axial stiffness of each rod [N]
     S_b_sh_syms = list(
-        sp.symbols(f"S_b_sh1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+        sp.symbols(
+            f"S_b_sh1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
+        )
     )  # elastic coupling between bending and shearing of each rod [Nm/rad]
     C_S_b_syms = list(
-        sp.symbols(f"C_S_b1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+        sp.symbols(
+            f"C_S_b1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
+        )
     )  # change of bending stiffness of each rod [Nm^3/rad]
     C_S_sh_syms = list(
-        sp.symbols(f"C_S_sh1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+        sp.symbols(
+            f"C_S_sh1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
+        )
     )  # change of shear stiffness of each rod [Nm/rad]
     C_S_a_syms = list(
-        sp.symbols(f"C_S_a1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
+        sp.symbols(
+            f"C_S_a1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
+        )
     )  # change of axial stiffness of each rod [Nm/rad]
     zetab_syms = list(
         sp.symbols(
@@ -145,27 +159,15 @@ def symbolically_derive_planar_hsa_model(
     # volumetric mass density of the rod end caps (both at the proximal and distal ends) [kg/m^3]
     rhoec = sp.Matrix(rhoec_syms)
     g = sp.Matrix(g_syms)  # gravity vector
-    S_b_hat = sp.Matrix(S_b_hat_syms).reshape(
-        num_segments, num_rods_per_segment
-    )
-    S_sh_hat = sp.Matrix(S_sh_hat_syms).reshape(
-        num_segments, num_rods_per_segment
-    )
-    S_a_hat = sp.Matrix(S_a_hat_syms).reshape(
-        num_segments, num_rods_per_segment
-    )
+    S_b_hat = sp.Matrix(S_b_hat_syms).reshape(num_segments, num_rods_per_segment)
+    S_sh_hat = sp.Matrix(S_sh_hat_syms).reshape(num_segments, num_rods_per_segment)
+    S_a_hat = sp.Matrix(S_a_hat_syms).reshape(num_segments, num_rods_per_segment)
     S_b_sh = sp.Matrix(S_b_sh_syms).reshape(
         num_segments, num_rods_per_segment
     )  # elastic coupling between bending and shearing of each rod
-    C_S_b = sp.Matrix(C_S_b_syms).reshape(
-        num_segments, num_rods_per_segment
-    )
-    C_S_sh = sp.Matrix(C_S_sh_syms).reshape(
-        num_segments, num_rods_per_segment
-    )
-    C_S_a = sp.Matrix(C_S_a_syms).reshape(
-        num_segments, num_rods_per_segment
-    )
+    C_S_b = sp.Matrix(C_S_b_syms).reshape(num_segments, num_rods_per_segment)
+    C_S_sh = sp.Matrix(C_S_sh_syms).reshape(num_segments, num_rods_per_segment)
+    C_S_a = sp.Matrix(C_S_a_syms).reshape(num_segments, num_rods_per_segment)
 
     # damping coefficient for bending of each rod
     zetab = sp.Matrix(zetab_syms).reshape(num_segments, num_rods_per_segment)
@@ -292,9 +294,15 @@ def symbolically_derive_planar_hsa_model(
 
             # define the stiffness matrix of the current rod
             # difference between the nominal and current stiffness
-            S_b_deltar = C_S_b[i, j] * h[i, j] / l[i] * phi[i * num_rods_per_segment + j]
-            S_sh_deltar = C_S_sh[i, j] * h[i, j] / l[i] * phi[i * num_rods_per_segment + j]
-            S_a_deltar = C_S_a[i, j] * h[i, j] / l[i] * phi[i * num_rods_per_segment + j]
+            S_b_deltar = (
+                C_S_b[i, j] * h[i, j] / l[i] * phi[i * num_rods_per_segment + j]
+            )
+            S_sh_deltar = (
+                C_S_sh[i, j] * h[i, j] / l[i] * phi[i * num_rods_per_segment + j]
+            )
+            S_a_deltar = (
+                C_S_a[i, j] * h[i, j] / l[i] * phi[i * num_rods_per_segment + j]
+            )
 
             Shatr = _sym_compute_planar_stiffness_matrix(
                 S_b_hat[i, j], S_sh_hat[i, j], S_a_hat[i, j], S_b_sh[i, j]

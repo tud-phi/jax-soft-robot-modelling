@@ -5,7 +5,11 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple, Union
 
-from .utils import concatenate_params_syms, compute_strain_basis, compute_planar_stiffness_matrix
+from .utils import (
+    concatenate_params_syms,
+    compute_strain_basis,
+    compute_planar_stiffness_matrix,
+)
 from jsrm.math_utils import blk_diag
 
 
@@ -149,11 +153,11 @@ def factory(
     K_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["K"], "jax"
     )
-    D_lambda = sp.lambdify(
-        params_syms_cat, sym_exps["exps"]["D"], "jax"
-    )
+    D_lambda = sp.lambdify(params_syms_cat, sym_exps["exps"]["D"], "jax")
     alpha_lambda = sp.lambdify(
-        params_syms_cat + sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["phi"], sym_exps["exps"]["alpha"], "jax"
+        params_syms_cat + sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["phi"],
+        sym_exps["exps"]["alpha"],
+        "jax",
     )
 
     @jit
@@ -171,8 +175,8 @@ def factory(
 
         pxi = jnp.repeat(vxi, num_rods_per_segment, axis=1)
         psigma_a = (
-                pxi[:, :, 2]
-                + params["roff"] * jnp.repeat(vxi, num_rods_per_segment, axis=1)[..., 0]
+            pxi[:, :, 2]
+            + params["roff"] * jnp.repeat(vxi, num_rods_per_segment, axis=1)[..., 0]
         )
         pxi = pxi.at[:, :, 2].set(psigma_a)
 
@@ -189,7 +193,9 @@ def factory(
             vxi: strains of the virtual backbone of shape (n_xi, )
         """
         vxi = jnp.mean(pxi, axis=1)
-        vxi = vxi.at[:, 2].set(vxi[:, 2] - jnp.mean(params["roff"] * pxi[..., 0], axis=1))
+        vxi = vxi.at[:, 2].set(
+            vxi[:, 2] - jnp.mean(params["roff"] * pxi[..., 0], axis=1)
+        )
         vxi = vxi.flatten()
 
         return vxi
