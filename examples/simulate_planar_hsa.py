@@ -245,10 +245,14 @@ if __name__ == "__main__":
         forward_kinematics_virtual_backbone_fn, in_axes=(None, None, 0), out_axes=-1
     )
     batched_forward_kinematics_rod_fn = vmap(
-        sys_helpers["forward_kinematics_rod_fn"], in_axes=(None, None, 0, None), out_axes=-1
+        sys_helpers["forward_kinematics_rod_fn"],
+        in_axes=(None, None, 0, None),
+        out_axes=-1,
     )
     batched_forward_kinematics_platform_fn = vmap(
-        sys_helpers["forward_kinematics_platform_fn"], in_axes=(None, None, 0), out_axes=0
+        sys_helpers["forward_kinematics_platform_fn"],
+        in_axes=(None, None, 0),
+        out_axes=0,
     )
 
     s_ps = jnp.linspace(0, jnp.sum(params["l"]), 100)

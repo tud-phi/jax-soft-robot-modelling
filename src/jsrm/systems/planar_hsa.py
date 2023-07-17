@@ -5,7 +5,11 @@ import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple, Union
 
-from .utils import concatenate_params_syms, compute_strain_basis, compute_planar_stiffness_matrix
+from .utils import (
+    concatenate_params_syms,
+    compute_strain_basis,
+    compute_planar_stiffness_matrix,
+)
 from jsrm.math_utils import blk_diag
 
 
@@ -146,11 +150,14 @@ def factory(
     G_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax"
     )
-
-    compute_stiffness_matrix_for_all_rods_fn = vmap(
-        vmap(compute_planar_stiffness_matrix, in_axes=(0, 0, 0, 0), out_axes=0),
-        in_axes=(0, 0, 0, 0),
-        out_axes=0,
+    K_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["K"], "jax"
+    )
+    D_lambda = sp.lambdify(params_syms_cat, sym_exps["exps"]["D"], "jax")
+    alpha_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["phi"],
+        sym_exps["exps"]["alpha"],
+        "jax",
     )
 
     @jit
@@ -168,8 +175,8 @@ def factory(
 
         pxi = jnp.repeat(vxi, num_rods_per_segment, axis=1)
         psigma_a = (
-                pxi[:, :, 2]
-                + params["roff"] * jnp.repeat(vxi, num_rods_per_segment, axis=1)[..., 0]
+            pxi[:, :, 2]
+            + params["roff"] * jnp.repeat(vxi, num_rods_per_segment, axis=1)[..., 0]
         )
         pxi = pxi.at[:, :, 2].set(psigma_a)
 
@@ -186,7 +193,9 @@ def factory(
             vxi: strains of the virtual backbone of shape (n_xi, )
         """
         vxi = jnp.mean(pxi, axis=1)
-        vxi = vxi.at[:, 2].set(vxi[:, 2] - jnp.mean(params["roff"] * pxi[..., 0], axis=1))
+        vxi = vxi.at[:, 2].set(
+            vxi[:, 2] - jnp.mean(params["roff"] * pxi[..., 0], axis=1)
+        )
         vxi = vxi.flatten()
 
         return vxi
@@ -499,7 +508,7 @@ def factory(
             G: gravity vector of shape (n_q, )
             K: elastic vector of shape (n_q, )
             D: dissipative matrix of shape (n_q, n_q)
-            tau_q: actuation torque acting on the generalized coordinates of shape (n_q, )
+            alpha: actuation vector acting on the generalized coordinates of shape (n_q, )
         """
         # map the configuration to the strains
         xi = configuration_to_strains_fn(params, q)
@@ -508,171 +517,24 @@ def factory(
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains_fn(xi, 1e4 * eps)
 
-        # the strains of the physical rods as array of shape (num_segments, num_rods_per_segment, 3)
-        pxi = beta_fn(params, xi_epsed)
-
-        # rest strains in the physical rods as array of shape (num_segments, num_rods_per_segment, 3)
-        pxi_eq = jnp.zeros_like(pxi)
-        pxi_eq = pxi_eq.at[..., 2].set(params["sigma_a_eq"])
-
-        # number of segments
-        num_segments = params["rout"].shape[0]
-        num_rods_per_segment = params["rout"].shape[1]
-
-        # printed (i.e. original) length of each segment
-        l = params["l"]  # shape (num_segments, )
-        # offset of rods from the centerline
-        roff = params["roff"]  # shape (num_segments, num_rods_per_segment)
-        # handedness of the rods
-        h = params["h"]  # shape (num_segments, num_rods_per_segment)
-
-        # reshape phi and l to be of shape (num_segments, num_rods_per_segment)
-        phi_per_rod = phi.reshape(num_segments, num_rods_per_segment)
-        l_per_rod = jnp.repeat(
-            l.reshape(num_segments, 1), axis=1, repeats=num_rods_per_segment
-        )
-
-        # change in the rest length
-        varepsilon = params["C_varepsilon"] * h / l_per_rod * phi_per_rod
-
-        # cross-sectional area and second moment of area for bending
-        A = jnp.pi * (params["rout"] ** 2 - params["rin"] ** 2)
-        Ib = jnp.pi / 4 * (params["rout"] ** 4 - params["rin"] ** 4)
-
-        # nominal elastic and shear modulus
-        Ehat, Ghat = params["Ehat"], params["Ghat"]
-        # difference between the current modulus and the nominal modulus
-        Edelta = params["C_E"] * h / l_per_rod * phi_per_rod
-        Gdelta = params["C_G"] * h / l_per_rod * phi_per_rod
-        # current elastic and shear modulus
-        E = Ehat + Edelta
-        G = Ghat + Gdelta
-
-        # stiffness matrix of shape (num_segments, num_rods_per_segment, 3, 3)
-        Shat = compute_stiffness_matrix_for_all_rods_fn(A, Ib, Ehat, Ghat)
-        # add the elastic bending shear contributions for all rods
-        Shat = Shat.at[..., 0, 1].set(params["S_b_sh"])
-        Shat = Shat.at[..., 1, 0].set(params["S_b_sh"])
-        Sdelta = compute_stiffness_matrix_for_all_rods_fn(A, Ib, Edelta, Gdelta)
-        S = Shat + Sdelta
-
-        # Jacobian of the strain of the physical HSA rods with respect to the configuration variables
-        J_beta = jnp.zeros((num_segments, num_rods_per_segment, 3, 3))
-        J_beta = J_beta.at[..., 0, 0].set(1.0)
-        J_beta = J_beta.at[..., 1, 1].set(1.0)
-        J_beta = J_beta.at[..., 2, 2].set(1.0)
-        J_beta = J_beta.at[..., 2, 0].set(roff)
-
-        # we define the elastic matrix of the physical rods of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
-        vK = vmap(  # vmap over the segments
-            vmap(  # vmap over the rods of each segment
-                lambda _J_beta, _Shat, _pxi, _pxi_eq: _J_beta.T
-                @ _Shat
-                @ (_pxi - _pxi_eq),
-                in_axes=(0, 0, 0, 0),
-                out_axes=0,
-            ),
-            in_axes=(0, 0, 0, 0),
-            out_axes=0,
-        )(
-            J_beta, Shat, pxi, pxi_eq
-        )  # shape (num_segments, num_rods_per_segment, 3)
-        # sum the elastic forces over all rods of each segment
-        K = jnp.sum(vK, axis=1).flatten()  # shape (n_xi, )
-
-        # damping coefficients for bending of shape (num_segments, num_rods_per_segment)
-        zetab = params.get("zetab", jnp.zeros((num_segments, num_rods_per_segment)))
-        # damping coefficients for shearing of shape (num_segments, num_rods_per_segment)
-        zetash = params.get("zetash", jnp.zeros((num_segments, num_rods_per_segment)))
-        # damping coefficients for axial elongation of shape (num_segments, num_rods_per_segment)
-        zetaa = params.get("zetaa", jnp.zeros((num_segments, num_rods_per_segment)))
-        # combined zeta
-        zeta = jnp.stack([zetab, zetash, zetaa], axis=-1)
-        vD = vmap(  # vmap over the segments
-            vmap(  # vmap over the rods of each segment
-                lambda _J_beta, _zeta: _J_beta.T @ jnp.diag(_zeta) @ _J_beta,
-                in_axes=(0, 0),
-                out_axes=0,
-            ),
-            in_axes=(0, 0),
-            out_axes=0,
-        )(
-            J_beta, zeta
-        )  # shape (num_segments, num_rods_per_segment, 3, 3)
-        # dissipative matrix
-        D = blk_diag(jnp.sum(vD, axis=1))  # shape (n_xi, n_xi)
-
-        # actuation strain in the physical rods
-        pxiphi = jnp.zeros_like(pxi)
-        # consider axial strain generated by twisting rod
-        pxiphi = pxiphi.at[..., 2].set(varepsilon)
-
-        # compute the actuation torque on the strain of the virtual backbone
-        tau_xi = vmap(
-            vmap(
-                lambda _J_beta, _S, _Sdelta, _pxi, _pxi_eq, _pxiphi: _J_beta.T
-                @ (-_Sdelta @ (_pxi - _pxi_eq) + _S @ _pxiphi),
-                in_axes=(0, 0, 0, 0, 0, 0),
-                out_axes=0,
-            ),
-            in_axes=(0, 0, 0, 0, 0, 0),
-            out_axes=0,
-        )(
-            J_beta, S, Sdelta, pxi, pxi_eq, pxiphi
-        )  # shape (num_segments, num_rods_per_segment, 3)
-        tau_xi = tau_xi.sum(
-            axis=1
-        ).flatten()  # sum over all the rods and then flatten over all the segments
+        # evaluate the symbolic expressions
+        params_for_lambdify = select_params_for_lambdify_fn(params)
+        B = B_lambda(*params_for_lambdify, *xi_epsed)
+        C_xi = C_lambda(*params_for_lambdify, *xi_epsed, *xi_d)
+        G = G_lambda(*params_for_lambdify, *xi_epsed).squeeze()
+        K = K_lambda(*params_for_lambdify, *xi_epsed).squeeze()
+        D = D_lambda(*params_for_lambdify)
+        alpha = alpha_lambda(*params_for_lambdify, *xi_epsed, *phi).squeeze()
 
         # apply the strain basis
-        params_for_lambdify = select_params_for_lambdify_fn(params)
-        B = B_xi.T @ B_lambda(*params_for_lambdify, *xi_epsed) @ B_xi
-        C_xi = C_lambda(*params_for_lambdify, *xi_epsed, *xi_d)
+        B = B_xi.T @ B @ B_xi
         C = B_xi.T @ C_xi @ B_xi
-        G = B_xi.T @ G_lambda(*params_for_lambdify, *xi_epsed).squeeze()
-
-        # apply the strain basis to the elastic, and dissipative matrices and the actuation torques
+        G = B_xi.T @ G
         K = B_xi.T @ K
         D = B_xi.T @ D @ B_xi
-        tau_q = B_xi.T @ tau_xi @ B_xi
+        alpha = B_xi.T @ alpha
 
-        # def alpha_fn(phi: Array) -> Array:
-        #     """
-        #     Compute the actuation vector as a function of the twist angles phi.
-        #         tau_q = alpha(phi)
-        #
-        #     Args:
-        #         phi: twist angles of shape (num_rods)
-        #
-        #     Returns:
-        #         tau_q: torque applied on the generalized coordinates
-        #     """
-        #
-        #     _phi = phi.reshape(num_segments, num_rods_per_segment)
-        #     _l = jnp.repeat(l.reshape(num_segments, 1), axis=1, repeats=num_rods_per_segment)
-        #
-        #     # change in the rest length
-        #     varepsilon = params["C_varepsilon"] * h * _l * _phi
-        #
-        #     # difference between the current modulus and the nominal modulus
-        #     Edelta = C_E * h * _l * _phi
-        #     Gdelta = C_G * h * _l * _phi
-        #
-        #     Sdelta = compute_stiffness_matrix_for_all_rods_fn(A, Ib, Edelta, Gdelta)
-        #     S = Shat + Sdelta
-        #
-        #     actuation_strain = jnp.zeros_like(pxi)
-        #     # consider axial strain generated by twisting rod
-        #     actuation_strain = actuation_strain.at[..., 2].set(varepsilon)
-        #     tau_xi = J_beta.T @ (-Sdelta @ (pxi - pxi_eq) + S @ actuation_strain)
-        #     print("tau_xi before", tau_xi.shape)
-        #     tau_xi = tau_xi.sum(axis=1).flatten()  # sum over all the rods and then flatten over all the segments
-        #     print("tau_xi", tau_xi.shape)
-        #
-        #     tau_q = B_xi.T @ tau_xi @ B_xi
-        #     return tau_q
-
-        return B, C, G, K, D, tau_q
+        return B, C, G, K, D, alpha
 
     def operational_space_dynamical_matrices_fn(
         params: Dict[str, Array], q: Array, q_d: Array, B: Array, C: Array
