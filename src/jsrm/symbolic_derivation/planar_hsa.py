@@ -109,6 +109,7 @@ def symbolically_derive_planar_hsa_model(
     # planar strains and their derivatives
     xi_syms = list(sp.symbols(f"xi1:{num_dof + 1}", nonzero=True))  # strains
     xi_d_syms = list(sp.symbols(f"xi_d1:{num_dof + 1}"))  # strain time derivatives
+    xi_dd_syms = list(sp.symbols(f"xi_dd1:{num_dof + 1}"))  # strain accelerations
     phi_syms = list(
         sp.symbols(f"phi1:{num_segments * num_rods_per_segment + 1}")
     )  # twist angles
@@ -176,6 +177,7 @@ def symbolically_derive_planar_hsa_model(
     # configuration variables and their derivatives
     xi = sp.Matrix(xi_syms)  # strains
     xi_d = sp.Matrix(xi_d_syms)  # strain time derivatives
+    xi_dd = sp.Matrix(xi_dd_syms)  # strain accelerations
     # twist angle of rods
     phi = sp.Matrix(phi_syms)
 
@@ -497,6 +499,7 @@ def symbolically_derive_planar_hsa_model(
         "state_syms": {
             "xi": xi_syms,
             "xi_d": xi_d_syms,
+            "xi_dd": xi_dd_syms,
             "phi": phi_syms,
             "s": s,
         },
