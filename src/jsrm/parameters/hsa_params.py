@@ -17,7 +17,8 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         "ldc": 14e-3 * jnp.ones((num_segments,)),
         "sigma_a_eq": 1.0 * ones_rod,  # axial rest strains of each rod
         # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
-        "C_varepsilon": 0.01032588 * ones_rod,  # Average: 0.009118994, Std: 0.000696435
+        # manually measured: Average: 0.009118994, Std: 0.000696435
+        "C_varepsilon": 0.01032588 * ones_rod,
         # outside radius of each rod [m]. The rows correspond to the segments.
         "rout": 25.4e-3 / 2 * ones_rod,  # this is for FPU rods
         # inside radius of each rod [m]. The rows correspond to the segments.
