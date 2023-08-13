@@ -18,7 +18,7 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         "sigma_a_eq": 1.0 * ones_rod,  # axial rest strains of each rod
         # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
         # manually measured: Average: 0.009118994, Std: 0.000696435
-        "C_varepsilon": 0.01032588 * ones_rod,
+        "C_varepsilon": 0.00984819 * ones_rod,
         # outside radius of each rod [m]. The rows correspond to the segments.
         "rout": 25.4e-3 / 2 * ones_rod,  # this is for FPU rods
         # inside radius of each rod [m]. The rows correspond to the segments.
@@ -51,19 +51,19 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         "rhoec": 710.4 * jnp.ones((num_segments,)),
         "g": jnp.array([0.0, 9.81]),
         # Nominal bending stiffness of each rod [Nm^2]
-        "S_b_hat": 9.37790706e-05 * ones_rod,
+        "S_b_hat": 5.58273410e-04 * ones_rod,
         # Nominal shear stiffness of each rod [N]
-        "S_sh_hat": 9.69609493e-01 * ones_rod,
+        "S_sh_hat": -9.60279292e-04 * ones_rod,
         # Nominal axial stiffness of each rod [N]
-        "S_a_hat": 0.79971525 * ones_rod,
+        "S_a_hat": 5.66472469 * ones_rod,
         # Elastic coupling between bending and shear [Nm/rad]
-        "S_b_sh": 7.61903729e-03 * ones_rod,
+        "S_b_sh": 3.75265673e-04 * ones_rod,
         # Scaling of bending stiffness with twist strain [Nm^3/rad]
-        "C_S_b": -1.46893066e-07 * ones_rod,
+        "C_S_b": -1.11731024e-05 * ones_rod,
         # Scaling of shear stiffness with twist strain [Nm/rad]
-        "C_S_sh": -3.89972741e-03 * ones_rod,
+        "C_S_sh": 7.19750543e-05 * ones_rod,
         # Scaling of axial stiffness with twist strain [Nm/rad]
-        "C_S_a": 0.01019387 * ones_rod,
+        "C_S_a": 0.01508165 * ones_rod,
         # damping coefficient for bending of shape (num_segments, rods_per_segment)
         "zetab": 8e-6 * ones_rod,
         # damping coefficient for shear of shape (num_segments, rods_per_segment)
