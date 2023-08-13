@@ -51,25 +51,25 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         "rhoec": 710.4 * jnp.ones((num_segments,)),
         "g": jnp.array([0.0, 9.81]),
         # Nominal bending stiffness of each rod [Nm^2]
-        "S_b_hat": 5.58273410e-04 * ones_rod,
+        "S_b_hat": 5.71346377e-04 * ones_rod,
         # Nominal shear stiffness of each rod [N]
-        "S_sh_hat": -9.60279292e-04 * ones_rod,
+        "S_sh_hat": 5.91462074e-01 * ones_rod,
         # Nominal axial stiffness of each rod [N]
         "S_a_hat": 5.66472469 * ones_rod,
         # Elastic coupling between bending and shear [Nm/rad]
-        "S_b_sh": 3.75265673e-04 * ones_rod,
+        "S_b_sh": 4.48419541e-03 * ones_rod,
         # Scaling of bending stiffness with twist strain [Nm^3/rad]
-        "C_S_b": -1.11731024e-05 * ones_rod,
+        "C_S_b": -9.67560524e-06 * ones_rod,
         # Scaling of shear stiffness with twist strain [Nm/rad]
-        "C_S_sh": 7.19750543e-05 * ones_rod,
+        "C_S_sh": -4.75687961e-04 * ones_rod,
         # Scaling of axial stiffness with twist strain [Nm/rad]
         "C_S_a": 0.01508165 * ones_rod,
         # damping coefficient for bending of shape (num_segments, rods_per_segment)
-        "zetab": 8e-6 * ones_rod,
+        "zetab": 3e-5 * ones_rod,
         # damping coefficient for shear of shape (num_segments, rods_per_segment)
         "zetash": 2e-4 * ones_rod,
         # damping coefficient for axial elongation of shape (num_segments, rods_per_segment)
-        "zetaa": 2e-3 * ones_rod,
+        "zetaa": 2e-2 * ones_rod,
         # maximum twist angles (positive) [rad]
         "phi_max": 210 / 180 * jnp.pi * ones_rod,
     }
