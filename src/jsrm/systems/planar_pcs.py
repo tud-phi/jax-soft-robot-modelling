@@ -30,7 +30,7 @@ def factory(
     Create jax functions from file containing symbolic expressions.
     Args:
         filepath: path to file containing symbolic expressions
-        strain_selector: array of shape (3, ) with boolean values indicating which components of the
+        strain_selector: array of shape (n_xi, ) with boolean values indicating which components of the
                 strain are active / non-zero
         xi_eq: array of shape (3 * num_segments) with the rest strains of the rod
         eps: small number to avoid division by zero
