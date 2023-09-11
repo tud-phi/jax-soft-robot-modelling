@@ -19,7 +19,7 @@ You can find the publication ~~online~~ in the Springer Proceedings on Advanced 
 Please use the following citation if you use our software in your (scientific) work:
 
 ```bibtex
-@inproceedings{stolzle2023modelling,
+@inproceedings{stolzle2023experimental,
   title={An Experimental Study of Model-based Control for Planar Handed Shearing Auxetics Robots},
   author={St{\"o}lzle, Maximilian and Rus, Daniela and Della Santina, Cosimo},
   booktitle={Experimental Robotics: The 18th International Symposium},
