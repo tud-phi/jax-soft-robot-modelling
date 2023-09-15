@@ -2,7 +2,7 @@ import cv2  # importing cv2
 from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
-from diffrax import diffeqsolve, Euler, ODETerm, SaveAt
+from diffrax import diffeqsolve, Dopri5, Euler, ODETerm, SaveAt
 from jax import Array, vmap
 from jax import numpy as jnp
 import numpy as onp
@@ -50,7 +50,7 @@ video_ts = ts[::skip_step]  # time steps for video
 
 # video settings
 video_width, video_height = 700, 700  # img height and width
-video_path = Path(__file__).parent / "videos" / "planar_pcs_ns-2.mp4"
+video_path = Path(__file__).parent / "videos" / f"planar_pcs_ns-{num_segments}.mp4"
 
 
 def draw_robot(
@@ -122,7 +122,7 @@ if __name__ == "__main__":
 
     sol = diffeqsolve(
         term,
-        solver=Euler(),
+        solver=Dopri5(),
         t0=ts[0],
         t1=ts[-1],
         dt0=dt,
