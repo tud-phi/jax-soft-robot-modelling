@@ -48,7 +48,7 @@ def ode_factory(
     return ode_fn
 
 
-def ode_factory_with_forcing(
+def ode_with_forcing_factory(
     dynamical_matrices_fn: Callable, params: Dict[str, Array]
 ) -> Callable[[float, Array], Array]:
     """
