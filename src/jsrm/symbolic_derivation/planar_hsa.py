@@ -519,6 +519,7 @@ def symbolically_derive_planar_hsa_model(
             "zetab": zetab_syms,
             "zetash": zetash_syms,
             "zetaa": zetaa_syms,
+            "mpl": mpl,
         },
         "state_syms": {
             "xi": xi_syms,
