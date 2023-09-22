@@ -119,6 +119,7 @@ def symbolically_derive_planar_hsa_model(
             f"zetaa1:{num_segments * num_rods_per_segment + 1}", nonnegative=True
         )
     )  # damping coefficient for elongation of each rod
+    mpl = sp.Symbol("mpl", real=True, nonnegative=True)  # mass of payload [kg]
 
     # planar strains and their derivatives
     xi_syms = list(sp.symbols(f"xi1:{num_dof + 1}", nonzero=True))  # strains
@@ -439,6 +440,21 @@ def symbolically_derive_planar_hsa_model(
         Up = sp.simplify(mp * g.T @ pCoGp)
         U = U + Up
 
+        # add contribution of the payload mass
+        # we assume the payload to be attached to (i.e., its CoG to be at) the bottom end of the platform
+        # position of the payload CoG (adding the distal end cap to the rod)
+        pCoGpl = p.subs(s, l[i]) + Rp @ sp.Matrix([0.0, ldc[i, 0]])
+        # positional Jacobian of the payload CoG
+        JpCoGpl = pCoGpl.jacobian(xi)
+        # mass matrix of the payload while neglecting its rotational inertia around its CoG
+        Bpl = mpl * JpCoGpl.T @ JpCoGpl
+        if simplify:
+            Bpl = sp.simplify(Bpl)
+        B = B + Bpl
+        # add the gravitational potential energy of the payload
+        Upl = sp.simplify(mpl * g.T @ pCoGpl)
+        U = U + Upl
+
         # update the orientation for the next segment
         th_prev = th.subs(s, l[i])
 
@@ -503,6 +519,7 @@ def symbolically_derive_planar_hsa_model(
             "zetab": zetab_syms,
             "zetash": zetash_syms,
             "zetaa": zetaa_syms,
+            "mpl": mpl,
         },
         "state_syms": {
             "xi": xi_syms,

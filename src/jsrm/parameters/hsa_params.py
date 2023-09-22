@@ -139,6 +139,7 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
         "zetaa": 2e-2 * ones_rod,
         # maximum twist angles (positive) [rad]
         "phi_max": 210 / 180 * jnp.pi * ones_rod,
+        "mpl": 0.0,  # payload mass [kg]
     }
 
     return params
