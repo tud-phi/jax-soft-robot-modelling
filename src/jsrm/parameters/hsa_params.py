@@ -1,10 +1,10 @@
-__all__ = ["PARAMS_CONTROL", "PARAMS_SYSTEM_ID", "generate_base_params"]
+__all__ = ["generate_base_params_for_fpu", "PARAMS_FPU_CONTROL", "PARAMS_FPU_SYSTEM_ID"]
 
 import jax.numpy as jnp
 from typing import Dict
 
 
-def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -> Dict:
+def generate_base_params_for_fpu(num_segments: int = 1, num_rods_per_segment: int = 2) -> Dict:
     assert num_rods_per_segment % 2 == 0, "num_rods_per_segment must be even"
 
     ones_rod = jnp.ones((num_segments, num_rods_per_segment))
@@ -145,28 +145,28 @@ def generate_base_params(num_segments: int = 1, num_rods_per_segment: int = 2) -
     return params
 
 
-PARAMS_SYSTEM_ID = generate_base_params(num_segments=1, num_rods_per_segment=4)
-PARAMS_SYSTEM_ID.update(
+PARAMS_FPU_SYSTEM_ID = generate_base_params_for_fpu(num_segments=1, num_rods_per_segment=4)
+PARAMS_FPU_SYSTEM_ID.update(
     {
         "h": jnp.array([[1.0, -1.0, 1.0, -1.0]]),
         "roff": 24e-3 * jnp.array([[1.0, 1.0, -1.0, -1.0]]),
     }
 )
 
-PARAMS_CONTROL = generate_base_params(num_segments=1, num_rods_per_segment=2)
-PARAMS_CONTROL.update(
+PARAMS_FPU_CONTROL = generate_base_params_for_fpu(num_segments=1, num_rods_per_segment=2)
+PARAMS_FPU_CONTROL.update(
     {
-        "rhor": 2 * PARAMS_CONTROL["rhor"],
-        "rhoec": 2 * PARAMS_CONTROL["rhoec"],
-        "S_b_hat": 2 * PARAMS_CONTROL["S_b_hat"],
-        "S_sh_hat": 2 * PARAMS_CONTROL["S_sh_hat"],
-        "S_a_hat": 2 * PARAMS_CONTROL["S_a_hat"],
-        "S_b_sh": 2 * PARAMS_CONTROL["S_b_sh"],
-        "C_S_b": 2 * PARAMS_CONTROL["C_S_b"],
-        "C_S_sh": 2 * PARAMS_CONTROL["C_S_sh"],
-        "C_S_a": 2 * PARAMS_CONTROL["C_S_a"],
-        "zetab": 2 * PARAMS_CONTROL["zetab"],
-        "zetash": 2 * PARAMS_CONTROL["zetash"],
-        "zetaa": 2 * PARAMS_CONTROL["zetaa"],
+        "rhor": 2 * PARAMS_FPU_CONTROL["rhor"],
+        "rhoec": 2 * PARAMS_FPU_CONTROL["rhoec"],
+        "S_b_hat": 2 * PARAMS_FPU_CONTROL["S_b_hat"],
+        "S_sh_hat": 2 * PARAMS_FPU_CONTROL["S_sh_hat"],
+        "S_a_hat": 2 * PARAMS_FPU_CONTROL["S_a_hat"],
+        "S_b_sh": 2 * PARAMS_FPU_CONTROL["S_b_sh"],
+        "C_S_b": 2 * PARAMS_FPU_CONTROL["C_S_b"],
+        "C_S_sh": 2 * PARAMS_FPU_CONTROL["C_S_sh"],
+        "C_S_a": 2 * PARAMS_FPU_CONTROL["C_S_a"],
+        "zetab": 2 * PARAMS_FPU_CONTROL["zetab"],
+        "zetash": 2 * PARAMS_FPU_CONTROL["zetash"],
+        "zetaa": 2 * PARAMS_FPU_CONTROL["zetaa"],
     }
 )

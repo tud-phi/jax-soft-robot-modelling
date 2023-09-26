@@ -9,7 +9,7 @@ from pathlib import Path
 import sympy as sp
 from typing import Tuple
 
-from jsrm.parameters.hsa_params import PARAMS_CONTROL as params
+from jsrm.parameters.hsa_params import PARAMS_FPU_CONTROL as params
 from jsrm.systems import planar_hsa
 from jsrm.systems.utils import substitute_params_into_all_symbolic_expressions
 

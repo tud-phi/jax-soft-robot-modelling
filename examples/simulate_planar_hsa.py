@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable, Dict
 
 import jsrm
-from jsrm.parameters.hsa_params import PARAMS_CONTROL as params
+from jsrm.parameters.hsa_params import PARAMS_FPU_CONTROL as params
 from jsrm.systems import planar_hsa
 
 num_segments = 1
