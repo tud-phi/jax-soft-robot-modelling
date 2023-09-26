@@ -13,7 +13,7 @@ import jsrm
 from jsrm import ode_factory
 from jsrm.systems import planar_pcs
 
-num_segments = 2
+num_segments = 1
 
 # filepath to symbolic expressions
 sym_exp_filepath = (
@@ -24,28 +24,29 @@ sym_exp_filepath = (
 
 # set parameters
 rho = 1070 * jnp.ones((num_segments,))  # Volumetric density of Dragon Skin 20 [kg/m^3]
-D = 1e-5 * jnp.diag(jnp.array([1e0, 1e3, 1e3, 1e0, 1e3, 1e3]))  # Damping coefficient
+D = 5e-6 * jnp.diag(jnp.array([1e0, 1e3, 1e3]))  # Damping coefficient
 params = {
     "th0": jnp.array(0.0),  # initial orientation angle [rad]
     "l": 1e-1 * jnp.ones((num_segments,)),
     "r": 2e-2 * jnp.ones((num_segments,)),
     "rho": rho,
-    "g": jnp.array([0.0, -9.81]),
-    "E": 1e4 * jnp.ones((num_segments,)),  # Elastic modulus [Pa]
-    "G": 1e3 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
+    "g": jnp.array([0.0, 9.81]),
+    "E": 2e2 * jnp.ones((num_segments,)),  # Elastic modulus [Pa]
+    "G": 1e2 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
     "D": D,
 }
 
 # activate all strains (i.e. bending, shear, and axial)
 strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
+strain_selector = jnp.array([True, False, False])
 
 # define initial configuration
-q0 = jnp.array([jnp.pi, 0.0, 0.0, -2 * jnp.pi, 0.0, 0.0])
+q0 = jnp.array([10 * jnp.pi])
 
 # set simulation parameters
-dt = 1e-4  # time step
-ts = jnp.arange(0.0, 5, dt)  # time steps
-skip_step = 100  # how many time steps to skip in between video frames
+dt = 1e-3  # time step
+ts = jnp.arange(0.0, 2, dt)  # time steps
+skip_step = 10  # how many time steps to skip in between video frames
 video_ts = ts[::skip_step]  # time steps for video
 
 # video settings

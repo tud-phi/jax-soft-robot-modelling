@@ -120,6 +120,9 @@ def symbolically_derive_planar_hsa_model(
         )
     )  # damping coefficient for elongation of each rod
     mpl = sp.Symbol("mpl", real=True, nonnegative=True)  # mass of payload [kg]
+    CoGpl_syms = list(
+        sp.symbols("CoGpl1:3", real=True)
+    )  # CoG of payload relative to the end-effector position
 
     # planar strains and their derivatives
     xi_syms = list(sp.symbols(f"xi1:{num_dof + 1}", nonzero=True))  # strains
@@ -176,6 +179,8 @@ def symbolically_derive_planar_hsa_model(
     zetash = sp.Matrix(zetash_syms).reshape(num_segments, num_rods_per_segment)
     # damping coefficient for axial elongation of each rod
     zetaa = sp.Matrix(zetaa_syms).reshape(num_segments, num_rods_per_segment)
+    # center of origin of the payload
+    CoGpl = sp.Matrix(CoGpl_syms)
 
     # configuration variables and their derivatives
     xi = sp.Matrix(xi_syms)  # strains
@@ -440,21 +445,6 @@ def symbolically_derive_planar_hsa_model(
         Up = sp.simplify(mp * g.T @ pCoGp)
         U = U + Up
 
-        # add contribution of the payload mass
-        # we assume the payload to be attached to (i.e., its CoG to be at) the bottom end of the platform
-        # position of the payload CoG (adding the distal end cap to the rod)
-        pCoGpl = p.subs(s, l[i]) + Rp @ sp.Matrix([0.0, ldc[i, 0]])
-        # positional Jacobian of the payload CoG
-        JpCoGpl = pCoGpl.jacobian(xi)
-        # mass matrix of the payload while neglecting its rotational inertia around its CoG
-        Bpl = mpl * JpCoGpl.T @ JpCoGpl
-        if simplify:
-            Bpl = sp.simplify(Bpl)
-        B = B + Bpl
-        # add the gravitational potential energy of the payload
-        Upl = sp.simplify(mpl * g.T @ pCoGpl)
-        U = U + Upl
-
         # update the orientation for the next segment
         th_prev = th.subs(s, l[i])
 
@@ -462,13 +452,30 @@ def symbolically_derive_planar_hsa_model(
         # add the length of the distal caps and the height of the platform
         p_prev = p.subs(s, l[i]) + Rp @ sp.Matrix([0.0, ldc[i, 0] + pcudim[i, 1]])
 
-    # end-effector pose
-    chiee = sp.Matrix([p_prev[0], p_prev[1], th_prev])
+    # end-effector pose (the distal plane of the last platform)
+    pee = p_prev  # end-effector position
+    chiee = sp.Matrix([pee[0], pee[1], th_prev])
     print("chiee =\n", chiee)
+    # rotation matrix of the end-effector
+    Ree = sp.Matrix([[sp.cos(chiee[2]), -sp.sin(chiee[2])], [sp.sin(chiee[2]), sp.cos(chiee[2])]])
     Jee = chiee.jacobian(xi)  # Jacobian of the end-effector
     print("Jee =\n", Jee)
     Jee_d = compute_dAdt(Jee, xi, xi_d)  # time derivative of the end-effector Jacobian
     print("Jee_d =\n", Jee_d)
+
+    # add contribution of the payload mass
+    # the center of gravity of the payload mass should be specified relative to the end effector position
+    pCoGpl = pee + Ree @ CoGpl
+    # positional Jacobian of the payload CoG
+    JpCoGpl = pCoGpl.jacobian(xi)
+    # mass matrix of the payload while neglecting its rotational inertia around its CoG
+    Bpl = mpl * JpCoGpl.T @ JpCoGpl
+    if simplify:
+        Bpl = sp.simplify(Bpl)
+    B = B + Bpl
+    # add the gravitational potential energy of the payload
+    Upl = sp.simplify(mpl * g.T @ pCoGpl)
+    U = U + Upl
 
     # simplify mass matrix
     if simplify:
@@ -520,6 +527,7 @@ def symbolically_derive_planar_hsa_model(
             "zetash": zetash_syms,
             "zetaa": zetaa_syms,
             "mpl": mpl,
+            "CoGpl": CoGpl_syms,
         },
         "state_syms": {
             "xi": xi_syms,

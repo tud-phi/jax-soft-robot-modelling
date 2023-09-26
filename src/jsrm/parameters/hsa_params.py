@@ -1,11 +1,44 @@
 __all__ = ["generate_base_params_for_fpu", "PARAMS_FPU_CONTROL", "PARAMS_FPU_SYSTEM_ID"]
 
+from jax import Array
 import jax.numpy as jnp
 from typing import Dict
 
 
-def generate_base_params_for_fpu(num_segments: int = 1, num_rods_per_segment: int = 2) -> Dict:
+def generate_common_base_params(num_segments: int, num_rods_per_segment) -> Dict[str, Array]:
     assert num_rods_per_segment % 2 == 0, "num_rods_per_segment must be even"
+
+    ones_rod = jnp.ones((num_segments, num_rods_per_segment))
+
+    return {
+        "th0": jnp.array(0.0),  # initial orientation angle [rad]
+        "l": 59e-3 * jnp.ones((num_segments,)),  # length of each rod [m]
+        # length of the rigid proximal caps of the rods connecting to the base [m]
+        "lpc": 25e-3 * jnp.ones((num_segments,)),
+        # length of the rig id distal caps of the rods connecting to the platform [m]
+        "ldc": 14e-3 * jnp.ones((num_segments,)),
+        # outside radius of each rod [m]. The rows correspond to the segments.
+        "rout": 25.4e-3 / 2 * ones_rod,  # this is for FPU rods
+        # handedness of each rod. The rows correspond to the segments.
+        "h": ones_rod,
+        # offset [m] of each rod from the centerline. The rows correspond to the segments.
+        "roff": jnp.repeat(
+            jnp.repeat(jnp.array([[-24e-3, 24e-3]]), num_rods_per_segment // 2, axis=1),
+            num_segments,
+            axis=0,
+        ),
+        "pcudim": jnp.repeat(
+            jnp.array([[80e-3, 12e-3, 80e-3]]), num_segments, axis=0
+        ),  # width, height, depth of the platform [m]
+        "g": jnp.array([0.0, 9.81]),
+        "mpl": jnp.array(0.0),  # payload mass [kg]
+        # center of origin of the payload relative to end-effector [m]
+        "CoGpl": jnp.array([0.0, -12e-3 - 5e-3]),  # subtract 12 mm for the thickness of the platform
+    }
+
+
+def generate_base_params_for_fpu(num_segments: int = 1, num_rods_per_segment: int = 2) -> Dict[str, Array]:
+    common_params = generate_common_base_params(num_segments, num_rods_per_segment)
 
     ones_rod = jnp.ones((num_segments, num_rods_per_segment))
     # old params (1st ISER submission)
@@ -75,32 +108,13 @@ def generate_base_params_for_fpu(num_segments: int = 1, num_rods_per_segment: in
         "phi_max": 210 / 180 * jnp.pi * ones_rod,
     } """
     # new params (final ISER submission)
-    params = {
-        "th0": jnp.array(0.0),  # initial orientation angle [rad]
-        "l": 59e-3 * jnp.ones((num_segments,)),  # length of each rod [m]
-        # length of the rigid proximal caps of the rods connecting to the base [m]
-        "lpc": 25e-3 * jnp.ones((num_segments,)),
-        # length of the rig id distal caps of the rods connecting to the platform [m]
-        "ldc": 14e-3 * jnp.ones((num_segments,)),
+    params = common_params | {
         "sigma_a_eq": 1.0 * ones_rod,  # axial rest strains of each rod
         # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
         # manually measured: Average: 0.009118994, Std: 0.000696435
         "C_varepsilon": 0.00984819 * ones_rod,
-        # outside radius of each rod [m]. The rows correspond to the segments.
-        "rout": 25.4e-3 / 2 * ones_rod,  # this is for FPU rods
         # inside radius of each rod [m]. The rows correspond to the segments.
         "rin": (25.4e-3 / 2 - 2.43e-3) * ones_rod,  # this is for FPU rods
-        # handedness of each rod. The rows correspond to the segments.
-        "h": ones_rod,
-        # offset [m] of each rod from the centerline. The rows correspond to the segments.
-        "roff": jnp.repeat(
-            jnp.repeat(jnp.array([[-24e-3, 24e-3]]), num_rods_per_segment // 2, axis=1),
-            num_segments,
-            axis=0,
-        ),
-        "pcudim": jnp.repeat(
-            jnp.array([[80e-3, 12e-3, 80e-3]]), num_segments, axis=0
-        ),  # width, height, depth of the platform [m]
         # mass of FPU rod: 14 g
         # For FPU, this corresponds to a measure volume of 0000175355 m^3 --> rho = 798.38 kg/m^3
         "rhor": 798.38 * ones_rod,  # Volumetric density of rods [kg/m^3],
@@ -116,7 +130,6 @@ def generate_base_params_for_fpu(num_segments: int = 1, num_rods_per_segment: in
         # volume: pi*lpc*rout^2 = 0.0000126677 m^3
         # --> rho = 710.4 kg/m^3
         "rhoec": 710.4 * jnp.ones((num_segments,)),
-        "g": jnp.array([0.0, 9.81]),
         # Nominal bending stiffness of each rod [Nm^2]
         "S_b_hat": 5.71346377e-04 * ones_rod,
         # Nominal shear stiffness of each rod [N]
@@ -139,42 +152,22 @@ def generate_base_params_for_fpu(num_segments: int = 1, num_rods_per_segment: in
         "zetaa": 2e-2 * ones_rod,
         # maximum twist angles (positive) [rad]
         "phi_max": 210 / 180 * jnp.pi * ones_rod,
-        "mpl": jnp.array(0.0),  # payload mass [kg]
     }
 
     return params
 
 
-def generate_base_params_for_epu(num_segments: int = 1, num_rods_per_segment: int = 2) -> Dict:
-    assert num_rods_per_segment % 2 == 0, "num_rods_per_segment must be even"
+def generate_base_params_for_epu(num_segments: int = 1, num_rods_per_segment: int = 2) -> Dict[str, Array]:
+    common_params = generate_common_base_params(num_segments, num_rods_per_segment)
 
     ones_rod = jnp.ones((num_segments, num_rods_per_segment))
-    params = {
-        "th0": jnp.array(0.0),  # initial orientation angle [rad]
-        "l": 59e-3 * jnp.ones((num_segments,)),  # length of each rod [m]
-        # length of the rigid proximal caps of the rods connecting to the base [m]
-        "lpc": 25e-3 * jnp.ones((num_segments,)),
-        # length of the rig id distal caps of the rods connecting to the platform [m]
-        "ldc": 14e-3 * jnp.ones((num_segments,)),
+    params = common_params | {
         "sigma_a_eq": 1.0 * ones_rod,  # axial rest strains of each rod
         # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
         # manually measured: Average: 0.009118994, Std: 0.000696435
         "C_varepsilon": 0.00984819 * ones_rod,
-        # outside radius of each rod [m]. The rows correspond to the segments.
-        "rout": 25.4e-3 / 2 * ones_rod,  # this is for EPU rods
         # inside radius of each rod [m]. The rows correspond to the segments.
         "rin": (25.4e-3 / 2 - 5.0e-3) * ones_rod,  # this is for EPU rods
-        # handedness of each rod. The rows correspond to the segments.
-        "h": ones_rod,
-        # offset [m] of each rod from the centerline. The rows correspond to the segments.
-        "roff": jnp.repeat(
-            jnp.repeat(jnp.array([[-24e-3, 24e-3]]), num_rods_per_segment // 2, axis=1),
-            num_segments,
-            axis=0,
-        ),
-        "pcudim": jnp.repeat(
-            jnp.array([[80e-3, 12e-3, 80e-3]]), num_segments, axis=0
-        ),  # width, height, depth of the platform [m]
         # mass of EPU rod: 26 g
         # For EPU, this corresponds to a measure volume of 0000314034 m^3 --> rho = 827.94 kg/m^3
         "rhor": 827.94 * ones_rod,  # Volumetric density of rods [kg/m^3],
@@ -190,7 +183,6 @@ def generate_base_params_for_epu(num_segments: int = 1, num_rods_per_segment: in
         # volume: pi*lpc*rout^2 = 0.0000126677 m^3
         # --> rho = 710.4 kg/m^3
         "rhoec": 710.4 * jnp.ones((num_segments,)),
-        "g": jnp.array([0.0, 9.81]),
         # Nominal bending stiffness of each rod [Nm^2]
         "S_b_hat": 5.71346377e-04 * ones_rod,
         # Nominal shear stiffness of each rod [N]
@@ -213,7 +205,6 @@ def generate_base_params_for_epu(num_segments: int = 1, num_rods_per_segment: in
         "zetaa": 2e-2 * ones_rod,
         # maximum twist angles (positive) [rad]
         "phi_max": 210 / 180 * jnp.pi * ones_rod,
-        "mpl": jnp.array(0.0),  # payload mass [kg]
     }
 
     return params
