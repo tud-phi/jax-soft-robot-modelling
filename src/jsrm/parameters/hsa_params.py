@@ -244,3 +244,29 @@ PARAMS_FPU_CONTROL.update(
         "zetaa": 2 * PARAMS_FPU_CONTROL["zetaa"],
     }
 )
+
+PARAMS_EPU_SYSTEM_ID = generate_base_params_for_epu(num_segments=1, num_rods_per_segment=4)
+PARAMS_EPU_SYSTEM_ID.update(
+    {
+        "h": jnp.array([[1.0, -1.0, 1.0, -1.0]]),
+        "roff": 24e-3 * jnp.array([[1.0, 1.0, -1.0, -1.0]]),
+    }
+)
+
+PARAMS_EPU_CONTROL = generate_base_params_for_epu(num_segments=1, num_rods_per_segment=2)
+PARAMS_EPU_CONTROL.update(
+    {
+        "rhor": 2 * PARAMS_EPU_CONTROL["rhor"],
+        "rhoec": 2 * PARAMS_EPU_CONTROL["rhoec"],
+        "S_b_hat": 2 * PARAMS_EPU_CONTROL["S_b_hat"],
+        "S_sh_hat": 2 * PARAMS_EPU_CONTROL["S_sh_hat"],
+        "S_a_hat": 2 * PARAMS_EPU_CONTROL["S_a_hat"],
+        "S_b_sh": 2 * PARAMS_EPU_CONTROL["S_b_sh"],
+        "C_S_b": 2 * PARAMS_EPU_CONTROL["C_S_b"],
+        "C_S_sh": 2 * PARAMS_EPU_CONTROL["C_S_sh"],
+        "C_S_a": 2 * PARAMS_EPU_CONTROL["C_S_a"],
+        "zetab": 2 * PARAMS_EPU_CONTROL["zetab"],
+        "zetash": 2 * PARAMS_EPU_CONTROL["zetash"],
+        "zetaa": 2 * PARAMS_EPU_CONTROL["zetaa"],
+    }
+)
