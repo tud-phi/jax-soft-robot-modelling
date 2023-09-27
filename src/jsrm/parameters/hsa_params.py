@@ -206,7 +206,7 @@ def generate_base_params_for_epu(num_segments: int = 1, num_rods_per_segment: in
         # damping coefficient for axial elongation of shape (num_segments, rods_per_segment)
         "zetaa": 2e-2 * ones_rod,
         # maximum twist angles (positive) [rad]
-        "phi_max": 210 / 180 * jnp.pi * ones_rod,
+        "phi_max": 270 / 180 * jnp.pi * ones_rod,
     }
 
     return params
