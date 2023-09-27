@@ -169,7 +169,7 @@ def generate_base_params_for_epu(num_segments: int = 1, num_rods_per_segment: in
         # manually measured: Average: 0.009118994, Std: 0.000696435
         "C_varepsilon": 0.00984819 * ones_rod,
         # inside radius of each rod [m]. The rows correspond to the segments.
-        "rin": (25.4e-3 / 2 - 5.0e-3) * ones_rod,  # this is for EPU rods
+        "rin": (25.4e-3 / 2 - 4.76e-3) * ones_rod,  # this is for EPU rods
         # mass of EPU rod: 26 g
         # For EPU, this corresponds to a measure volume of 0000314034 m^3 --> rho = 827.94 kg/m^3
         "rhor": 827.94 * ones_rod,  # Volumetric density of rods [kg/m^3],
