@@ -18,7 +18,7 @@ def generate_common_base_params(num_segments: int, num_rods_per_segment) -> Dict
         # length of the rig id distal caps of the rods connecting to the platform [m]
         "ldc": 14e-3 * jnp.ones((num_segments,)),
         # outside radius of each rod [m]. The rows correspond to the segments.
-        "rout": 25.4e-3 / 2 * ones_rod,  # this is for FPU rods
+        "rout": 25.4e-3 / 2 * ones_rod,
         # handedness of each rod. The rows correspond to the segments.
         "h": ones_rod,
         # offset [m] of each rod from the centerline. The rows correspond to the segments.
