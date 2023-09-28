@@ -166,8 +166,7 @@ def generate_base_params_for_epu(num_segments: int = 1, num_rods_per_segment: in
     params = common_params | {
         "sigma_a_eq": 1.0 * ones_rod,  # axial rest strains of each rod
         # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
-        # manually measured: Average: 0.009118994, Std: 0.000696435
-        "C_varepsilon": 0.00984819 * ones_rod,
+        "C_varepsilon": 0.0079049 * ones_rod,
         # inside radius of each rod [m]. The rows correspond to the segments.
         "rin": (25.4e-3 / 2 - 4.76e-3) * ones_rod,  # this is for EPU rods
         # mass of EPU rod: 26 g
@@ -190,7 +189,7 @@ def generate_base_params_for_epu(num_segments: int = 1, num_rods_per_segment: in
         # Nominal shear stiffness of each rod [N]
         "S_sh_hat": 5.91462074e-01 * ones_rod,
         # Nominal axial stiffness of each rod [N]
-        "S_a_hat": 5.66472469 * ones_rod,
+        "S_a_hat": 0.73610293 * ones_rod,
         # Elastic coupling between bending and shear [Nm/rad]
         "S_b_sh": 4.48419541e-03 * ones_rod,
         # Scaling of bending stiffness with twist strain [Nm^3/rad]
@@ -198,7 +197,7 @@ def generate_base_params_for_epu(num_segments: int = 1, num_rods_per_segment: in
         # Scaling of shear stiffness with twist strain [Nm/rad]
         "C_S_sh": -4.75687961e-04 * ones_rod,
         # Scaling of axial stiffness with twist strain [Nm/rad]
-        "C_S_a": 0.01508165 * ones_rod,
+        "C_S_a": 0.00981059 * ones_rod,
         # damping coefficient for bending of shape (num_segments, rods_per_segment)
         "zetab": 3e-5 * ones_rod,
         # damping coefficient for shear of shape (num_segments, rods_per_segment)
