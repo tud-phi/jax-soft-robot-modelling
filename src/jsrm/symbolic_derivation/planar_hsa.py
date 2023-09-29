@@ -50,6 +50,12 @@ def symbolically_derive_planar_hsa_model(
     roff_syms = list(
         sp.symbols(f"roff1:{num_segments * num_rods_per_segment + 1}", nonnegative=True)
     )  # radial offset of each rod from the centerline
+    kappa_b_eq_syms = list(
+        sp.symbols(f"kappa_b_eq1:{num_segments * num_rods_per_segment + 1}")
+    )  # equilibrium bending strain of each rod
+    sigma_sh_eq_syms = list(
+        sp.symbols(f"sigma_sh_eq1:{num_segments * num_rods_per_segment + 1}")
+    )  # equilibrium shear strain of each rod
     sigma_a_eq_syms = list(
         sp.symbols(f"sigma_a_eq1:{num_segments * num_rods_per_segment + 1}")
     )  # equilibrium axial strain of each rod
@@ -149,6 +155,10 @@ def symbolically_derive_planar_hsa_model(
     )  # inside radius of each rod
     # radial offset of each rod from the centerline
     roff = sp.Matrix(roff_syms).reshape(num_segments, num_rods_per_segment)
+    # bending rest strain of each rod
+    kappa_b_eq = sp.Matrix(kappa_b_eq_syms).reshape(num_segments, num_rods_per_segment)
+    # shear rest strain of each rod
+    sigma_sh_eq = sp.Matrix(sigma_sh_eq_syms).reshape(num_segments, num_rods_per_segment)
     # axial rest strain of each rod
     sigma_a_eq = sp.Matrix(sigma_a_eq_syms).reshape(num_segments, num_rods_per_segment)
     C_varepsilon = sp.Matrix(C_varepsilon_syms).reshape(
@@ -291,7 +301,7 @@ def symbolically_derive_planar_hsa_model(
 
             # strains in physical HSA rod
             pxir = _sym_beta_fn(vxi, roff[i, j])
-            pxi_eqr = sp.Matrix([[0.0], [0.0], [sigma_a_eq[i, j]]])
+            pxi_eqr = sp.Matrix([[kappa_b_eq[i, j]], [sigma_sh_eq[i, j]], [sigma_a_eq[i, j]]])
             # twist angle of the current rod
             phir = phi[i * num_rods_per_segment + j]
 
@@ -509,6 +519,8 @@ def symbolically_derive_planar_hsa_model(
             "rout": rout_syms,
             "rin": rin_syms,
             "roff": roff_syms,
+            "kappa_b_eq": kappa_b_eq_syms,
+            "sigma_sh_eq": sigma_sh_eq_syms,
             "sigma_a_eq": sigma_a_eq_syms,
             "C_varepsilon": C_varepsilon_syms,
             "pcudim": pcudim_syms,

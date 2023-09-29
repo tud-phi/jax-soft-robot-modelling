@@ -212,6 +212,8 @@ def factory(
         """
         # rest strains of the physical rods
         pxi_eq = jnp.zeros((num_segments, num_rods_per_segment, 3))
+        pxi_eq = pxi_eq.at[:, :, 0].set(params["kappa_b_eq"])
+        pxi_eq = pxi_eq.at[:, :, 1].set(params["sigma_sh_eq"])
         pxi_eq = pxi_eq.at[:, :, 2].set(params["sigma_a_eq"])
 
         # map the rest strains from the physical rods to the virtual backbone

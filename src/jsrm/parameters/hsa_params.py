@@ -18,6 +18,9 @@ def generate_common_base_params(num_segments: int, num_rods_per_segment) -> Dict
         # length of the rig id distal caps of the rods connecting to the platform [m]
         "ldc": 14e-3 * jnp.ones((num_segments,)),
         # outside radius of each rod [m]. The rows correspond to the segments.
+        "kappa_b_eq": 0.0 * ones_rod,  # bending rest curvatures of each rod
+        "sigma_sh_eq": 0.0 * ones_rod,  # shear rest curvatures of each rod
+        "sigma_a_eq": 1.0 * ones_rod,  # axial rest strains of each rod
         "rout": 25.4e-3 / 2 * ones_rod,
         # handedness of each rod. The rows correspond to the segments.
         "h": ones_rod,
@@ -111,7 +114,6 @@ def generate_base_params_for_fpu(num_segments: int = 1, num_rods_per_segment: in
     } """
     # new params (final ISER submission)
     params = common_params | {
-        "sigma_a_eq": 1.0 * ones_rod,  # axial rest strains of each rod
         # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
         # manually measured: Average: 0.009118994, Std: 0.000696435
         "C_varepsilon": 0.00984819 * ones_rod,
@@ -164,7 +166,6 @@ def generate_base_params_for_epu(num_segments: int = 1, num_rods_per_segment: in
 
     ones_rod = jnp.ones((num_segments, num_rods_per_segment))
     params = common_params | {
-        "sigma_a_eq": 1.0 * ones_rod,  # axial rest strains of each rod
         # scale factor for the rest length as a function of the twist strain [1/(rad/m) = m / rad]
         "C_varepsilon": 0.0079049 * ones_rod,
         # inside radius of each rod [m]. The rows correspond to the segments.
