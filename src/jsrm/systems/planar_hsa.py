@@ -522,7 +522,7 @@ def factory(
         # evaluate the symbolic expressions
         params_for_lambdify = select_params_for_lambdify_fn(params)
         B = B_lambda(*params_for_lambdify, *xi_epsed)
-        C_xi = C_lambda(*params_for_lambdify, *xi_epsed, *xi_d)
+        C = C_lambda(*params_for_lambdify, *xi_epsed, *xi_d)
         G = G_lambda(*params_for_lambdify, *xi_epsed).squeeze()
         K = K_lambda(*params_for_lambdify, *xi_epsed).squeeze()
         D = D_lambda(*params_for_lambdify)
@@ -530,7 +530,7 @@ def factory(
 
         # apply the strain basis
         B = B_xi.T @ B @ B_xi
-        C = B_xi.T @ C_xi @ B_xi
+        C = B_xi.T @ C @ B_xi
         G = B_xi.T @ G
         K = B_xi.T @ K
         D = B_xi.T @ D @ B_xi
