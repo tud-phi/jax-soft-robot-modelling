@@ -2,7 +2,7 @@ import cv2  # importing cv2
 from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
-from diffrax import diffeqsolve, Euler, ODETerm, SaveAt
+from diffrax import diffeqsolve, Dopri5, Euler, ODETerm, SaveAt
 from jax import Array, jit, vmap
 from jax import numpy as jnp
 from functools import partial
@@ -290,7 +290,7 @@ if __name__ == "__main__":
 
     sol = diffeqsolve(
         ode_term,
-        solver=Euler(),
+        solver=Dopri5(),
         t0=ts[0],
         t1=ts[-1],
         dt0=dt,
