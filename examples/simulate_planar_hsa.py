@@ -70,7 +70,7 @@ def draw_robot(
         params, q, s_ps
     )  # poses of virtual backbone
     chiL_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 0)  # poses of left rod
-    chiR_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 1)  # poses of left rod
+    chiR_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 1)  # poses of right rod
     # poses of the platforms
     chip_ps = batched_forward_kinematics_platform_fn(
         params, q, jnp.arange(0, num_segments)
