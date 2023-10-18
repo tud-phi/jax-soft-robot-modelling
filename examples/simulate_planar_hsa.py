@@ -70,7 +70,7 @@ def draw_robot(
         params, q, s_ps
     )  # poses of virtual backbone
     chiL_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 0)  # poses of left rod
-    chiR_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 1)  # poses of left rod
+    chiR_ps = batched_forward_kinematics_rod_fn(params, q, s_ps, 1)  # poses of right rod
     # poses of the platforms
     chip_ps = batched_forward_kinematics_platform_fn(
         params, q, jnp.arange(0, num_segments)
@@ -286,7 +286,7 @@ if __name__ == "__main__":
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
 
     ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params)
-    ode_term = ODETerm(partial(ode_fn, u=phi))
+    ode_term = ODETerm(ode_fn)
 
     sol = diffeqsolve(
         ode_term,
@@ -295,6 +295,7 @@ if __name__ == "__main__":
         t1=ts[-1],
         dt0=dt,
         y0=x0,
+        args=phi,
         max_steps=None,
         saveat=SaveAt(ts=video_ts),
     )
