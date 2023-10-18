@@ -634,13 +634,12 @@ def ode_factory(
     num_rods = params["rout"].shape[0] * params["rout"].shape[1]
 
     @jit
-    def ode_fn(t: float, x: Array, *args, u: Array) -> Array:
+    def ode_fn(t: float, x: Array, u: Array) -> Array:
         """
         ODE of the dynamical Lagrangian system.
         Args:
             t: time
             x: state vector of shape (2 * n_q, )
-            args: additional arguments
             u: input to the system.
                 - if consider_underactuation_model is True, then this is an array of shape (n_phi) with
                     motor positions / twist angles of the proximal end of the rods

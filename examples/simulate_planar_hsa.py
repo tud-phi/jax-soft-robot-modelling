@@ -286,7 +286,7 @@ if __name__ == "__main__":
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
 
     ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params)
-    ode_term = ODETerm(partial(ode_fn, u=phi))
+    ode_term = ODETerm(ode_fn)
 
     sol = diffeqsolve(
         ode_term,
@@ -295,6 +295,7 @@ if __name__ == "__main__":
         t1=ts[-1],
         dt0=dt,
         y0=x0,
+        args=phi,
         max_steps=None,
         saveat=SaveAt(ts=video_ts),
     )
