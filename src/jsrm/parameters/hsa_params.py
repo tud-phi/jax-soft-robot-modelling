@@ -149,11 +149,11 @@ def generate_base_params_for_fpu(num_segments: int = 1, num_rods_per_segment: in
         # Scaling of axial stiffness with twist strain [Nm/rad]
         "C_S_a": 0.01508165 * ones_rod,
         # damping coefficient for bending of shape (num_segments, rods_per_segment)
-        "zetab": 3e-5 * ones_rod,
+        "zetab": 2e-6 * ones_rod,
         # damping coefficient for shear of shape (num_segments, rods_per_segment)
-        "zetash": 2e-4 * ones_rod,
+        "zetash": 1e-5 * ones_rod,
         # damping coefficient for axial elongation of shape (num_segments, rods_per_segment)
-        "zetaa": 2e-2 * ones_rod,
+        "zetaa": 8e-4 * ones_rod,
         # maximum twist angles (positive) [rad]
         "phi_max": 200 / 180 * jnp.pi * ones_rod,
     }
