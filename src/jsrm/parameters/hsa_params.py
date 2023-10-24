@@ -36,9 +36,7 @@ def generate_common_base_params(num_segments: int, num_rods_per_segment) -> Dict
         "g": jnp.array([0.0, 9.81]),
         "mpl": jnp.array(0.0),  # payload mass [kg]
         # center of origin of the payload relative to end-effector [m]
-        # subtract 12 mm for the thickness of the platform
-        # the 100g weights have a length of 27mm
-        "CoGpl": jnp.array([0.0, -12e-3 - 13.5e-3]),
+        "CoGpl": jnp.array([0.0, 0.0]),
     }
 
 
