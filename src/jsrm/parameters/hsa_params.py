@@ -37,6 +37,8 @@ def generate_common_base_params(num_segments: int, num_rods_per_segment) -> Dict
         "mpl": jnp.array(0.0),  # payload mass [kg]
         # center of origin of the payload relative to end-effector [m]
         "CoGpl": jnp.array([0.0, 0.0]),
+        # rigid offset SE(2) transformation from the distal end of the platform to the end-effector
+        "chiee_off": jnp.array([0.0, 0.0, 0.0]),
     }
 
 

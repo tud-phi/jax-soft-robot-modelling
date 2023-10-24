@@ -129,6 +129,8 @@ def symbolically_derive_planar_hsa_model(
     CoGpl_syms = list(
         sp.symbols("CoGpl1:3", real=True)
     )  # CoG of payload relative to the end-effector position
+    # rigid offset of the end-effector from the distal end of the last platform
+    chiee_off_syms = list(sp.symbols("chiee_off1:4", real=True))
 
     # planar strains and their derivatives
     xi_syms = list(sp.symbols(f"xi1:{num_dof + 1}", nonzero=True))  # strains
@@ -464,10 +466,17 @@ def symbolically_derive_planar_hsa_model(
 
     # end-effector pose (the distal plane of the last platform)
     pee = p_prev  # end-effector position
-    chiee = sp.Matrix([pee[0], pee[1], th_prev])
+    thee = th_prev  # end-effector orientation
+    # rotation matrix of the last platform
+    R_last_last_platform = sp.Matrix([[sp.cos(thee), -sp.sin(thee)], [sp.sin(thee), sp.cos(thee)]])
+    # add the rigid offset of the end-effector from the distal end of the last platform
+    pee += R_last_last_platform @ sp.Matrix([chiee_off_syms[0], chiee_off_syms[1]])
+    thee += chiee_off_syms[2]
+    # the rotation matrix of the end-effector
+    Ree = sp.Matrix([[sp.cos(thee), -sp.sin(thee)], [sp.sin(thee), sp.cos(thee)]])
+    # formulating the pose of the end-effector
+    chiee = sp.Matrix([pee[0], pee[1], thee])
     print("chiee =\n", chiee)
-    # rotation matrix of the end-effector
-    Ree = sp.Matrix([[sp.cos(chiee[2]), -sp.sin(chiee[2])], [sp.sin(chiee[2]), sp.cos(chiee[2])]])
     Jee = chiee.jacobian(xi)  # Jacobian of the end-effector
     print("Jee =\n", Jee)
     Jee_d = compute_dAdt(Jee, xi, xi_d)  # time derivative of the end-effector Jacobian
@@ -540,6 +549,7 @@ def symbolically_derive_planar_hsa_model(
             "zetaa": zetaa_syms,
             "mpl": mpl,
             "CoGpl": CoGpl_syms,
+            "chiee_off": chiee_off_syms,
         },
         "state_syms": {
             "xi": xi_syms,
