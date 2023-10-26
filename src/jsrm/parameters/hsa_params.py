@@ -1,7 +1,10 @@
 __all__ = [
-    "generate_base_params_for_fpu", "generate_base_params_for_epu",
-    "PARAMS_FPU_CONTROL", "PARAMS_FPU_SYSTEM_ID",
-    "PARAMS_EPU_CONTROL", "PARAMS_EPU_SYSTEM_ID",
+    "generate_base_params_for_fpu",
+    "generate_base_params_for_epu",
+    "PARAMS_FPU_CONTROL",
+    "PARAMS_FPU_SYSTEM_ID",
+    "PARAMS_EPU_CONTROL",
+    "PARAMS_EPU_SYSTEM_ID",
 ]
 
 from jax import Array
@@ -10,9 +13,9 @@ from typing import Dict
 
 
 def generate_common_base_params(
-        num_segments: int = 1,
-        num_rods_per_segment: int = 4,
-        end_effector_attached: int = False
+    num_segments: int = 1,
+    num_rods_per_segment: int = 4,
+    end_effector_attached: int = False,
 ) -> Dict[str, Array]:
     assert num_rods_per_segment % 2 == 0, "num_rods_per_segment must be even"
 
@@ -52,7 +55,9 @@ def generate_common_base_params(
     if end_effector_attached:
         # the end-effector is moved by 25mm in the y-dir relative to the top surface of the HSA platform
         params["chiee_off"] = jnp.array([0.0, 0.025, 0.0])
-        params["mpl"] = jnp.array(0.018)  # the end-effector attachment has a mass of 18g
+        params["mpl"] = jnp.array(
+            0.018
+        )  # the end-effector attachment has a mass of 18g
         # the end-effector attachment has a center of gravity of 3.63mm in y-dir from its base.
         # as it has a thickness of 25mm, this is -21.37mm from the top surface (i.e., end-effector position)
         params["CoGpl"] = jnp.array([0.0, -0.02137])
@@ -61,12 +66,14 @@ def generate_common_base_params(
 
 
 def generate_base_params_for_fpu(
-        num_segments: int = 1,
-        num_rods_per_segment: int = 4,
-        rod_multiplier: int = 1,
-        **kwargs
+    num_segments: int = 1,
+    num_rods_per_segment: int = 4,
+    rod_multiplier: int = 1,
+    **kwargs,
 ) -> Dict[str, Array]:
-    common_params = generate_common_base_params(num_segments, num_rods_per_segment, **kwargs)
+    common_params = generate_common_base_params(
+        num_segments, num_rods_per_segment, **kwargs
+    )
 
     ones_rod = jnp.ones((num_segments, num_rods_per_segment))
     # old params (1st ISER submission)
@@ -144,7 +151,9 @@ def generate_base_params_for_fpu(
         "rin": (25.4e-3 / 2 - 2.43e-3) * ones_rod,  # this is for FPU rods
         # mass of FPU rod: 14 g
         # For FPU, this corresponds to a measure volume of 0000175355 m^3 --> rho = 798.38 kg/m^3
-        "rhor": 798.38 * rod_multiplier * ones_rod,  # Volumetric density of rods [kg/m^3],
+        "rhor": 798.38
+        * rod_multiplier
+        * ones_rod,  # Volumetric density of rods [kg/m^3],
         # Volumetric density of platform [kg/m^3],
         # weight of platform + marker holder + cylinder top piece: 0.107 kg
         # subtracting 4 x 9g for distal cap: 0.071 kg
@@ -185,12 +194,14 @@ def generate_base_params_for_fpu(
 
 
 def generate_base_params_for_epu(
-        num_segments: int = 1,
-        num_rods_per_segment: int = 4,
-        rod_multiplier: int = 1,
-        **kwargs
+    num_segments: int = 1,
+    num_rods_per_segment: int = 4,
+    rod_multiplier: int = 1,
+    **kwargs,
 ) -> Dict[str, Array]:
-    common_params = generate_common_base_params(num_segments, num_rods_per_segment, **kwargs)
+    common_params = generate_common_base_params(
+        num_segments, num_rods_per_segment, **kwargs
+    )
 
     ones_rod = jnp.ones((num_segments, num_rods_per_segment))
     params = common_params | {
@@ -200,7 +211,9 @@ def generate_base_params_for_epu(
         "rin": (25.4e-3 / 2 - 4.76e-3) * ones_rod,  # this is for EPU rods
         # mass of EPU rod: 26 g
         # For EPU, this corresponds to a measure volume of 0000314034 m^3 --> rho = 827.94 kg/m^3
-        "rhor": 827.94 * rod_multiplier * ones_rod,  # Volumetric density of rods [kg/m^3],
+        "rhor": 827.94
+        * rod_multiplier
+        * ones_rod,  # Volumetric density of rods [kg/m^3],
         # Volumetric density of platform [kg/m^3],
         # weight of platform + marker holder + cylinder top piece: 0.107 kg
         # subtracting 4 x 9g for distal cap: 0.071 kg
@@ -218,7 +231,7 @@ def generate_base_params_for_epu(
         # Nominal shear stiffness of each rod [N]
         "S_sh_hat": 4.28135773e-02 * rod_multiplier * ones_rod,
         # Nominal axial stiffness of each rod [N]
-        "S_a_hat": 0. * rod_multiplier * ones_rod,
+        "S_a_hat": 0.0 * rod_multiplier * ones_rod,
         # Elastic coupling between bending and shear [Nm/rad]
         "S_b_sh": 5.04204068e-04 * rod_multiplier * ones_rod,
         # Scaling of bending stiffness with twist strain [Nm^3/rad]
@@ -240,16 +253,22 @@ def generate_base_params_for_epu(
     return params
 
 
-PARAMS_FPU_SYSTEM_ID = generate_base_params_for_fpu(num_segments=1, num_rods_per_segment=4)
+PARAMS_FPU_SYSTEM_ID = generate_base_params_for_fpu(
+    num_segments=1, num_rods_per_segment=4
+)
 PARAMS_FPU_SYSTEM_ID.update(
     {
         "h": jnp.array([[1.0, -1.0, 1.0, -1.0]]),
         "roff": 24e-3 * jnp.array([[1.0, 1.0, -1.0, -1.0]]),
     }
 )
-PARAMS_FPU_CONTROL = generate_base_params_for_fpu(num_segments=1, num_rods_per_segment=2, rod_multiplier=2)
+PARAMS_FPU_CONTROL = generate_base_params_for_fpu(
+    num_segments=1, num_rods_per_segment=2, rod_multiplier=2
+)
 
-PARAMS_EPU_SYSTEM_ID = generate_base_params_for_epu(num_segments=1, num_rods_per_segment=4)
+PARAMS_EPU_SYSTEM_ID = generate_base_params_for_epu(
+    num_segments=1, num_rods_per_segment=4
+)
 PARAMS_EPU_SYSTEM_ID.update(
     {
         "h": jnp.array([[1.0, -1.0, 1.0, -1.0]]),
@@ -257,4 +276,6 @@ PARAMS_EPU_SYSTEM_ID.update(
     }
 )
 
-PARAMS_EPU_CONTROL = generate_base_params_for_epu(num_segments=1, num_rods_per_segment=2, rod_multiplier=2)
+PARAMS_EPU_CONTROL = generate_base_params_for_epu(
+    num_segments=1, num_rods_per_segment=2, rod_multiplier=2
+)

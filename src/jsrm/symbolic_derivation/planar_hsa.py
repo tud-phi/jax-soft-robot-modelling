@@ -160,7 +160,9 @@ def symbolically_derive_planar_hsa_model(
     # bending rest strain of each rod
     kappa_b_eq = sp.Matrix(kappa_b_eq_syms).reshape(num_segments, num_rods_per_segment)
     # shear rest strain of each rod
-    sigma_sh_eq = sp.Matrix(sigma_sh_eq_syms).reshape(num_segments, num_rods_per_segment)
+    sigma_sh_eq = sp.Matrix(sigma_sh_eq_syms).reshape(
+        num_segments, num_rods_per_segment
+    )
     # axial rest strain of each rod
     sigma_a_eq = sp.Matrix(sigma_a_eq_syms).reshape(num_segments, num_rods_per_segment)
     C_varepsilon = sp.Matrix(C_varepsilon_syms).reshape(
@@ -303,7 +305,9 @@ def symbolically_derive_planar_hsa_model(
 
             # strains in physical HSA rod
             pxir = _sym_beta_fn(vxi, roff[i, j])
-            pxi_eqr = sp.Matrix([[kappa_b_eq[i, j]], [sigma_sh_eq[i, j]], [sigma_a_eq[i, j]]])
+            pxi_eqr = sp.Matrix(
+                [[kappa_b_eq[i, j]], [sigma_sh_eq[i, j]], [sigma_a_eq[i, j]]]
+            )
             # twist angle of the current rod
             phir = phi[i * num_rods_per_segment + j]
 
@@ -468,7 +472,9 @@ def symbolically_derive_planar_hsa_model(
     pee = p_prev  # end-effector position
     thee = th_prev  # end-effector orientation
     # rotation matrix of the last platform
-    R_last_last_platform = sp.Matrix([[sp.cos(thee), -sp.sin(thee)], [sp.sin(thee), sp.cos(thee)]])
+    R_last_last_platform = sp.Matrix(
+        [[sp.cos(thee), -sp.sin(thee)], [sp.sin(thee), sp.cos(thee)]]
+    )
     # add the rigid offset of the end-effector from the distal end of the last platform
     pee += R_last_last_platform @ sp.Matrix([chiee_off_syms[0], chiee_off_syms[1]])
     thee += chiee_off_syms[2]
