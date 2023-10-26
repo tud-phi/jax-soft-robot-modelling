@@ -572,7 +572,7 @@ def factory(
 
     def operational_space_dynamical_matrices_fn(
         params: Dict[str, Array], q: Array, q_d: Array, B: Array, C: Array
-    ):
+    ) -> Tuple[Array, Array, Array, Array, Array]:
         """
         Compute the dynamics in operational space.
         The implementation is based on Chapter 7.8 of "Modelling, Planning and Control of Robotics" by
@@ -587,7 +587,9 @@ def factory(
         Returns:
             Lambda: inertia matrix in the operational space of shape (n_x, n_x)
             nu: coriolis vector in the operational space of shape (n_x, )
-            JB_pinv: Dynamically-consistent pseudo-inverse of the Jacobian. Allows the mapping of torques
+            Jee: Jacobian of the end-effector pose with respect to the generalized coordinates of shape (3, n_q)
+            Jee_d: time-derivative of the Jacobian of the end-effector pose with respect to the generalized coordinates
+            JeeB_pinv: Dynamically-consistent pseudo-inverse of the Jacobian. Allows the mapping of torques
                 from the generalized coordinates to the operational space: f = JB_pinv.T @ tau_q
                 Shape (n_q, n_x)
         """
@@ -610,9 +612,9 @@ def factory(
         Lambda = jnp.linalg.inv(Jee @ B_inv @ Jee.T)
         nu = Lambda @ (Jee @ B_inv @ C - Jee_d) @ q_d
 
-        JB_pinv = B_inv @ Jee.T @ Lambda
+        JeeB_pinv = B_inv @ Jee.T @ Lambda
 
-        return Lambda, nu, JB_pinv
+        return Lambda, nu, Jee, Jee_d, JeeB_pinv
 
     sys_helpers = {
         "eps": eps,
