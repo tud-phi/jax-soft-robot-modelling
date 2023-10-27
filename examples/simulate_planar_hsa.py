@@ -2,7 +2,7 @@ import cv2  # importing cv2
 from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)  # double precision
-from diffrax import diffeqsolve, Euler, ODETerm, SaveAt
+from diffrax import diffeqsolve, Euler, ODETerm, SaveAt, Tsit5
 from jax import Array, jit, vmap
 from jax import numpy as jnp
 from functools import partial
@@ -32,10 +32,15 @@ q0 = jnp.array([jnp.pi, 0.0, 0.0])
 phi = jnp.array([jnp.pi, jnp.pi / 2])  # motor actuation angles
 
 # set simulation parameters
-dt = 1e-4  # time step
+dt = 5e-5  # time step
 ts = jnp.arange(0.0, 5, dt)  # time steps
 skip_step = 100  # how many time steps to skip in between video frames
 video_ts = ts[::skip_step]  # time steps for video
+
+# increase damping for simulation stability
+params["zetab"] = 5 * params["zetab"]
+params["zetash"] = 5 * params["zetash"]
+params["zetaa"] = 5 * params["zetaa"]
 
 # video settings
 video_width, video_height = 700, 700  # img height and width
@@ -292,7 +297,7 @@ if __name__ == "__main__":
 
     sol = diffeqsolve(
         ode_term,
-        solver=Euler(),
+        solver=Tsit5(),
         t0=ts[0],
         t1=ts[-1],
         dt0=dt,
