@@ -152,7 +152,6 @@ def factory(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["K"], "jax"
     )
     D_lambda = sp.lambdify(params_syms_cat, sym_exps["exps"]["D"], "jax")
-    print("alpha exp:\n", sym_exps["exps"]["alpha"])
     alpha_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["phi"],
         sym_exps["exps"]["alpha"],
@@ -557,7 +556,7 @@ def factory(
         G = G_lambda(*params_for_lambdify, *xi_epsed).squeeze()
         K = K_lambda(*params_for_lambdify, *xi).squeeze()
         D = D_lambda(*params_for_lambdify)
-        alpha = alpha_lambda(*params_for_lambdify, *xi_epsed, *phi).squeeze()
+        alpha = alpha_lambda(*params_for_lambdify, *xi, *phi).squeeze()
 
         # apply the strain basis
         B = B_xi.T @ B @ B_xi
