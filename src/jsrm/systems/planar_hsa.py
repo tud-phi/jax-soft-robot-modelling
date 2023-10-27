@@ -8,9 +8,7 @@ from typing import Callable, Dict, List, Tuple, Union
 from .utils import (
     concatenate_params_syms,
     compute_strain_basis,
-    compute_planar_stiffness_matrix,
 )
-from jsrm.math_utils import blk_diag
 
 
 def factory(
@@ -154,6 +152,7 @@ def factory(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["K"], "jax"
     )
     D_lambda = sp.lambdify(params_syms_cat, sym_exps["exps"]["D"], "jax")
+    print("alpha exp:\n", sym_exps["exps"]["alpha"])
     alpha_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["phi"],
         sym_exps["exps"]["alpha"],
@@ -556,7 +555,7 @@ def factory(
         B = B_lambda(*params_for_lambdify, *xi_epsed)
         C_xi = C_lambda(*params_for_lambdify, *xi_epsed, *xi_d)
         G = G_lambda(*params_for_lambdify, *xi_epsed).squeeze()
-        K = K_lambda(*params_for_lambdify, *xi_epsed).squeeze()
+        K = K_lambda(*params_for_lambdify, *xi).squeeze()
         D = D_lambda(*params_for_lambdify)
         alpha = alpha_lambda(*params_for_lambdify, *xi_epsed, *phi).squeeze()
 
