@@ -43,7 +43,7 @@ def factory(
                 positions and orientations of the rod
             forward_kinematics_platform_fn: function that returns the chi vector of shape (3, n_q) with the positions
                 and orientations of the platform
-            operational_space_dynamical_matrices_fn: function that returns Lambda, nu, and JB_pinv describing
+            operational_space_dynamical_matrices_fn: function that returns Lambda, mu, and JB_pinv describing
                 the dynamics in operational space
     """
     # load saved symbolic data
@@ -584,7 +584,7 @@ def factory(
 
         Returns:
             Lambda: inertia matrix in the operational space of shape (n_x, n_x)
-            nu: coriolis vector in the operational space of shape (n_x, )
+            mu: matrix with corioli and centrifugal terms in the operational space of shape (n_x, n_x)
             Jee: Jacobian of the end-effector pose with respect to the generalized coordinates of shape (3, n_q)
             Jee_d: time-derivative of the Jacobian of the end-effector pose with respect to the generalized coordinates
             JeeB_pinv: Dynamically-consistent pseudo-inverse of the Jacobian. Allows the mapping of torques
@@ -607,12 +607,12 @@ def factory(
         # inverse of the inertia matrix in the configuration space
         B_inv = jnp.linalg.inv(B)
 
-        Lambda = jnp.linalg.inv(Jee @ B_inv @ Jee.T)
-        nu = Lambda @ (Jee @ B_inv @ C - Jee_d) @ q_d
+        Lambda = jnp.linalg.inv(Jee @ B_inv @ Jee.T)  # inertia matrix in the operational space
+        mu = Lambda @ (Jee @ B_inv @ C - Jee_d)  # coriolis and centrifugal matrix in the operational space
 
         JeeB_pinv = B_inv @ Jee.T @ Lambda
 
-        return Lambda, nu, Jee, Jee_d, JeeB_pinv
+        return Lambda, mu, Jee, Jee_d, JeeB_pinv
 
     sys_helpers = {
         "eps": eps,
