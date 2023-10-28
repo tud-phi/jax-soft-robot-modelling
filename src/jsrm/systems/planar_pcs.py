@@ -17,7 +17,7 @@ def factory(
     filepath: Union[str, Path],
     strain_selector: Array = None,
     xi_eq: Array = None,
-    eps: float = 1e-6,
+    global_eps: float = 1e-6,
 ) -> Tuple[
     Array,
     Callable[[Dict[str, Array], Array, Array], Array],
@@ -33,7 +33,7 @@ def factory(
         strain_selector: array of shape (n_xi, ) with boolean values indicating which components of the
                 strain are active / non-zero
         xi_eq: array of shape (3 * num_segments) with the rest strains of the rod
-        eps: small number to avoid division by zero
+        global_eps: small number to avoid singularities (e.g., division by zero)
     Returns:
         B_xi: strain basis matrix of shape (3 * num_segments, n_q)
         forward_kinematics_fn: function that returns the p vector of shape (3, n_q) with the positions
@@ -146,13 +146,14 @@ def factory(
         return xi_epsed
 
     @jit
-    def forward_kinematics_fn(params: Dict[str, Array], q: Array, s: Array) -> Array:
+    def forward_kinematics_fn(params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
         Args:
             params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
             s: point coordinate along the rod in the interval [0, L].
+            eps: small number to avoid singularities (e.g., division by zero)
         Returns:
             chi: pose of the backbone point in Cartesian-space with shape (3, )
                 Consists of [p_x, p_y, theta]
@@ -188,7 +189,7 @@ def factory(
 
     @jit
     def dynamical_matrices_fn(
-        params: Dict[str, Array], q: Array, q_d: Array
+        params: Dict[str, Array], q: Array, q_d: Array, eps: float = 1e4 * global_eps
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
         Compute the dynamical matrices of the system.
@@ -196,6 +197,7 @@ def factory(
             params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
             q_d: generalized velocities of shape (n_q, )
+            eps: small number to avoid singularities (e.g., division by zero)
         Returns:
             B: mass / inertia matrix of shape (n_q, n_q)
             C: coriolis / centrifugal matrix of shape (n_q, n_q)
@@ -209,7 +211,7 @@ def factory(
         xi_d = B_xi @ q_d
 
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains(xi, 1e4 * eps)
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
 
         # cross-sectional area and second moment of area
         A = jnp.pi * params["r"] ** 2

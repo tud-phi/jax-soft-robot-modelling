@@ -14,7 +14,7 @@ from .utils import (
 def factory(
     sym_exp_filepath: Union[str, Path],
     strain_selector: Array = None,
-    eps: float = 1e-6,
+    global_eps: float = 1e-6,
 ) -> Tuple[
     Callable[[Dict[str, Array], Array, Array], Array],
     Callable[[Dict[str, Array], Array, Array], Array],
@@ -29,7 +29,7 @@ def factory(
         sym_exp_filepath: path to file containing symbolic expressions
         strain_selector: array of shape (n_xi, ) with boolean values indicating which components of the
                 strain are active / non-zero
-        eps: small number to avoid division by zero
+        global_eps: small number to avoid singularities (e.g., division by zero)
     Returns:
         forward_kinematics_virtual_backbone_fn: function that returns the chi vector of shape (3, n_q) with the
             positions and orientations of the virtual backbone
@@ -269,7 +269,7 @@ def factory(
 
     @jit
     def forward_kinematics_virtual_backbone_fn(
-        params: Dict[str, Array], q: Array, s: Array
+        params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
     ) -> Array:
         """
         Evaluate the forward kinematics the virtual backbone
@@ -277,6 +277,7 @@ def factory(
             params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
             s: point coordinate along the rod in the interval [0, L].
+            eps: small number to avoid singularities (e.g., division by zero)
         Returns:
             chi: pose of the backbone point in Cartesian-space with shape (3, )
                 Consists of [p_x, p_y, theta]
@@ -312,7 +313,7 @@ def factory(
 
     @jit
     def forward_kinematics_rod_fn(
-        params: Dict[str, Array], q: Array, s: Array, rod_idx: Array
+        params: Dict[str, Array], q: Array, s: Array, rod_idx: Array, eps: float = global_eps
     ) -> Array:
         """
         Evaluate the forward kinematics of the physical rods
@@ -321,6 +322,7 @@ def factory(
             q: generalized coordinates of shape (n_q, )
             s: point coordinate along the rod in the interval [0, L].
             rod_idx: index of the rod. If there are two rods per segment, then rod_idx can be 0 or 1.
+            eps: small number to avoid singularities (e.g., division by zero)
         Returns:
             chir: pose of the rod centerline point in Cartesian-space with shape (3, )
                 Consists of [p_x, p_y, theta]
@@ -361,7 +363,7 @@ def factory(
 
     @jit
     def forward_kinematics_platform_fn(
-        params: Dict[str, Array], q: Array, segment_idx: Array
+        params: Dict[str, Array], q: Array, segment_idx: Array, eps: float = global_eps
     ) -> Array:
         """
         Evaluate the forward kinematics the platform
@@ -369,6 +371,7 @@ def factory(
             params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
             segment_idx: index of the segment
+            eps: small number to avoid singularities (e.g., division by zero)
         Returns:
             chip: pose of the CoG of the platform in Cartesian-space with shape (3, )
                 Consists of [p_x, p_y, theta]
@@ -391,12 +394,13 @@ def factory(
         return chip
 
     @jit
-    def forward_kinematics_end_effector_fn(params: Dict[str, Array], q: Array) -> Array:
+    def forward_kinematics_end_effector_fn(params: Dict[str, Array], q: Array, eps: float = global_eps) -> Array:
         """
         Evaluate the forward kinematics of the end-effector
         Args:
             params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
+            eps: small number to avoid singularities (e.g., division by zero)
         Returns:
             chiee: pose of the end-effector in Cartesian-space of shape (3, )
                 Consists of [p_x, p_y, theta]
@@ -416,12 +420,13 @@ def factory(
         return chiee
 
     @jit
-    def jacobian_end_effector_fn(params: Dict[str, Array], q: Array) -> Array:
+    def jacobian_end_effector_fn(params: Dict[str, Array], q: Array, eps: float = global_eps) -> Array:
         """
         Evaluate the Jacobian of the end-effector
         Args:
            params: Dictionary of robot parameters
            q: generalized coordinates of shape (n_q, )
+           eps: small number to avoid singularities (e.g., division by zero)
         Returns:
            Jee: the Jacobian of the end-effector pose with respect to the generalized coordinates.
                 Jee is an array of shape (3, n_q).
@@ -440,7 +445,7 @@ def factory(
 
     @jit
     def inverse_kinematics_end_effector_fn(
-        params: Dict[str, Array], chiee: Array
+        params: Dict[str, Array], chiee: Array, eps: float = global_eps
     ) -> Array:
         """
         Evaluates the inverse kinematics for a given end-effector pose.
@@ -448,6 +453,7 @@ def factory(
         Args:
            params: Dictionary of robot parameters
            chiee: pose of the end-effector in Cartesian-space of shape (3, )
+           eps: small number to avoid singularities (e.g., division by zero)
         Returns:
            q: generalized coordinates of shape (n_q, )
         """
@@ -538,6 +544,7 @@ def factory(
         q: Array,
         q_d: Array,
         phi: Array = jnp.zeros((num_segments * num_rods_per_segment,)),
+        eps: float = 1e4 * global_eps,
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
         Compute the dynamical matrices of the system.
@@ -546,6 +553,7 @@ def factory(
             q: generalized coordinates of shape (n_q, )
             q_d: generalized velocities of shape (n_q, )
             phi: motor positions / twist angles of shape (num_segments * num_rods_per_segment, )
+            eps: small number to avoid singularities (e.g., division by zero)
         Returns:
             B: mass / inertia matrix of shape (n_q, n_q)
             C: coriolis / centrifugal matrix of shape (n_q, n_q)
@@ -559,7 +567,7 @@ def factory(
         xi_d = B_xi @ q_d
 
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains_fn(xi, 1e4 * eps)
+        xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
 
         # evaluate the symbolic expressions
         params_for_lambdify = select_params_for_lambdify_fn(params)
@@ -581,7 +589,7 @@ def factory(
         return B, C, G, K, D, alpha
 
     def operational_space_dynamical_matrices_fn(
-        params: Dict[str, Array], q: Array, q_d: Array, B: Array, C: Array
+        params: Dict[str, Array], q: Array, q_d: Array, B: Array, C: Array, eps: float = 1e4 * global_eps
     ) -> Tuple[Array, Array, Array, Array, Array]:
         """
         Compute the dynamics in operational space.
@@ -593,7 +601,7 @@ def factory(
             q_d: generalized velocities of shape (n_q,)
             B: inertia matrix in the generalized coordinates of shape (n_q, n_q)
             C: coriolis matrix derived with Christoffer symbols in the generalized coordinates of shape (n_q, n_q)
-
+            eps: small number to avoid singularities (e.g., division by zero)
         Returns:
             Lambda: inertia matrix in the operational space of shape (n_x, n_x)
             mu: matrix with corioli and centrifugal terms in the operational space of shape (n_x, n_x)
@@ -607,7 +615,7 @@ def factory(
         xi = configuration_to_strains_fn(params, q)
         xi_d = B_xi @ q_d
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains_fn(xi, 1e4*eps)
+        xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
         params_for_lambdify = select_params_for_lambdify_fn(params)
@@ -627,7 +635,7 @@ def factory(
         return Lambda, mu, Jee, Jee_d, JeeB_pinv
 
     sys_helpers = {
-        "eps": eps,
+        "eps": global_eps,
         "select_params_for_lambdify_fn": select_params_for_lambdify_fn,
         "beta_fn": beta_fn,
         "beta_inv_fn": beta_inv_fn,
