@@ -595,7 +595,7 @@ def factory(
         xi = configuration_to_strains_fn(params, q)
         xi_d = B_xi @ q_d
         # add a small number to the bending strain to avoid singularities
-        xi_epsed = apply_eps_to_bend_strains_fn(xi, eps)
+        xi_epsed = apply_eps_to_bend_strains_fn(xi, 1e4*eps)
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
         params_for_lambdify = select_params_for_lambdify_fn(params)
@@ -610,7 +610,7 @@ def factory(
         Lambda = jnp.linalg.inv(Jee @ B_inv @ Jee.T)  # inertia matrix in the operational space
         mu = Lambda @ (Jee @ B_inv @ C - Jee_d)  # coriolis and centrifugal matrix in the operational space
 
-        JeeB_pinv = B_inv @ Jee.T @ Lambda
+        JeeB_pinv = B_inv @ Jee.T @ Lambda  # dynamically-consistent pseudo-inverse of the Jacobian
 
         return Lambda, mu, Jee, Jee_d, JeeB_pinv
 
