@@ -130,11 +130,14 @@ def factory(
             xi_bend_sign * _eps,
             xi_reshaped[:, 0],
         )
-        xi_epsed = jnp.stack([
-            sigma_b_epsed,
-            xi_reshaped[:, 1],
-            xi_reshaped[:, 2],
-        ], axis=1)
+        xi_epsed = jnp.stack(
+            [
+                sigma_b_epsed,
+                xi_reshaped[:, 1],
+                xi_reshaped[:, 2],
+            ],
+            axis=1,
+        )
 
         # old implementation:
         # xi_epsed = xi_reshaped
@@ -146,7 +149,9 @@ def factory(
         return xi_epsed
 
     @jit
-    def forward_kinematics_fn(params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps) -> Array:
+    def forward_kinematics_fn(
+        params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
+    ) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
         Args:

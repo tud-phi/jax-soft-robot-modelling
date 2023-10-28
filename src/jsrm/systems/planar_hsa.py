@@ -252,11 +252,14 @@ def factory(
             xi_bend_sign * _eps,
             xi_reshaped[:, 0],
         )
-        xi_epsed = jnp.stack([
-            sigma_b_epsed,
-            xi_reshaped[:, 1],
-            xi_reshaped[:, 2],
-        ], axis=1)
+        xi_epsed = jnp.stack(
+            [
+                sigma_b_epsed,
+                xi_reshaped[:, 1],
+                xi_reshaped[:, 2],
+            ],
+            axis=1,
+        )
 
         # old implementation:
         # xi_epsed = xi_reshaped
@@ -313,7 +316,11 @@ def factory(
 
     @jit
     def forward_kinematics_rod_fn(
-        params: Dict[str, Array], q: Array, s: Array, rod_idx: Array, eps: float = global_eps
+        params: Dict[str, Array],
+        q: Array,
+        s: Array,
+        rod_idx: Array,
+        eps: float = global_eps,
     ) -> Array:
         """
         Evaluate the forward kinematics of the physical rods
@@ -394,7 +401,9 @@ def factory(
         return chip
 
     @jit
-    def forward_kinematics_end_effector_fn(params: Dict[str, Array], q: Array, eps: float = global_eps) -> Array:
+    def forward_kinematics_end_effector_fn(
+        params: Dict[str, Array], q: Array, eps: float = global_eps
+    ) -> Array:
         """
         Evaluate the forward kinematics of the end-effector
         Args:
@@ -420,7 +429,9 @@ def factory(
         return chiee
 
     @jit
-    def jacobian_end_effector_fn(params: Dict[str, Array], q: Array, eps: float = global_eps) -> Array:
+    def jacobian_end_effector_fn(
+        params: Dict[str, Array], q: Array, eps: float = global_eps
+    ) -> Array:
         """
         Evaluate the Jacobian of the end-effector
         Args:
@@ -589,7 +600,12 @@ def factory(
         return B, C, G, K, D, alpha
 
     def operational_space_dynamical_matrices_fn(
-        params: Dict[str, Array], q: Array, q_d: Array, B: Array, C: Array, eps: float = 1e4 * global_eps
+        params: Dict[str, Array],
+        q: Array,
+        q_d: Array,
+        B: Array,
+        C: Array,
+        eps: float = 1e4 * global_eps,
     ) -> Tuple[Array, Array, Array, Array, Array]:
         """
         Compute the dynamics in operational space.
@@ -627,10 +643,16 @@ def factory(
         # inverse of the inertia matrix in the configuration space
         B_inv = jnp.linalg.inv(B)
 
-        Lambda = jnp.linalg.inv(Jee @ B_inv @ Jee.T)  # inertia matrix in the operational space
-        mu = Lambda @ (Jee @ B_inv @ C - Jee_d)  # coriolis and centrifugal matrix in the operational space
+        Lambda = jnp.linalg.inv(
+            Jee @ B_inv @ Jee.T
+        )  # inertia matrix in the operational space
+        mu = Lambda @ (
+            Jee @ B_inv @ C - Jee_d
+        )  # coriolis and centrifugal matrix in the operational space
 
-        JeeB_pinv = B_inv @ Jee.T @ Lambda  # dynamically-consistent pseudo-inverse of the Jacobian
+        JeeB_pinv = (
+            B_inv @ Jee.T @ Lambda
+        )  # dynamically-consistent pseudo-inverse of the Jacobian
 
         return Lambda, mu, Jee, Jee_d, JeeB_pinv
 
