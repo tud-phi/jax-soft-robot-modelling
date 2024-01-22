@@ -1,7 +1,7 @@
 # JAX Soft Robot Modelling
 
 This repository contains symbolic derivations of the kinematics and dynamics of various soft robots using Sympy.
-The symbolic expressions are then implemented in JAX used for fast, parallelizable, and differentiable simulations.
+The symbolic expressions are then implemented in JAX and can be used for fast, parallelizable, and differentiable simulations.
 So far, we have focused on planar settings and implemented the following soft robots:
 
 - [N-link pendulum](examples/simulate_pendulum.py)
@@ -50,13 +50,13 @@ pip install ".[examples]"
 
 ## Usage
 
-Always, first source all necessary environment variables when opening a new terminal:
+Always first source all necessary environment variables when opening a new terminal:
 
 ```bash
 source 01-configure-env-vars.sh
 ```
 
-Then, we can symbolically derive the pendulum kinematics and dynamics
+Then, we can symbolically derive the pendulum kinematics and dynamics:
 
 ```bash
 python examples/derive_pendulum.py
@@ -66,3 +66,14 @@ Finally, we can simulate the pendulum
 ```bash
 python examples/simulate_pendulum.py
 ```
+
+## See also
+
+You might also be interested in the following repositories:
+ - The [`jax-spcs-kinematics`](https://github.com/tud-phi/jax-spcs-kinematics) repository contains an implementation
+ of the Selective Piecewise Constant Strain (SPCS) kinematics in JAX. We have shown in our paper that this kinematic 
+model is suitable for representing the shape of HSA rods.
+ - The [`HSA-PyElastica`](https://github.com/tud-phi/HSA-PyElastica) repository contains a plugin for PyElastica
+for the simulation of HSA robots.
+ - The [`hsa-planar-control`](https://github.com/tud-phi/hsa-planar-control) repository contains JAX and ROS2 implementations
+ of model-based control algorithms for planar HSA robots.
