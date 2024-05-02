@@ -1,7 +1,7 @@
 import cv2  # importing cv2
-from jax import config as jax_config
+import jax
 
-jax_config.update("jax_enable_x64", True)  # double precision
+jax.config.update("jax_enable_x64", True)  # double precision
 from diffrax import diffeqsolve, Dopri5, Euler, ODETerm, SaveAt
 from jax import Array, vmap
 from jax import numpy as jnp

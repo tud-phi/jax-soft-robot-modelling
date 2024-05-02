@@ -684,6 +684,7 @@ def ode_factory(
     dynamical_matrices_fn: Callable,
     params: Dict[str, Array],
     consider_underactuation_model: bool = True,
+    consider_hysteresis: bool = False,
 ) -> Callable[[float, Array], Array]:
     """
     Make an ODE function of the form ode_fn(t, x) -> x_dot.
@@ -702,6 +703,7 @@ def ode_factory(
         params: Dictionary with robot parameters
         consider_underactuation_model: If True, the underactuation model is considered. Otherwise, the fully-actuated
             model is considered with the identity matrix as the actuation matrix.
+        consider_hysteresis: If True, Bouc-Wen is used to model hysteresis. Otherwise, hysteresis will be neglected.
     Returns:
         ode_fn: ODE function of the form ode_fn(t, x) -> x_dot
     """
