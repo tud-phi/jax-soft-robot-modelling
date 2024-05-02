@@ -26,7 +26,7 @@ sym_exp_filepath = (
 
 # activate all strains (i.e. bending, shear, and axial)
 strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
-consider_hysteresis = False
+consider_hysteresis = True
 
 params = PARAMS_FPU_HYSTERESIS_CONTROL if consider_hysteresis else PARAMS_FPU_CONTROL
 
@@ -249,7 +249,7 @@ if __name__ == "__main__":
         inverse_kinematics_end_effector_fn,
         dynamical_matrices_fn,
         sys_helpers,
-    ) = planar_hsa.factory(sym_exp_filepath, strain_selector)
+    ) = planar_hsa.factory(sym_exp_filepath, strain_selector, consider_hysteresis=consider_hysteresis)
 
     batched_forward_kinematics_virtual_backbone_fn = vmap(
         forward_kinematics_virtual_backbone_fn, in_axes=(None, None, 0), out_axes=-1
@@ -298,7 +298,7 @@ if __name__ == "__main__":
         x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
 
-    ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params)
+    ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params, consider_hysteresis=consider_hysteresis)
     ode_term = ODETerm(ode_fn)
 
     sol = diffeqsolve(

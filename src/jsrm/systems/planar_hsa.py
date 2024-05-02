@@ -3,7 +3,7 @@ from jax import Array, jit, lax, vmap
 from jax import numpy as jnp
 import sympy as sp
 from pathlib import Path
-from typing import Callable, Dict, List, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from .utils import (
     concatenate_params_syms,
@@ -559,7 +559,7 @@ def factory(
         params: Dict[str, Array],
         q: Array,
         q_d: Array,
-        z: Array = None,
+        z: Optional[Array] = None,
         phi: Array = jnp.zeros((num_segments * num_rods_per_segment,)),
         eps: float = 1e4 * global_eps,
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
@@ -750,8 +750,8 @@ def ode_factory(
             n_q = (x.shape[0] - n_z) // 2
             q, q_d, z = x[:n_q], x[n_q:2*n_q], x[2*n_q:]
 
-            z_d = (B_z.T @ x_d) * (
-                    hys_params["A"] - jnp.abs(z)**hys_params["n"] * (hys_params["gamma"] + hys_params["beta"] * jnp.sign((B_z.T @ x_d) * z))
+            z_d = (B_z.T @ q_d) * (
+                    hys_params["A"] - jnp.abs(z)**hys_params["n"] * (hys_params["gamma"] + hys_params["beta"] * jnp.sign((B_z.T @ q_d) * z))
                 )
         else:
             n_q = x.shape[0] // 2
