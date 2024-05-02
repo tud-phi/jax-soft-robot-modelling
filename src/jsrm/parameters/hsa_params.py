@@ -7,6 +7,7 @@ __all__ = [
     "PARAMS_EPU_SYSTEM_ID",
 ]
 
+import jax
 from jax import Array
 import jax.numpy as jnp
 from typing import Dict
@@ -16,6 +17,7 @@ def generate_common_base_params(
     num_segments: int = 1,
     num_rods_per_segment: int = 4,
     end_effector_attached: int = False,
+    consider_hysteresis: bool = False,
 ) -> Dict[str, Array]:
     assert num_rods_per_segment % 2 == 0, "num_rods_per_segment must be even"
 
@@ -61,6 +63,39 @@ def generate_common_base_params(
         # the end-effector attachment has a center of gravity of 3.63mm in y-dir from its base.
         # as it has a thickness of 25mm, this is -21.37mm from the top surface (i.e., end-effector position)
         params["CoGpl"] = jnp.array([0.0, -0.02137])
+
+    params["hysteresis"] = {}
+    if consider_hysteresis:
+        """
+        Parameters for modeling Bouc-Wen hysteresis
+        https://en.wikipedia.org/wiki/Bouc%E2%80%93Wen_model_of_hysteresis
+
+        Notation of Bouc-Wen hysteresis model is based on the paper:
+        Song J. and Der Kiureghian A. (2006) 
+        Generalized Bouc–Wen model for highly asymmetric hysteresis. 
+        Journal of Engineering Mechanics. ASCE. Vol 132, No. 6 pp. 610–618
+
+        Important: we assume that each strain experiences independent hysteresis
+        """
+        # mapping hysteresis displacements to the strains
+        # per default, we only model the hysteresis on the axial strain
+        B_z = jax.scipy.linalg.block_diag(
+            *[jnp.array([[0.0], [0.0], [1.0]]) for _ in range(num_segments)]  # assumes 3 strains per segment
+
+        )
+        params["hysteresis"]["basis"] = B_z
+        # number of hysteresis states
+        n_z = params["hysteresis"]["basis"].shape[1]
+        # ratio of post-yield and pre-yield stiffness
+        hys_alpha_val = 0.6
+        hys_alpha = jnp.array([(hys_alpha_val if B_z[xi_idx, :].sum() > 0 else 1.0) for xi_idx in range(3 * num_segments)])
+        params["hysteresis"]["alpha"] = hys_alpha
+        # params["hysteresis"]["alpha"] = 0.6 * jnp.ones((n_q, ))  # ratio of post-yield and pre-yield stiffness
+        params["hysteresis"]["beta"] = 30.0 * jnp.ones((n_z, ))  # dimensionless parameter in the Bouc-Wen model
+        params["hysteresis"]["gamma"] = 1.0 * jnp.ones((n_z, ))  # dimensionless parameter in the Bouc-Wen model
+        params["hysteresis"]["n"] = 1.0 * jnp.ones((n_z, ))  # dimensionless parameter in the Bouc-Wen model
+        # to remove redundancy from Bouc-Wen model, choose A = 1
+        params["hysteresis"]["A"] = jnp.ones((n_z, ))
 
     return params
 
@@ -265,6 +300,9 @@ PARAMS_FPU_SYSTEM_ID.update(
 PARAMS_FPU_CONTROL = generate_base_params_for_fpu(
     num_segments=1, num_rods_per_segment=2, rod_multiplier=2
 )
+PARAMS_FPU_HYSTERESIS_CONTROL = generate_base_params_for_fpu(
+    num_segments=1, num_rods_per_segment=2, rod_multiplier=2, consider_hysteresis=True
+)
 
 PARAMS_EPU_SYSTEM_ID = generate_base_params_for_epu(
     num_segments=1, num_rods_per_segment=4
@@ -278,4 +316,7 @@ PARAMS_EPU_SYSTEM_ID.update(
 
 PARAMS_EPU_CONTROL = generate_base_params_for_epu(
     num_segments=1, num_rods_per_segment=2, rod_multiplier=2
+)
+PARAMS_EPU_HYSTERESIS_CONTROL = generate_base_params_for_epu(
+    num_segments=1, num_rods_per_segment=2, rod_multiplier=2, consider_hysteresis=True
 )

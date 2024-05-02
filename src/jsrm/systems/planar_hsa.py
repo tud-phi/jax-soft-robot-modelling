@@ -15,6 +15,7 @@ def factory(
     sym_exp_filepath: Union[str, Path],
     strain_selector: Array = None,
     global_eps: float = 1e-6,
+    consider_hysteresis: bool = False,
 ) -> Tuple[
     Callable[[Dict[str, Array], Array, Array], Array],
     Callable[[Dict[str, Array], Array, Array], Array],
@@ -30,6 +31,7 @@ def factory(
         strain_selector: array of shape (n_xi, ) with boolean values indicating which components of the
                 strain are active / non-zero
         global_eps: small number to avoid singularities (e.g., division by zero)
+        consider_hysteresis: If True, Bouc-Wen is used to model hysteresis. Otherwise, hysteresis will be neglected.
     Returns:
         forward_kinematics_virtual_backbone_fn: function that returns the chi vector of shape (3, n_q) with the
             positions and orientations of the virtual backbone
@@ -147,6 +149,9 @@ def factory(
     )
     G_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax"
+    )
+    Shat_lambda = sp.lambdify(
+        params_syms_cat, sym_exps["exps"]["Shat"], "jax"
     )
     K_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["K"], "jax"
@@ -554,6 +559,7 @@ def factory(
         params: Dict[str, Array],
         q: Array,
         q_d: Array,
+        z: Array = None,
         phi: Array = jnp.zeros((num_segments * num_rods_per_segment,)),
         eps: float = 1e4 * global_eps,
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
@@ -563,6 +569,7 @@ def factory(
             params: Dictionary of robot parameters
             q: generalized coordinates of shape (n_q, )
             q_d: generalized velocities of shape (n_q, )
+            z: state variables of the hysteresis model of shape (n_z, )
             phi: motor positions / twist angles of shape (num_segments * num_rods_per_segment, )
             eps: small number to avoid singularities (e.g., division by zero)
         Returns:
@@ -586,8 +593,18 @@ def factory(
         C_xi = C_lambda(*params_for_lambdify, *xi_epsed, *xi_d)
         G = G_lambda(*params_for_lambdify, *xi_epsed).squeeze()
         K = K_lambda(*params_for_lambdify, *xi).squeeze()
+        Shat = Shat_lambda(*params_for_lambdify)
         D = D_lambda(*params_for_lambdify)
         alpha = alpha_lambda(*params_for_lambdify, *xi, *phi).squeeze()
+
+        if consider_hysteresis is True:
+            # hysteresis parameters
+            B_z = params["hysteresis"]["basis"]
+            hyst_alpha = params["hysteresis"]["alpha"]
+            # add the post-yield potential forces
+            K = hyst_alpha*K + (1-hyst_alpha) * Shat @ (B_z @ z)
+            
+            # TODO: add post-yield potential forces (i.e., hysteresis effects) to the actuation vector
 
         # apply the strain basis
         B = B_xi.T @ B @ B_xi
@@ -691,7 +708,7 @@ def ode_factory(
     This function assumes a constant torque input (i.e. zero-order hold).
     Args:
         dynamical_matrices_fn: Callable that returns B, C, G, K, D, alpha_fn. Needs to conform to the signature:
-            dynamical_matrices_fn(params, q, q_d) -> Tuple[B, C, G, K, D, A]
+            dynamical_matrices_fn(params, q, q_d, z, phi) -> Tuple[B, C, G, K, D, A]
             where q and q_d are the configuration and velocity vectors, respectively,
             B is the inertia matrix of shape (n_q, n_q),
             C is the Coriolis matrix of shape (n_q, n_q),
@@ -715,7 +732,8 @@ def ode_factory(
         ODE of the dynamical Lagrangian system.
         Args:
             t: time
-            x: state vector of shape (2 * n_q, )
+            x: state vector of shape (2 * n_q + n_z, ) where n_q is the number of configuration variables and n_z is the
+                number of state variables of the hysteresis model. The state vector is of the form [q, q_d, z]
             u: input to the system.
                 - if consider_underactuation_model is True, then this is an array of shape (n_phi) with
                     motor positions / twist angles of the proximal end of the rods
@@ -724,15 +742,28 @@ def ode_factory(
         Returns:
             x_d: time-derivative of the state vector of shape (2 * n_q, )
         """
-        n_q = x.shape[0] // 2
-        q, q_d = x[:n_q], x[n_q:]
+        if consider_hysteresis is True:
+            hys_params = params["hysteresis"]
+            B_z = hys_params["basis"]
+
+            n_z = B_z.shape[1]
+            n_q = (x.shape[0] - n_z) // 2
+            q, q_d, z = x[:n_q], x[n_q:2*n_q], x[2*n_q:]
+
+            z_d = (B_z.T @ x_d) * (
+                    hys_params["A"] - jnp.abs(z)**hys_params["n"] * (hys_params["gamma"] + hys_params["beta"] * jnp.sign((B_z.T @ x_d) * z))
+                )
+        else:
+            n_q = x.shape[0] // 2
+            q, q_d = x[:n_q], x[n_q:]
+            z = None
 
         if consider_underactuation_model is True:
             phi = u
-            B, C, G, K, D, tau_q = dynamical_matrices_fn(params, q, q_d, phi)
+            B, C, G, K, D, tau_q = dynamical_matrices_fn(params, q, q_d, z=z, phi=phi)
         else:
             B, C, G, K, D, _ = dynamical_matrices_fn(
-                params, q, q_d, jnp.zeros((num_rods,))
+                params, q, q_d, z=z, phi=jnp.zeros((num_rods,))
             )
             tau_q = u
 
@@ -742,7 +773,10 @@ def ode_factory(
         # compute the acceleration
         q_dd = B_inv @ (tau_q - C @ q_d - G - K - D @ q_d)
 
-        x_d = jnp.concatenate([x[n_q:], q_dd])
+        if consider_hysteresis is True:
+            x_d = jnp.concatenate([q_d, q_dd, z_d])
+        else:
+            x_d = jnp.concatenate([x[n_q:], q_dd])
 
         return x_d
 

@@ -220,6 +220,8 @@ def symbolically_derive_planar_hsa_model(
     B = sp.zeros(num_dof, num_dof)
     # potential energy
     U = sp.Matrix([[0]])
+    # stiffness matrix
+    Shat = sp.zeros(3 * num_segments, 3 * num_segments)
     # elastic vector
     K = sp.zeros(3 * num_segments, 1)
     # damping matrix
@@ -338,6 +340,10 @@ def symbolically_derive_planar_hsa_model(
             # Jacobian of the strain of the physical HSA rods with respect to the configuration variables
             J_betar = sp.Matrix([[1, 0, 0], [0, 1, 0], [roff[i, j], 0, 1]])
 
+            # nominal stiffness matrix of the virtual backbone
+            Shat[3 * i : 3 * (i + 1), 3 * i : 3 * (i + 1)] += J_betar.T @ Shatr @ J_betar
+            
+            # contribution of elastic forces of current rod to the virtual backbone
             vKr = J_betar.T @ Shatr @ (pxir - pxi_eqr)
             # add contribution of elasticity vector
             K[3 * i : 3 * (i + 1), 0] += vKr
@@ -516,6 +522,8 @@ def symbolically_derive_planar_hsa_model(
         G = sp.simplify(G)
     print("G =\n", G)
 
+    Shat = sp.simplify(Shat)
+    print("Shat =\n", Shat)
     K = sp.simplify(K)
     print("K =\n", K)
     D = sp.simplify(D)
@@ -581,7 +589,8 @@ def symbolically_derive_planar_hsa_model(
             "B": B,
             "C": C,
             "G": G,
-            "K": K,
+            "Shat": Shat,  # nominal stiffness matrix of the virtual backbone
+            "K": K,  # nominal elastic forces on the virtual backbone
             "D": D,
             "alpha": alpha,
         },

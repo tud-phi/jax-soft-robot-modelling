@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable, Dict
 
 import jsrm
-from jsrm.parameters.hsa_params import PARAMS_FPU_CONTROL as params
+from jsrm.parameters.hsa_params import PARAMS_FPU_CONTROL, PARAMS_FPU_HYSTERESIS_CONTROL
 from jsrm.systems import planar_hsa
 
 num_segments = 1
@@ -26,6 +26,9 @@ sym_exp_filepath = (
 
 # activate all strains (i.e. bending, shear, and axial)
 strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
+consider_hysteresis = False
+
+params = PARAMS_FPU_HYSTERESIS_CONTROL if consider_hysteresis else PARAMS_FPU_CONTROL
 
 # define initial configuration
 q0 = jnp.array([jnp.pi, 0.0, 0.0])
@@ -289,7 +292,10 @@ if __name__ == "__main__":
     cv2.waitKey()
     cv2.destroyWindow(window_name)
 
-    x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
+    if consider_hysteresis:
+        x0 = jnp.zeros((2 * q0.shape[0] + 1,))  # initial condition
+    else:
+        x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
 
     ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params)
