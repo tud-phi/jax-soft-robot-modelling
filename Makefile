@@ -2,23 +2,20 @@
 PYTHON := python3
 PYTHONPATH := `pwd`
 #* Formatters
-.PHONY: black
-black:
-	black --version
-	black --config pyproject.toml examples src tests
+.PHONY: format
+format:
+	ruff --version
+	ruff format --config pyproject.toml examples src tests
 
-.PHONY: black-check
-black-check:
-	black --version
-	black --diff --check --config pyproject.toml examples src tests
+.PHONY: format-check
+format-check:
+	ruff --version
+	ruff format --diff --check --config pyproject.toml examples src tests
 
 .PHONY: flake8
 flake8:
 	flake8 --version
 	flake8 src tests
-
-.PHONY: format-codestyle
-format-codestyle: black flake8
 
 .PHONY: pre-commit-install
 pre-commit-install:
@@ -35,12 +32,6 @@ test_coverage:
 .PHONY: test_coverage_xml
 test_coverage_xml:
 	pytest --cov=src --cov-report=xml
-
-.PHONY: check-codestyle
-check-codestyle: black-check flake8
-
-.PHONY: formatting
-formatting: format-codestyle
 
 #* Cleaning
 .PHONY: pycache-remove

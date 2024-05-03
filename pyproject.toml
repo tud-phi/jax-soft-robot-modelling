@@ -118,7 +118,6 @@ dependencies = [ # Optional
 # projects.
 [project.optional-dependencies] # Optional
 dev = [
-    "black",
     "bump2version",
     "check-manifest",
     "codecov",
@@ -127,6 +126,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-html",
+    "ruff",
     "tox",
 ]
 examples = [
