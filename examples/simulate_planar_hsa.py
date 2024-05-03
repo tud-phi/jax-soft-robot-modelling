@@ -59,7 +59,9 @@ if __name__ == "__main__":
         inverse_kinematics_end_effector_fn,
         dynamical_matrices_fn,
         sys_helpers,
-    ) = planar_hsa.factory(sym_exp_filepath, strain_selector, consider_hysteresis=consider_hysteresis)
+    ) = planar_hsa.factory(
+        sym_exp_filepath, strain_selector, consider_hysteresis=consider_hysteresis
+    )
 
     # import matplotlib.pyplot as plt
     # plt.plot(chi_ps[0, :], chi_ps[1, :])
@@ -91,7 +93,9 @@ if __name__ == "__main__":
         x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
     x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
 
-    ode_fn = planar_hsa.ode_factory(dynamical_matrices_fn, params, consider_hysteresis=consider_hysteresis)
+    ode_fn = planar_hsa.ode_factory(
+        dynamical_matrices_fn, params, consider_hysteresis=consider_hysteresis
+    )
     ode_term = ODETerm(ode_fn)
 
     sol = diffeqsolve(
@@ -118,7 +122,7 @@ if __name__ == "__main__":
         video_path,
         video_ts=video_ts,
         q_ts=sol.ys[:, :3],
-        video_width=video_width, 
-        video_height=video_height
+        video_width=video_width,
+        video_height=video_height,
     )
     print(f"Video saved at {video_path}")

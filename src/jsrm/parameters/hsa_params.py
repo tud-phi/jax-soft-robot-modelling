@@ -80,22 +80,34 @@ def generate_common_base_params(
         # mapping hysteresis displacements to the strains
         # per default, we only model the hysteresis on the axial strain
         B_z = jax.scipy.linalg.block_diag(
-            *[jnp.array([[0.0], [0.0], [1.0]]) for _ in range(num_segments)]  # assumes 3 strains per segment
-
+            *[
+                jnp.array([[0.0], [0.0], [1.0]]) for _ in range(num_segments)
+            ]  # assumes 3 strains per segment
         )
         params["hysteresis"]["basis"] = B_z
         # number of hysteresis states
         n_z = params["hysteresis"]["basis"].shape[1]
         # ratio of post-yield and pre-yield stiffness
         hys_alpha_val = 0.6
-        hys_alpha = jnp.array([(hys_alpha_val if B_z[xi_idx, :].sum() > 0 else 1.0) for xi_idx in range(3 * num_segments)])
+        hys_alpha = jnp.array(
+            [
+                (hys_alpha_val if B_z[xi_idx, :].sum() > 0 else 1.0)
+                for xi_idx in range(3 * num_segments)
+            ]
+        )
         params["hysteresis"]["alpha"] = hys_alpha
         # params["hysteresis"]["alpha"] = 0.6 * jnp.ones((n_q, ))  # ratio of post-yield and pre-yield stiffness
-        params["hysteresis"]["beta"] = 30.0 * jnp.ones((n_z, ))  # dimensionless parameter in the Bouc-Wen model
-        params["hysteresis"]["gamma"] = 1.0 * jnp.ones((n_z, ))  # dimensionless parameter in the Bouc-Wen model
-        params["hysteresis"]["n"] = 1.0 * jnp.ones((n_z, ))  # dimensionless parameter in the Bouc-Wen model
+        params["hysteresis"]["beta"] = 30.0 * jnp.ones(
+            (n_z,)
+        )  # dimensionless parameter in the Bouc-Wen model
+        params["hysteresis"]["gamma"] = 1.0 * jnp.ones(
+            (n_z,)
+        )  # dimensionless parameter in the Bouc-Wen model
+        params["hysteresis"]["n"] = 1.0 * jnp.ones(
+            (n_z,)
+        )  # dimensionless parameter in the Bouc-Wen model
         # to remove redundancy from Bouc-Wen model, choose A = 1
-        params["hysteresis"]["A"] = jnp.ones((n_z, ))
+        params["hysteresis"]["A"] = jnp.ones((n_z,))
 
     return params
 

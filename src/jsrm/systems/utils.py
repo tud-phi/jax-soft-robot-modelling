@@ -31,10 +31,10 @@ def substitute_params_into_all_symbolic_expressions(
     for exp_key, exp_val in exps.items():
         if issubclass(type(exp_val), list):
             for exp_item_idx, exp_item_val in enumerate(exp_val):
-                exps[exp_key][
-                    exp_item_idx
-                ] = substitute_params_into_single_symbolic_expression(
-                    exp_item_val, params_syms, params
+                exps[exp_key][exp_item_idx] = (
+                    substitute_params_into_single_symbolic_expression(
+                        exp_item_val, params_syms, params
+                    )
                 )
         else:
             exps[exp_key] = substitute_params_into_single_symbolic_expression(
@@ -74,7 +74,7 @@ def substitute_params_into_single_symbolic_expression(
 
 
 def concatenate_params_syms(
-    params_syms: Dict[str, Union[sp.Symbol, List[sp.Symbol]]]
+    params_syms: Dict[str, Union[sp.Symbol, List[sp.Symbol]]],
 ) -> List[sp.Symbol]:
     # concatenate the robot params symbols
     params_syms_cat = []

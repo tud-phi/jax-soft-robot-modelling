@@ -150,9 +150,7 @@ def factory(
     G_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax"
     )
-    Shat_lambda = sp.lambdify(
-        params_syms_cat, sym_exps["exps"]["Shat"], "jax"
-    )
+    Shat_lambda = sp.lambdify(params_syms_cat, sym_exps["exps"]["Shat"], "jax")
     K_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["K"], "jax"
     )
@@ -602,8 +600,8 @@ def factory(
             B_z = params["hysteresis"]["basis"]
             hyst_alpha = params["hysteresis"]["alpha"]
             # add the post-yield potential forces
-            K = hyst_alpha*K + (1-hyst_alpha) * Shat @ (B_z @ z)
-            
+            K = hyst_alpha * K + (1 - hyst_alpha) * Shat @ (B_z @ z)
+
             # TODO: add post-yield potential forces (i.e., hysteresis effects) to the actuation vector
 
         # apply the strain basis
@@ -752,11 +750,16 @@ def ode_factory(
 
             n_z = B_z.shape[1]
             n_q = (x.shape[0] - n_z) // 2
-            q, q_d, z = x[:n_q], x[n_q:2*n_q], x[2*n_q:]
+            q, q_d, z = x[:n_q], x[n_q : 2 * n_q], x[2 * n_q :]
 
             z_d = (B_z.T @ q_d) * (
-                    hys_params["A"] - jnp.abs(z)**hys_params["n"] * (hys_params["gamma"] + hys_params["beta"] * jnp.sign((B_z.T @ q_d) * z))
+                hys_params["A"]
+                - jnp.abs(z) ** hys_params["n"]
+                * (
+                    hys_params["gamma"]
+                    + hys_params["beta"] * jnp.sign((B_z.T @ q_d) * z)
                 )
+            )
         else:
             n_q = x.shape[0] // 2
             q, q_d = x[:n_q], x[n_q:]

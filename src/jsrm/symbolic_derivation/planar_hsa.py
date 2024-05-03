@@ -341,8 +341,10 @@ def symbolically_derive_planar_hsa_model(
             J_betar = sp.Matrix([[1, 0, 0], [0, 1, 0], [roff[i, j], 0, 1]])
 
             # nominal stiffness matrix of the virtual backbone
-            Shat[3 * i : 3 * (i + 1), 3 * i : 3 * (i + 1)] += J_betar.T @ Shatr @ J_betar
-            
+            Shat[3 * i : 3 * (i + 1), 3 * i : 3 * (i + 1)] += (
+                J_betar.T @ Shatr @ J_betar
+            )
+
             # contribution of elastic forces of current rod to the virtual backbone
             vKr = J_betar.T @ Shatr @ (pxir - pxi_eqr)
             # add contribution of elasticity vector
