@@ -1,10 +1,12 @@
 import cv2  # importing cv2
+from functools import partial
 import jax
 
 jax.config.update("jax_enable_x64", True)  # double precision
 from diffrax import diffeqsolve, Dopri5, Euler, ODETerm, SaveAt
 from jax import Array, vmap
 from jax import numpy as jnp
+import matplotlib.pyplot as plt
 import numpy as onp
 from pathlib import Path
 from typing import Callable, Dict
@@ -42,6 +44,8 @@ strain_selector = jnp.array([True, False, False])
 
 # define initial configuration
 q0 = jnp.array([10 * jnp.pi])
+# number of generalized coordinates
+n_q = q0.shape[0]
 
 # set simulation parameters
 dt = 1e-3  # time step
@@ -91,7 +95,7 @@ def draw_robot(
 
 
 if __name__ == "__main__":
-    strain_basis, forward_kinematics_fn, dynamical_matrices_fn = planar_pcs.factory(
+    strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = planar_pcs.factory(
         sym_exp_filepath, strain_selector
     )
     batched_forward_kinematics = vmap(
@@ -133,6 +137,25 @@ if __name__ == "__main__":
     )
 
     print("sol.ys =\n", sol.ys)
+    # the evolution of the generalized coordinates
+    q_ts = sol.ys[:, :n_q]
+    # the evolution of the generalized velocities
+    q_d_ts = sol.ys[:, n_q:]
+
+    # plot the energy along the trajectory
+    kinetic_energy_fn_vmapped = vmap(partial(auxiliary_fns["kinetic_energy_fn"], params))
+    potential_energy_fn_vmapped = vmap(partial(auxiliary_fns["potential_energy_fn"], params))
+    U_ts = potential_energy_fn_vmapped(q_ts)
+    T_ts = kinetic_energy_fn_vmapped(q_ts, q_d_ts)
+    plt.figure()
+    plt.plot(video_ts, U_ts, label="Potential energy")
+    plt.plot(video_ts, T_ts, label="Kinetic energy")
+    plt.xlabel("Time [s]")
+    plt.ylabel("Energy [J]")
+    plt.legend()
+    plt.grid(True)
+    plt.box(True)
+    plt.show()
 
     # create video
     fourcc = cv2.VideoWriter_fourcc(*"MP4V")

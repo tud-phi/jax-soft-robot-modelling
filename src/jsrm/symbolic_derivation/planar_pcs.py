@@ -169,9 +169,10 @@ def symbolically_derive_planar_pcs_model(
             ),  # expression for end-effector pose of shape (3, )
             "J_sms": J_sms,
             "Jee": J_sms[-1].subs(s, l[-1]),
-            "B": B,
-            "C": C,
-            "G": G,
+            "B": B,  # mass matrix
+            "C": C,  # coriolis matrix
+            "G": G,  # gravity vector
+            "U": U,  # gravitational potential energy
         },
     }
 

@@ -25,6 +25,7 @@ def factory(
         [Dict[str, Array], Array, Array],
         Tuple[Array, Array, Array, Array, Array, Array],
     ],
+    Dict[str, Callable],
 ]:
     """
     Create jax functions from file containing symbolic expressions.
@@ -38,6 +39,7 @@ def factory(
         B_xi: strain basis matrix of shape (3 * num_segments, n_q)
         forward_kinematics_fn: function that returns the p vector of shape (3, n_q) with the positions
         dynamical_matrices_fn: function that returns the B, C, G, K, D, and alpha matrices
+        auxiliary_fns: dictionary with auxiliary functions
     """
     # load saved symbolic data
     sym_exps = dill.load(open(str(filepath), "rb"))
@@ -249,5 +251,85 @@ def factory(
         alpha = B_xi.T @ jnp.identity(n_xi) @ B_xi
 
         return B, C, G, K, D, alpha
+    
 
-    return B_xi, forward_kinematics_fn, dynamical_matrices_fn
+    def kinetic_energy_fn(params: Dict[str, Array], q: Array, q_d: Array) -> Array:
+        """
+        Compute the kinetic energy of the system.
+        Args:
+            params: Dictionary of robot parameters
+            q: generalized coordinates of shape (n_q, )
+            q_d: generalized velocities of shape (n_q, )
+        Returns:
+            T: kinetic energy of shape ()
+        """
+        B, C, G, K, D, alpha = dynamical_matrices_fn(params, q=q, q_d=q_d)
+
+        # kinetic energy
+        T = (0.5 * q_d.T @ B @ q_d).squeeze()
+        
+        return T
+
+    
+    def potential_energy_fn(params: Dict[str, Array], q: Array, eps: float = 1e4 * global_eps) -> Array:
+        """
+        Compute the potential energy of the system.
+        Args:
+            params: Dictionary of robot parameters
+            q: generalized coordinates of shape (n_q, )
+            eps: small number to avoid singularities (e.g., division by zero)
+        Returns:
+            U: potential energy of shape ()
+        """
+        # map the configuration to the strains
+        xi = xi_eq + B_xi @ q
+        # add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+
+        # cross-sectional area and second moment of area
+        A = jnp.pi * params["r"] ** 2
+        Ib = A**2 / (4 * jnp.pi)
+
+        # elastic and shear modulus
+        E, G = params["E"], params["G"]
+        # stiffness matrix of shape (num_segments, 3, 3)
+        S = compute_stiffness_matrix_for_all_segments_fn(A, Ib, E, G)
+        # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
+        K = blk_diag(S)
+        # elastic energy
+        U_K = (xi - xi_eq).T @ K @ (xi - xi_eq)  # evaluate K(xi) = K @ xi
+
+        # gravitational potential energy
+        U_G = sp.Matrix([[0]])
+        params_for_lambdify = select_params_for_lambdify(params)
+        U_G = G_lambda(*params_for_lambdify, *xi_epsed).squeeze() @ xi_epsed
+
+        # total potential energy
+        U = (U_G + U_K).squeeze()
+
+        return U
+
+    def energy_fn(params: Dict[str, Array], q: Array, q_d: Array) -> Array:
+        """
+        Compute the total energy of the system.
+        Args:
+            params: Dictionary of robot parameters
+            q: generalized coordinates of shape (n_q, )
+            q_d: generalized velocities of shape (n_q, )
+        Returns:
+            E: total energy of shape ()
+        """
+        T = kinetic_energy_fn(params, q_d)
+        U = potential_energy_fn(params, q)
+        E = T + U
+
+        return E
+
+    auxiliary_fns = {
+        "apply_eps_to_bend_strains": apply_eps_to_bend_strains,
+        "kinetic_energy_fn": kinetic_energy_fn,
+        "potential_energy_fn": potential_energy_fn,
+        "energy_fn": energy_fn,
+    }
+
+    return B_xi, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns
