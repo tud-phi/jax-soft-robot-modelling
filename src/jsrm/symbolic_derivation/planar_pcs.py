@@ -1,13 +1,13 @@
 import dill
 from pathlib import Path
 import sympy as sp
-from typing import Callable, Dict, Tuple, Union
+from typing import Callable, Dict, Optional, Tuple, Union
 
 from .symbolic_utils import compute_coriolis_matrix
 
 
 def symbolically_derive_planar_pcs_model(
-    num_segments: int, filepath: Union[str, Path] = None
+    num_segments: int, filepath: Optional[Union[str, Path]] = None, simplify_expressions: bool = True
 ) -> Dict:
     """
     Symbolically derive the kinematics and dynamics of a planar continuum soft robot modelled with
@@ -15,6 +15,7 @@ def symbolically_derive_planar_pcs_model(
     Args:
         num_segments: number of constant strain segments
         filepath: path to save the derived model
+        simplify_expressions: if true, simplify the expressions (might take some time). Default is True.
     Returns:
         sym_exps: dictionary with entries
             params_syms: dictionary of robot parameters
@@ -118,16 +119,24 @@ def symbolically_derive_planar_pcs_model(
         J_sms.append(J)
 
         # derivative of mass matrix with respect to the point coordinate s
-        dB_ds = sp.simplify(rho[i] * A[i] * Jp.T @ Jp + rho[i] * I[i] * Jo.T @ Jo)
+        dB_ds = rho[i] * A[i] * Jp.T @ Jp + rho[i] * I[i] * Jo.T @ Jo
+        if simplify_expressions:
+            dB_ds = sp.simplify(dB_ds)
         # mass matrix of the current segment
-        B_i = sp.simplify(sp.integrate(dB_ds, (s, 0, l[i])))
+        B_i = sp.integrate(dB_ds, (s, 0, l[i]))
+        if simplify_expressions:
+            B_i = sp.simplify(B_i)
         # add mass matrix of segment to previous segments
         B = B + B_i
 
         # derivative of the potential energy with respect to the point coordinate s
-        dU_ds = sp.simplify(rho[i] * A[i] * g.T @ p)
+        dU_ds = rho[i] * A[i] * g.T @ p
+        if simplify_expressions:
+            dU_ds = sp.simplify(dU_ds)
         # potential energy of the current segment
-        U_i = sp.simplify(sp.integrate(dU_ds, (s, 0, l[i])))
+        U_i = sp.integrate(dU_ds, (s, 0, l[i]))
+        if simplify_expressions:
+            U_i = sp.simplify(U_i)
         # add potential energy of segment to previous segments
         U = U + U_i
 
@@ -137,15 +146,18 @@ def symbolically_derive_planar_pcs_model(
         # update the position for the next segment
         p_prev = p.subs(s, l[i])
 
-    # simplify mass matrix
-    B = sp.simplify(B)
+    if simplify_expressions:
+        # simplify mass matrix
+        B = sp.simplify(B)
     print("B =\n", B)
 
     C = compute_coriolis_matrix(B, xi, xi_d)
     print("C =\n", C)
 
     # compute the gravity force vector
-    G = sp.simplify(-U.jacobian(xi).transpose())
+    G = -U.jacobian(xi).transpose()
+    if simplify_expressions:
+        G = sp.simplify(G)
     print("G =\n", G)
 
     # dictionary with expressions

@@ -12,5 +12,5 @@ if __name__ == "__main__":
         / f"planar_pcs_ns-{NUM_SEGMENTS}.dill"
     )
     symbolically_derive_planar_pcs_model(
-        num_segments=NUM_SEGMENTS, filepath=sym_exp_filepath
+        num_segments=NUM_SEGMENTS, filepath=sym_exp_filepath, simplify_expressions=True
     )
