@@ -111,6 +111,9 @@ def factory(
     G_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax"
     )
+    U_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["U"], "jax"
+    )
 
     compute_stiffness_matrix_for_all_segments_fn = vmap(
         compute_planar_stiffness_matrix, in_axes=(0, 0, 0, 0), out_axes=0
@@ -300,9 +303,8 @@ def factory(
         U_K = (xi - xi_eq).T @ K @ (xi - xi_eq)  # evaluate K(xi) = K @ xi
 
         # gravitational potential energy
-        U_G = sp.Matrix([[0]])
         params_for_lambdify = select_params_for_lambdify(params)
-        U_G = G_lambda(*params_for_lambdify, *xi_epsed).squeeze() @ xi_epsed
+        U_G = U_lambda(*params_for_lambdify, *xi_epsed)
 
         # total potential energy
         U = (U_G + U_K).squeeze()
