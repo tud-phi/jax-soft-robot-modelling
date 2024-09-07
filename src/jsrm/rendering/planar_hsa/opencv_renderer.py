@@ -235,7 +235,7 @@ def animate_robot(
         video_height: video height
     """
     # create video
-    fourcc = cv2.VideoWriter_fourcc(*"MP4V")
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     filepath.parent.mkdir(parents=True, exist_ok=True)
     video_dt = jnp.mean(video_ts[1:] - video_ts[:-1]).item()
     print(f"Rendering video with dt={video_dt} and {video_ts.shape[0]} frames")

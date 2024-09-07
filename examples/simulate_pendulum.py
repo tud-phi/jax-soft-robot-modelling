@@ -101,7 +101,7 @@ if __name__ == "__main__":
     print("sol.ys =\n", sol.ys)
 
     # create video
-    fourcc = cv2.VideoWriter_fourcc(*"MP4V")
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     video_path.parent.mkdir(parents=True, exist_ok=True)
     video = cv2.VideoWriter(
         str(video_path),
