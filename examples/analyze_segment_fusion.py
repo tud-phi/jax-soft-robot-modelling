@@ -12,9 +12,9 @@ kappa_be2, sigma_sh2, sigma_ax2 = sp.symbols('kappa_be2 sigma_sh2 sigma_ax2', re
 q1 = [kappa_be1, sigma_sh1, sigma_ax1]
 q2 = [kappa_be2, sigma_sh2, sigma_ax2]
 
-# average the strains for fused segments
-qfus = [(l1 * q1[i] + l2 * q2[i]) / (l1 + l2) for i in range(len(q1))]
-print("qfus =\n", qfus)
+# average the strains
+qav = [(l1 * q1[i] + l2 * q2[i]) / (l1 + l2) for i in range(len(q1))]
+print("qav =\n", qav)
 
 # apply the forward kinematics on the individual segments
 s_be1, c_be1 = sp.sin(kappa_be1 * l1), sp.cos(kappa_be1 * l1)
