@@ -717,9 +717,9 @@ def ode_factory(
             alpha_fn is a function to compute the actuation vector of shape (n_q). It has the following signature:
                 alpha_fn(phi) -> tau_q where phi is the twist angle vector of shape (n_phi, )
         params: Dictionary with robot parameters
-        control_fn: Callable that returns the forcing function of the form control_fn(t, x) -> u. If consider_underactuation_model is True,
-            then u is an array of shape (n_q, ) with the configuration-space torques. If consider_underactuation_model is False,
-            then u is an array of shape (n_phi, ) with the motor positions / twist angles of the proximal end of the rods.
+        control_fn: Callable that returns the forcing function of the form control_fn(t, x) -> phi. If consider_underactuation_model is True,
+            then phi is an array of shape (n_q, ) with the configuration-space torques. If consider_underactuation_model is False,
+            then phi is an array of shape (n_phi, ) with the motor positions / twist angles of the proximal end of the rods.
         consider_underactuation_model: If True, the underactuation model is considered. Otherwise, the fully-actuated
             model is considered with the identity matrix as the actuation matrix.
         consider_hysteresis: If True, Bouc-Wen is used to model hysteresis. Otherwise, hysteresis will be neglected.

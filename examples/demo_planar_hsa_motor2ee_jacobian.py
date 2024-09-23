@@ -1,13 +1,13 @@
 import jax
 
 jax.config.update("jax_enable_x64", True)  # double precision
-from jax import Array, jacrev, jit, random, vmap
+from jax import Array, jacfwd, jacrev, jit, random, vmap
 from jax import numpy as jnp
 from jaxopt import GaussNewton, LevenbergMarquardt
 from functools import partial
 import numpy as onp
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Callable, Dict, Tuple
 
 import jsrm
 from jsrm.parameters.hsa_params import PARAMS_FPU_CONTROL
@@ -48,13 +48,14 @@ params["zetaa"] = 5 * params["zetaa"]
 jitted_dynamical_matrics_fn = jit(partial(dynamical_matrices_fn, params))
 
 
-def phi2q_static_model(phi: Array, q0: Array = jnp.zeros((3, ))) -> Array:
+def phi2q_static_model(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
     """
     A static model mapping the motor angles to the planar HSA configuration.
     Arguments:
-        u: motor angles
+        phi: motor angles
     Returns:
         q: planar HSA configuration consisting of (k_be, sigma_sh, sigma_ax)
+        aux: dictionary with auxiliary data
     """
     q_d = jnp.zeros((3,))
 
@@ -73,59 +74,74 @@ def phi2q_static_model(phi: Array, q0: Array = jnp.zeros((3, ))) -> Array:
     # compute the L2 optimality
     optimality_error = lm.l2_optimality_error(sol.params)
 
-    return q
+    aux = dict(
+        phi=phi,
+        q=q,
+        optimality_error=optimality_error,
+    )
 
-def u2chi_static_model(u: Array) -> Array:
+    return q, aux
+
+def phi2chi_static_model(phi: Array) -> Tuple[Array, Dict[str, Array]]:
     """
     A static model mapping the motor angles to the planar end-effector pose.
     Arguments:
-        u: motor angles
+        phi: motor angles
     Returns:
         chi: end-effector pose
+        aux: dictionary with auxiliary data
     """
-    q = phi2q_static_model(u)
+    q, aux = phi2q_static_model(phi)
     chi = forward_kinematics_end_effector_fn(params, q)
-    return chi
+    aux["chi"] = chi
+    return chi, aux
 
-def jac_u2chi_static_model(u: Array) -> Array:
+def jac_phi2chi_static_model(phi: Array) -> Tuple[Array, Dict[str, Array]]:
+    """
+    Compute the Jacobian between the actuation space and the task-space.
+    Arguments:
+        phi: motor angles
+    """
     # evaluate the static model to convert motor angles into a configuration
-    q = phi2q_static_model(u)
+    q = phi2q_static_model(phi)
     # take the Jacobian between actuation and configuration space
-    J_u2q = jacrev(phi2q_static_model)(u)
+    J_phi2q, aux = jacfwd(phi2q_static_model, has_aux=True)(phi)
 
     # evaluate the closed-form, analytical jacobian of the forward kinematics
     J_q2chi = jacobian_end_effector_fn(params, q)
 
     # evaluate the Jacobian between the actuation and the task-space
-    J_u2chi = J_q2chi @ J_u2q
+    J_phi2chi = J_q2chi @ J_phi2q
 
-    return J_u2chi
+    return J_phi2chi, aux
 
 
 if __name__ == "__main__":
     jitted_phi2q_static_model_fn = jit(phi2q_static_model)
-    J_u2chi_autodiff_fn = jacrev(u2chi_static_model)
-    J_u2chi_fn = jac_u2chi_static_model
+    J_phi2chi_autodiff_fn = jit(jacfwd(phi2chi_static_model, has_aux=True))
+    J_phi2chi_fn = jit(jac_phi2chi_static_model)
 
     rng = random.key(seed=0)
     for i in range(10):
         match i:
             case 0:
-                u = jnp.array([0.0, 0.0])
+                phi = jnp.array([0.0, 0.0])
             case 1:
-                u = jnp.array([1.0, 1.0])
+                phi = jnp.array([1.0, 1.0])
             case _:
                 rng, subkey = random.split(rng)
-                u = random.uniform(
+                phi = random.uniform(
                     subkey,
                     phi_max.shape,
                     minval=0.0,
                     maxval=phi_max
                 )
 
-        q = jitted_phi2q_static_model_fn(u)
-        print("u", u, "q", q)
-        # J_u2chi_autodiff = J_u2chi_autodiff_fn(u)
-        # J_u2chi = J_u2chi_fn(u)
-        # print("J_u2chi:\n", J_u2chi, "\nJ_u2chi_autodiff:\n", J_u2chi_autodiff)
-        # print(J_u2chi.shape)
+        print("i", i, "phi", phi)
+
+        q, aux = jitted_phi2q_static_model_fn(phi)
+        print("phi", phi, "q", q)
+
+        J_u2chi_autodiff, aux = J_phi2chi_autodiff_fn(phi)
+        J_u2chi, aux = J_phi2chi_fn(phi)
+        print("J_u2chi:\n", J_u2chi, "\nJ_u2chi_autodiff:\n", J_u2chi_autodiff)
