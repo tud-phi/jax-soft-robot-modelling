@@ -23,105 +23,143 @@ sym_exp_filepath = (
     / f"planar_hsa_ns-{num_segments}_nrs-{num_rods_per_segment}.dill"
 )
 
-# activate all strains (i.e. bending, shear, and axial)
-strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
-params = PARAMS_FPU_CONTROL
-phi_max = params["phi_max"].flatten()
 
-# define initial configuration
-q0 = jnp.array([0.0, 0.0, 0.0])
-
-# increase damping for simulation stability
-params["zetab"] = 5 * params["zetab"]
-params["zetash"] = 5 * params["zetash"]
-params["zetaa"] = 5 * params["zetaa"]
-
-# nonlinear least squares solver settings
-nlq_tol = 1e-5  # tolerance for the nonlinear least squares solver
-
-(
-    forward_kinematics_virtual_backbone_fn,
-    forward_kinematics_end_effector_fn,
-    jacobian_end_effector_fn,
-    inverse_kinematics_end_effector_fn,
-    dynamical_matrices_fn,
-    sys_helpers,
-) = planar_hsa.factory(sym_exp_filepath, strain_selector)
-jitted_dynamical_matrics_fn = jit(partial(dynamical_matrices_fn, params))
-
-
-def phi2q_static_model(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
+def factory_fn(params: Dict[str, Array], nlq_tol: float = 1e-5):
     """
-    A static model mapping the motor angles to the planar HSA configuration.
-    Arguments:
-        phi: motor angles
+    Factory function for the planar HSA.
+    Args:
+        params: dictionary with robot parameters
+        nlq_tol: tolerance for the nonlinear least squares solver
+
     Returns:
-        q: planar HSA configuration consisting of (k_be, sigma_sh, sigma_ax)
-        aux: dictionary with auxiliary data
-    """
-    q_d = jnp.zeros((3,))
 
-    def residual_fn(_q: Array) -> Array:
-        _, _, _G, _K, _, _alpha = jitted_dynamical_matrics_fn(_q, q_d, phi=phi)
-        res = _alpha - _G - _K
+    """
+    (
+        forward_kinematics_virtual_backbone_fn,
+        forward_kinematics_end_effector_fn,
+        jacobian_end_effector_fn,
+        inverse_kinematics_end_effector_fn,
+        dynamical_matrices_fn,
+        sys_helpers,
+    ) = planar_hsa.factory(sym_exp_filepath, strain_selector)
+    dynamical_matrices_fn = partial(dynamical_matrices_fn, params)
+    forward_kinematics_end_effector_fn = jit(partial(forward_kinematics_end_effector_fn, params))
+
+    def residual_fn(q: Array, phi: Array) -> Array:
+        q_d = jnp.zeros_like(q)
+        _, _, G, K, _, alpha = dynamical_matrices_fn(q, q_d, phi=phi)
+        res = alpha - G - K
         return res
 
-    # solve the nonlinear least squares problem
-    lm = LevenbergMarquardt(residual_fun=residual_fn, tol=nlq_tol, jit=True, unroll=True, verbose=True)
-    sol = lm.run(q0)
+    # jit the residual function
+    residual_fn = jit(residual_fn)
+    print("Compiling residual_fn...")
+    print(residual_fn(jnp.zeros((3,)), jnp.zeros((2,))))
 
-    # configuration that minimizes the residual
-    q = sol.params
+    # define the Jacobian of the residual function
+    jac_residual_fn = jit(jacrev(residual_fn, argnums=0))
+    print("Compiling jac_residual_fn...")
+    print(jac_residual_fn(jnp.zeros((3,)), jnp.zeros((2,))))
 
-    # compute the L2 optimality
-    optimality_error = lm.l2_optimality_error(sol.params)
+    def phi2q_static_model_jaxopt_fn(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
+        """
+        A static model mapping the motor angles to the planar HSA configuration.
+        Arguments:
+            phi: motor angles
+            q0: initial guess for the configuration
+        Returns:
+            q: planar HSA configuration consisting of (k_be, sigma_sh, sigma_ax)
+            aux: dictionary with auxiliary data
+        """
+        # solve the nonlinear least squares problem
+        lm = LevenbergMarquardt(
+            residual_fun=partial(residual_fn, phi=phi),
+            jac_fun=partial(jac_residual_fn, phi=phi),
+            tol=nlq_tol,
+            jit=False,
+            verbose=True
+        )
+        sol = lm.run(q0)
 
-    aux = dict(
-        phi=phi,
-        q=q,
-        optimality_error=optimality_error,
-    )
+        # configuration that minimizes the residual
+        q = sol.params
 
-    return q, aux
+        # compute the L2 optimality
+        optimality_error = lm.l2_optimality_error(sol.params)
 
-def phi2chi_static_model(phi: Array) -> Tuple[Array, Dict[str, Array]]:
-    """
-    A static model mapping the motor angles to the planar end-effector pose.
-    Arguments:
-        phi: motor angles
-    Returns:
-        chi: end-effector pose
-        aux: dictionary with auxiliary data
-    """
-    q, aux = phi2q_static_model(phi)
-    chi = forward_kinematics_end_effector_fn(params, q)
-    aux["chi"] = chi
-    return chi, aux
+        aux = dict(
+            phi=phi,
+            q=q,
+            optimality_error=optimality_error,
+        )
 
-def jac_phi2chi_static_model(phi: Array) -> Tuple[Array, Dict[str, Array]]:
-    """
-    Compute the Jacobian between the actuation space and the task-space.
-    Arguments:
-        phi: motor angles
-    """
-    # evaluate the static model to convert motor angles into a configuration
-    q = phi2q_static_model(phi)
-    # take the Jacobian between actuation and configuration space
-    J_phi2q, aux = jacfwd(phi2q_static_model, has_aux=True)(phi)
+        return q, aux
 
-    # evaluate the closed-form, analytical jacobian of the forward kinematics
-    J_q2chi = jacobian_end_effector_fn(params, q)
 
-    # evaluate the Jacobian between the actuation and the task-space
-    J_phi2chi = J_q2chi @ J_phi2q
+    def phi2chi_static_model_fn(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
+        """
+        A static model mapping the motor angles to the planar end-effector pose.
+        Arguments:
+            phi: motor angles
+            q0: initial guess for the configuration
+        Returns:
+            chi: end-effector pose
+            aux: dictionary with auxiliary data
+        """
+        q, aux = phi2q_static_model_jaxopt_fn(phi, q0=q0)
+        chi = forward_kinematics_end_effector_fn(q)
+        aux["chi"] = chi
+        return chi, aux
 
-    return J_phi2chi, aux
+    def jac_phi2chi_static_model_fn(phi: Array) -> Tuple[Array, Dict[str, Array]]:
+        """
+        Compute the Jacobian between the actuation space and the task-space.
+        Arguments:
+            phi: motor angles
+        """
+        # evaluate the static model to convert motor angles into a configuration
+        q = phi2q_static_model_jaxopt_fn(phi)
+        # take the Jacobian between actuation and configuration space
+        J_phi2q, aux = jacfwd(phi2q_static_model_jaxopt_fn, has_aux=True)(phi)
+
+        # evaluate the closed-form, analytical jacobian of the forward kinematics
+        J_q2chi = jacobian_end_effector_fn(params, q)
+
+        # evaluate the Jacobian between the actuation and the task-space
+        J_phi2chi = J_q2chi @ J_phi2q
+
+        return J_phi2chi, aux
+
+    return phi2chi_static_model_fn
 
 
 if __name__ == "__main__":
-    jitted_phi2q_static_model_fn = jit(phi2q_static_model)
-    J_phi2chi_autodiff_fn = jit(jacfwd(phi2chi_static_model, has_aux=True))
-    J_phi2chi_fn = jit(jac_phi2chi_static_model)
+    # activate all strains (i.e. bending, shear, and axial)
+    strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
+    params = PARAMS_FPU_CONTROL
+    phi_max = params["phi_max"].flatten()
+
+    # increase damping for simulation stability
+    params["zetab"] = 5 * params["zetab"]
+    params["zetash"] = 5 * params["zetash"]
+    params["zetaa"] = 5 * params["zetaa"]
+
+    # call the factory function
+    phi2chi_static_model_fn = factory_fn(params)
+
+    # define initial configuration
+    q0 = jnp.array([0.0, 0.0, 0.0])
+
+    # phi2q_static_model_fn = jit(phi2q_static_model)
+    # print("Compiling phi2q_static_model_fn...")
+    # print(phi2q_static_model_fn(jnp.zeros((2,))))
+
+    # print("Compiling J_phi2chi_autodiff_fn...")
+    # J_phi2chi_autodiff_fn = jit(jacfwd(phi2chi_static_model, has_aux=True))
+    # print(J_phi2chi_autodiff_fn(jnp.zeros((2,))))
+    # J_phi2chi_fn = jit(jac_phi2chi_static_model)
+    # print("Compiling J_phi2chi_fn...")
+    # print(J_phi2chi_fn(jnp.zeros((2,))))
 
     rng = random.key(seed=0)
     for i in range(10):
@@ -141,7 +179,7 @@ if __name__ == "__main__":
 
         print("i", i, "phi", phi)
 
-        q, aux = jitted_phi2q_static_model_fn(phi)
+        q, aux = phi2chi_static_model_fn(phi, q0=q0)
         print("phi", phi, "q", q)
 
         # J_phi2chi_autodiff, aux = J_phi2chi_autodiff_fn(phi)
