@@ -179,8 +179,8 @@ if __name__ == "__main__":
 
         print("i", i, "phi", phi)
 
-        q, aux = phi2chi_static_model_fn(phi, q0=q0)
-        print("phi", phi, "q", q)
+        chi, aux = phi2chi_static_model_fn(phi, q0=q0)
+        print("phi", phi, "q", aux["q"], "chi", chi)
 
         # J_phi2chi_autodiff, aux = J_phi2chi_autodiff_fn(phi)
         # J_phi2chi, aux = J_phi2chi_fn(phi)
