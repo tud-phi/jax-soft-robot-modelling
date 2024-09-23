@@ -13,6 +13,7 @@ from typing import Callable, Dict, Tuple
 import jsrm
 from jsrm.parameters.hsa_params import PARAMS_FPU_CONTROL
 from jsrm.systems import planar_hsa
+from jsrm.utils.numerical_jacobian import approx_derivative
 
 num_segments = 1
 num_rods_per_segment = 2
@@ -25,15 +26,14 @@ sym_exp_filepath = (
 )
 
 
-def factory_fn(params: Dict[str, Array], nlq_tol: float = 1e-5):
+def factory_fn(params: Dict[str, Array]) -> Tuple[Callable, Callable]:
     """
     Factory function for the planar HSA.
     Args:
         params: dictionary with robot parameters
-        nlq_tol: tolerance for the nonlinear least squares solver
-
     Returns:
-
+        phi2chi_static_model_fn: function that maps motor angles to the end-effector pose
+        jac_phi2chi_static_model_fn: function that computes the Jacobian between the actuation space and the task-space
     """
     (
         forward_kinematics_virtual_backbone_fn,
@@ -107,16 +107,20 @@ def factory_fn(params: Dict[str, Array], nlq_tol: float = 1e-5):
         aux["chi"] = chi
         return chi, aux
 
-    def jac_phi2chi_static_model_fn(phi: Array) -> Tuple[Array, Dict[str, Array]]:
+    def jac_phi2chi_static_model_fn(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
         """
         Compute the Jacobian between the actuation space and the task-space.
         Arguments:
             phi: motor angles
         """
         # evaluate the static model to convert motor angles into a configuration
-        q = phi2q_static_model_jaxopt_fn(phi)
-        # take the Jacobian between actuation and configuration space
-        J_phi2q, aux = jacfwd(phi2q_static_model_jaxopt_fn, has_aux=True)(phi)
+        q, aux = phi2q_static_model_fn(phi, q0=q0)
+        # approximate the Jacobian between the actuation and the task-space using finite differences
+        J_phi2q = approx_derivative(
+            fun=lambda _phi: phi2q_static_model_fn(phi, q0=q0)[0],
+            x0=phi,
+            f0=q,
+        )
 
         # evaluate the closed-form, analytical jacobian of the forward kinematics
         J_q2chi = jacobian_end_effector_fn(params, q)
@@ -126,7 +130,7 @@ def factory_fn(params: Dict[str, Array], nlq_tol: float = 1e-5):
 
         return J_phi2chi, aux
 
-    return phi2chi_static_model_fn
+    return phi2chi_static_model_fn, jac_phi2chi_static_model_fn
 
 
 if __name__ == "__main__":
@@ -135,13 +139,8 @@ if __name__ == "__main__":
     params = PARAMS_FPU_CONTROL
     phi_max = params["phi_max"].flatten()
 
-    # increase damping for simulation stability
-    params["zetab"] = 5 * params["zetab"]
-    params["zetash"] = 5 * params["zetash"]
-    params["zetaa"] = 5 * params["zetaa"]
-
     # call the factory function
-    phi2chi_static_model_fn = factory_fn(params)
+    phi2chi_static_model_fn, jac_phi2chi_static_model_fn = factory_fn(params)
 
     # define initial configuration
     q0 = jnp.array([0.0, 0.0, 0.0])
@@ -162,11 +161,10 @@ if __name__ == "__main__":
                     maxval=phi_max
                 )
 
-        print("i", i, "phi", phi)
+        print("i", i)
 
         chi, aux = phi2chi_static_model_fn(phi, q0=q0)
         print("phi", phi, "q", aux["q"], "chi", chi)
 
-        # J_phi2chi_autodiff, aux = J_phi2chi_autodiff_fn(phi)
-        # J_phi2chi, aux = J_phi2chi_fn(phi)
-        # print("J_phi2chi:\n", J_phi2chi, "\nJ_phi2chi_autodiff:\n", J_phi2chi_autodiff)
+        J_phi2chi, aux = jac_phi2chi_static_model_fn(phi, q0=q0)
+        print("J_phi2chi:\n", J_phi2chi)
