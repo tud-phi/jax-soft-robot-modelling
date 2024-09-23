@@ -40,13 +40,13 @@ pip install jsrm
 or locally from the source code:
 
 ```bash
-pip install .
+pip install -e .
 ```
 
 If you want to run the examples, you will also need to install the following dependencies:
 
 ```bash
-pip install ".[examples]"
+pip install -e ".[examples]"
 ```
 
 ## Usage
