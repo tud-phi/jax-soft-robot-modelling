@@ -131,8 +131,10 @@ dev = [
 ]
 examples = [
     "diffrax",
+    "jaxopt",
     "matplotlib",
     "opencv-python",
+    "scipy",
 ]
 test = [
     "codecov",
