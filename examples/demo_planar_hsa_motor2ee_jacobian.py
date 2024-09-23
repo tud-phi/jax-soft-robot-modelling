@@ -142,6 +142,6 @@ if __name__ == "__main__":
         q, aux = jitted_phi2q_static_model_fn(phi)
         print("phi", phi, "q", q)
 
-        J_u2chi_autodiff, aux = J_phi2chi_autodiff_fn(phi)
-        J_u2chi, aux = J_phi2chi_fn(phi)
-        print("J_u2chi:\n", J_u2chi, "\nJ_u2chi_autodiff:\n", J_u2chi_autodiff)
+        # J_phi2chi_autodiff, aux = J_phi2chi_autodiff_fn(phi)
+        # J_phi2chi, aux = J_phi2chi_fn(phi)
+        # print("J_phi2chi:\n", J_phi2chi, "\nJ_phi2chi_autodiff:\n", J_phi2chi_autodiff)
