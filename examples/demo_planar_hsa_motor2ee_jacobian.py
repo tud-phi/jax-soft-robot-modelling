@@ -26,11 +26,12 @@ sym_exp_filepath = (
 )
 
 
-def factory_fn(params: Dict[str, Array]) -> Tuple[Callable, Callable]:
+def factory_fn(params: Dict[str, Array], verbose: bool = False) -> Tuple[Callable, Callable]:
     """
     Factory function for the planar HSA.
     Args:
         params: dictionary with robot parameters
+        verbose: flag to print additional information
     Returns:
         phi2chi_static_model_fn: function that maps motor angles to the end-effector pose
         jac_phi2chi_static_model_fn: function that computes the Jacobian between the actuation space and the task-space
@@ -45,6 +46,7 @@ def factory_fn(params: Dict[str, Array]) -> Tuple[Callable, Callable]:
     ) = planar_hsa.factory(sym_exp_filepath, strain_selector)
     dynamical_matrices_fn = partial(dynamical_matrices_fn, params)
     forward_kinematics_end_effector_fn = jit(partial(forward_kinematics_end_effector_fn, params))
+    jacobian_end_effector_fn = jit(partial(jacobian_end_effector_fn, params))
 
     def residual_fn(q: Array, phi: Array) -> Array:
         q_d = jnp.zeros_like(q)
@@ -77,9 +79,10 @@ def factory_fn(params: Dict[str, Array]) -> Tuple[Callable, Callable]:
             fun=lambda q: residual_fn(q, phi).item(),
             x0=q0,
             jac=lambda q: jac_residual_fn(q, phi),
-            # options={"disp": True},
+            options={"disp": True} if verbose else None,
         )
-        print("Optimization converged after", sol.nit, "iterations with residual", sol.fun)
+        if verbose:
+         print("Optimization converged after", sol.nit, "iterations with residual", sol.fun)
 
         # configuration that minimizes the residual
         q = jnp.array(sol.x)
@@ -117,13 +120,13 @@ def factory_fn(params: Dict[str, Array]) -> Tuple[Callable, Callable]:
         q, aux = phi2q_static_model_fn(phi, q0=q0)
         # approximate the Jacobian between the actuation and the task-space using finite differences
         J_phi2q = approx_derivative(
-            fun=lambda _phi: phi2q_static_model_fn(phi, q0=q0)[0],
+            fun=lambda _phi: phi2q_static_model_fn(_phi, q0=q0)[0],
             x0=phi,
             f0=q,
         )
 
         # evaluate the closed-form, analytical jacobian of the forward kinematics
-        J_q2chi = jacobian_end_effector_fn(params, q)
+        J_q2chi = jacobian_end_effector_fn(q)
 
         # evaluate the Jacobian between the actuation and the task-space
         J_phi2chi = J_q2chi @ J_phi2q
