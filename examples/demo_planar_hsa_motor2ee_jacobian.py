@@ -7,6 +7,7 @@ from jaxopt import GaussNewton, LevenbergMarquardt
 from functools import partial
 import numpy as onp
 from pathlib import Path
+import scipy as sp
 from typing import Callable, Dict, Tuple
 
 import jsrm
@@ -49,7 +50,7 @@ def factory_fn(params: Dict[str, Array], nlq_tol: float = 1e-5):
         q_d = jnp.zeros_like(q)
         _, _, G, K, _, alpha = dynamical_matrices_fn(q, q_d, phi=phi)
         res = alpha - G - K
-        return res
+        return jnp.square(res).mean()
 
     # jit the residual function
     residual_fn = jit(residual_fn)
@@ -61,9 +62,9 @@ def factory_fn(params: Dict[str, Array], nlq_tol: float = 1e-5):
     print("Compiling jac_residual_fn...")
     print(jac_residual_fn(jnp.zeros((3,)), jnp.zeros((2,))))
 
-    def phi2q_static_model_jaxopt_fn(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
+    def phi2q_static_model_fn(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
         """
-        A static model mapping the motor angles to the planar HSA configuration.
+        A static model mapping the motor angles to the planar HSA configuration using scipy.optimize.minimize.
         Arguments:
             phi: motor angles
             q0: initial guess for the configuration
@@ -72,29 +73,24 @@ def factory_fn(params: Dict[str, Array], nlq_tol: float = 1e-5):
             aux: dictionary with auxiliary data
         """
         # solve the nonlinear least squares problem
-        lm = LevenbergMarquardt(
-            residual_fun=partial(residual_fn, phi=phi),
-            jac_fun=partial(jac_residual_fn, phi=phi),
-            tol=nlq_tol,
-            jit=False,
-            verbose=True
+        sol = sp.optimize.minimize(
+            fun=lambda q: residual_fn(q, phi).item(),
+            x0=q0,
+            jac=lambda q: jac_residual_fn(q, phi),
+            # options={"disp": True},
         )
-        sol = lm.run(q0)
+        print("Optimization converged after", sol.nit, "iterations with residual", sol.fun)
 
         # configuration that minimizes the residual
-        q = sol.params
-
-        # compute the L2 optimality
-        optimality_error = lm.l2_optimality_error(sol.params)
+        q = jnp.array(sol.x)
 
         aux = dict(
             phi=phi,
             q=q,
-            optimality_error=optimality_error,
+            residual=sol.fun,
         )
 
         return q, aux
-
 
     def phi2chi_static_model_fn(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
         """
@@ -106,7 +102,7 @@ def factory_fn(params: Dict[str, Array], nlq_tol: float = 1e-5):
             chi: end-effector pose
             aux: dictionary with auxiliary data
         """
-        q, aux = phi2q_static_model_jaxopt_fn(phi, q0=q0)
+        q, aux = phi2q_static_model_fn(phi, q0=q0)
         chi = forward_kinematics_end_effector_fn(q)
         aux["chi"] = chi
         return chi, aux
@@ -149,17 +145,6 @@ if __name__ == "__main__":
 
     # define initial configuration
     q0 = jnp.array([0.0, 0.0, 0.0])
-
-    # phi2q_static_model_fn = jit(phi2q_static_model)
-    # print("Compiling phi2q_static_model_fn...")
-    # print(phi2q_static_model_fn(jnp.zeros((2,))))
-
-    # print("Compiling J_phi2chi_autodiff_fn...")
-    # J_phi2chi_autodiff_fn = jit(jacfwd(phi2chi_static_model, has_aux=True))
-    # print(J_phi2chi_autodiff_fn(jnp.zeros((2,))))
-    # J_phi2chi_fn = jit(jac_phi2chi_static_model)
-    # print("Compiling J_phi2chi_fn...")
-    # print(J_phi2chi_fn(jnp.zeros((2,))))
 
     rng = random.key(seed=0)
     for i in range(10):
