@@ -29,13 +29,15 @@ params = PARAMS_FPU_CONTROL
 phi_max = params["phi_max"].flatten()
 
 # define initial configuration
-q0 = jnp.array([jnp.pi, 0.0, 0.0])
+q0 = jnp.array([0.0, 0.0, 0.0])
 
 # increase damping for simulation stability
 params["zetab"] = 5 * params["zetab"]
 params["zetash"] = 5 * params["zetash"]
 params["zetaa"] = 5 * params["zetaa"]
 
+# nonlinear least squares solver settings
+nlq_tol = 1e-5  # tolerance for the nonlinear least squares solver
 
 (
     forward_kinematics_virtual_backbone_fn,
@@ -65,7 +67,7 @@ def phi2q_static_model(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array,
         return res
 
     # solve the nonlinear least squares problem
-    lm = LevenbergMarquardt(residual_fun=residual_fn, jit=True, verbose=True)
+    lm = LevenbergMarquardt(residual_fun=residual_fn, tol=nlq_tol, jit=True, unroll=True, verbose=True)
     sol = lm.run(q0)
 
     # configuration that minimizes the residual
