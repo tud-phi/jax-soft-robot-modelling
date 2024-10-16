@@ -458,14 +458,12 @@ def factory(
             J @ B_inv @ J.T
         )  # inertia matrix in the operational space
         mu = Lambda @ (
-                J @ B_inv @ C - J_d
+            J @ B_inv @ C - J_d
         )  # coriolis and centrifugal matrix in the operational space
 
         JB_pinv = (
-                B_inv @ J.T @ Lambda
+            B_inv @ J.T @ Lambda
         )  # dynamically-consistent pseudo-inverse of the Jacobian
-        # apply TODO: remove
-        # JB_pinv = B_xi.T @ JB_pinv
 
         return Lambda, mu, J, J_d, JB_pinv
 
