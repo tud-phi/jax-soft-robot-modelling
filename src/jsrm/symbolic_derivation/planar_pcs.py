@@ -3,7 +3,7 @@ from pathlib import Path
 import sympy as sp
 from typing import Callable, Dict, Optional, Tuple, Union
 
-from .symbolic_utils import compute_coriolis_matrix
+from .symbolic_utils import compute_coriolis_matrix, compute_dAdt
 
 
 def symbolically_derive_planar_pcs_model(
@@ -55,8 +55,8 @@ def symbolically_derive_planar_pcs_model(
 
     # matrix with symbolic expressions to derive the poses along each segment
     chi_sms = []
-    # Jacobians (positional + orientation) in each segment as a function of the point coordinate s
-    J_sms = []
+    # Jacobians (positional + orientation) in each segment as a function of the point coordinate s and its time derivative
+    J_sms, J_d_sms = [], []
     # cross-sectional area of each segment
     A = sp.zeros(num_segments)
     # second area moment of inertia of each segment
@@ -117,6 +117,10 @@ def symbolically_derive_planar_pcs_model(
         # the columns correspond to the strains xi
         J = Jp.col_join(Jo)
         J_sms.append(J)
+
+        # compute the time derivative of the Jacobian
+        J_d = compute_dAdt(J, xi, xi_d)  # time derivative of the end-effector Jacobian
+        J_d_sms.append(J_d)
 
         # derivative of mass matrix with respect to the point coordinate s
         dB_ds = rho[i] * A[i] * Jp.T @ Jp + rho[i] * I[i] * Jo.T @ Jo
@@ -179,8 +183,10 @@ def symbolically_derive_planar_pcs_model(
             "chiee": chi_sms[-1].subs(
                 s, l[-1]
             ),  # expression for end-effector pose of shape (3, )
-            "J_sms": J_sms,
-            "Jee": J_sms[-1].subs(s, l[-1]),
+            "J_sms": J_sms,  # list of Jacobians (for each segment) of shape (3, num_dof)
+            "Jee": J_sms[-1].subs(s, l[-1]),  # end-effector Jacobian of shape (3, num_dof)
+            "J_d_sms": J_d_sms,  # list of time derivatives of Jacobians (for each segment)
+            "Jee_d": J_d_sms[-1].subs(s, l[-1]),  # time derivative of end-effector Jacobian of shape (3, num_dof)
             "B": B,  # mass matrix
             "C": C,  # coriolis matrix
             "G": G,  # gravity vector

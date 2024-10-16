@@ -48,7 +48,7 @@ def factory(
     params_syms = sym_exps["params_syms"]
 
     @jit
-    def select_params_for_lambdify(params: Dict[str, Array]) -> List[Array]:
+    def select_params_for_lambdify_fn(params: Dict[str, Array]) -> List[Array]:
         """
         Select the parameters for lambdify
         Args:
@@ -101,6 +101,27 @@ def factory(
             "jax",
         )
         chi_lambda_sms.append(chi_lambda)
+    J_lambda_sms = []
+    for J_exp in sym_exps["exps"]["J_sms"]:
+        J_lambda = sp.lambdify(
+            params_syms_cat
+            + sym_exps["state_syms"]["xi"]
+            + [sym_exps["state_syms"]["s"]],
+            J_exp,
+            "jax",
+        )
+        J_lambda_sms.append(J_lambda)
+    J_d_lambda_sms = []
+    for J_d_exp in sym_exps["exps"]["J_d_sms"]:
+        J_d_lambda = sp.lambdify(
+            params_syms_cat
+            + sym_exps["state_syms"]["xi"]
+            + sym_exps["state_syms"]["xi_d"]
+            + [sym_exps["state_syms"]["s"]],
+            J_d_exp,
+            "jax",
+        )
+        J_d_lambda_sms.append(J_d_lambda)
 
     B_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["B"], "jax"
@@ -153,6 +174,30 @@ def factory(
 
         return xi_epsed
 
+    def classify_segment(params: Dict[str, Array], s: Array) -> Tuple[Array, Array] :
+        """
+        Classify the point along the robot to the corresponding segment
+        Args:
+            params: Dictionary of robot parameters
+            s: point coordinate along the robot in the interval [0, L].
+        Returns:
+            segment_idx: index of the segment
+            s_segment: point coordinate along the segment in the interval [0, l_segment
+        """
+        # cumsum of the segment lengths
+        l_cum = jnp.cumsum(params["l"])
+        # add zero to the beginning of the array
+        l_cum_padded = jnp.concatenate([jnp.array([0.0]), l_cum], axis=0)
+        # determine in which segment the point is located
+        # use argmax to find the last index where the condition is true
+        segment_idx = (
+                l_cum.shape[0] - 1 - jnp.argmax((s >= l_cum_padded[:-1])[::-1]).astype(int)
+        )
+        # point coordinate along the segment in the interval [0, l_segment]
+        s_segment = s - l_cum_padded[segment_idx]
+
+        return segment_idx, s_segment
+
     @jit
     def forward_kinematics_fn(
         params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
@@ -172,30 +217,56 @@ def factory(
         """
         # map the configuration to the strains
         xi = xi_eq + B_xi @ q
-
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains(xi, eps)
 
-        # cumsum of the segment lengths
-        l_cum = jnp.cumsum(params["l"])
-        # add zero to the beginning of the array
-        l_cum_padded = jnp.concatenate([jnp.array([0.0]), l_cum], axis=0)
-        # determine in which segment the point is located
-        # use argmax to find the last index where the condition is true
-        segment_idx = (
-            l_cum.shape[0] - 1 - jnp.argmax((s >= l_cum_padded[:-1])[::-1]).astype(int)
-        )
-        # point coordinate along the segment in the interval [0, l_segment]
-        s_segment = s - l_cum_padded[segment_idx]
+        # classify the point along the robot to the corresponding segment
+        segment_idx, s_segment = classify_segment(params, s)
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
-        params_for_lambdify = select_params_for_lambdify(params)
+        params_for_lambdify = select_params_for_lambdify_fn(params)
 
         chi = lax.switch(
             segment_idx, chi_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
         ).squeeze()
 
         return chi
+
+    @jit
+    def jacobian_fn(
+            params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
+    ) -> Array:
+        """
+        Evaluate the forward kinematics the tip of the links
+        Args:
+            params: Dictionary of robot parameters
+            q: generalized coordinates of shape (n_q, )
+            s: point coordinate along the rod in the interval [0, L].
+            eps: small number to avoid singularities (e.g., division by zero)
+        Returns:
+            J: Jacobian matrix of shape (3, n_q) of the backbone point in Cartesian-space
+                Relates the configuration-space velocity q_d to the Cartesian-space velocity chi_d,
+                where chi_d = J @ q_d. Chi_d consists of [p_x_d, p_y_d, theta_d]
+        """
+        # map the configuration to the strains
+        xi = xi_eq + B_xi @ q
+        # add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+
+        # classify the point along the robot to the corresponding segment
+        segment_idx, s_segment = classify_segment(params, s)
+
+        # convert the dictionary of parameters to a list, which we can pass to the lambda function
+        params_for_lambdify = select_params_for_lambdify_fn(params)
+
+        J = lax.switch(
+            segment_idx, J_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
+        ).squeeze()
+
+        # apply the strain basis to the Jacobian
+        J = J @ B_xi
+
+        return J
 
     @jit
     def dynamical_matrices_fn(
@@ -239,7 +310,7 @@ def factory(
         # dissipative matrix from the parameters
         D = params.get("D", jnp.zeros((n_xi, n_xi)))
 
-        params_for_lambdify = select_params_for_lambdify(params)
+        params_for_lambdify = select_params_for_lambdify_fn(params)
 
         B = B_xi.T @ B_lambda(*params_for_lambdify, *xi_epsed) @ B_xi
         C_xi = C_lambda(*params_for_lambdify, *xi_epsed, *xi_d)
@@ -303,7 +374,7 @@ def factory(
         U_K = (xi - xi_eq).T @ K @ (xi - xi_eq)  # evaluate K(xi) = K @ xi
 
         # gravitational potential energy
-        params_for_lambdify = select_params_for_lambdify(params)
+        params_for_lambdify = select_params_for_lambdify_fn(params)
         U_G = U_lambda(*params_for_lambdify, *xi_epsed)
 
         # total potential energy
@@ -327,11 +398,85 @@ def factory(
 
         return E
 
+    def operational_space_dynamical_matrices_fn(
+        params: Dict[str, Array],
+        q: Array,
+        q_d: Array,
+        s: Array,
+        B: Array,
+        C: Array,
+        eps: float = 1e4 * global_eps,
+    ) -> Tuple[Array, Array, Array, Array, Array]:
+        """
+        Compute the dynamics in operational space.
+        The implementation is based on Chapter 7.8 of "Modelling, Planning and Control of Robotics" by
+        Siciliano, Sciavicco, Villani, Oriolo.
+        Args:
+            params: dictionary of parameters
+            q: generalized coordinates of shape (n_q,)
+            q_d: generalized velocities of shape (n_q,)
+            s: point coordinate along the robot in the interval [0, L].
+            B: inertia matrix in the generalized coordinates of shape (n_q, n_q)
+            C: coriolis matrix derived with Christoffer symbols in the generalized coordinates of shape (n_q, n_q)
+            eps: small number to avoid singularities (e.g., division by zero)
+        Returns:
+            Lambda: inertia matrix in the operational space of shape (3, 3)
+            mu: matrix with corioli and centrifugal terms in the operational space of shape (3, 3)
+            J: Jacobian of the Cartesian pose with respect to the generalized coordinates of shape (3, n_q)
+            J: time-derivative of the Jacobian of the end-effector pose with respect to the generalized coordinates
+                of shape (3, n_q)
+            JB_pinv: Dynamically-consistent pseudo-inverse of the Jacobian. Allows the mapping of torques
+                from the generalized coordinates to the operational space: f = JB_pinv.T @ tau_q
+                Shape (n_q, 3)
+        """
+        ## map the configuration to the strains
+        xi = xi_eq + B_xi @ q
+        xi_d = B_xi @ q_d
+        # add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+
+        # classify the point along the robot to the corresponding segment
+        segment_idx, s_segment = classify_segment(params, s)
+
+        # convert the dictionary of parameters to a list, which we can pass to the lambda function
+        params_for_lambdify = select_params_for_lambdify_fn(params)
+
+        # Jacobian and its time-derivative
+        J = lax.switch(
+            segment_idx, J_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
+        ).squeeze()
+        J_d = lax.switch(
+            segment_idx, J_d_lambda_sms, *params_for_lambdify, *xi_epsed, *xi_d, s_segment
+        ).squeeze()
+        # apply the strain basis to the J and J_d
+        J = J @ B_xi
+        J_d = J_d @ B_xi
+
+        # inverse of the inertia matrix in the configuration space
+        B_inv = jnp.linalg.inv(B)
+
+        Lambda = jnp.linalg.inv(
+            J @ B_inv @ J.T
+        )  # inertia matrix in the operational space
+        mu = Lambda @ (
+                J @ B_inv @ C - J_d
+        )  # coriolis and centrifugal matrix in the operational space
+
+        JB_pinv = (
+                B_inv @ J.T @ Lambda
+        )  # dynamically-consistent pseudo-inverse of the Jacobian
+        # apply TODO: remove
+        # JB_pinv = B_xi.T @ JB_pinv
+
+        return Lambda, mu, J, J_d, JB_pinv
+
     auxiliary_fns = {
         "apply_eps_to_bend_strains": apply_eps_to_bend_strains,
+        "jacobian_fn": jacobian_fn,
         "kinetic_energy_fn": kinetic_energy_fn,
         "potential_energy_fn": potential_energy_fn,
         "energy_fn": energy_fn,
+        "operational_space_dynamical_matrices_fn": operational_space_dynamical_matrices_fn,
     }
 
     return B_xi, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns
