@@ -219,7 +219,7 @@ def symbolically_derive_planar_hsa_model(
     # inertia matrix
     B = sp.zeros(num_dof, num_dof)
     # potential energy
-    U = sp.Matrix([[0]])
+    U_g = sp.Matrix([[0]])
     # stiffness matrix
     Shat = sp.zeros(3 * num_segments, 3 * num_segments)
     # elastic vector
@@ -299,11 +299,11 @@ def symbolically_derive_planar_hsa_model(
             B = B + Br_ij
 
             # derivative of the potential energy with respect to the point coordinate s
-            dUr_ds = sp.simplify(rhor[i, j] * Ar[i, j] * g.T @ pr)
+            dU_g_r_ds = sp.simplify(-rhor[i, j] * Ar[i, j] * g.T @ pr)
             # potential energy of the current segment
-            U_ij = sp.simplify(sp.integrate(dUr_ds, (s, 0, l[i])))
+            U_g_ij = sp.simplify(sp.integrate(dU_g_r_ds, (s, 0, l[i])))
             # add potential energy of segment to previous segments
-            U = U + U_ij
+            U_g = U_g + U_g_ij
 
             # strains in physical HSA rod
             pxir = _sym_beta_fn(vxi, roff[i, j])
@@ -466,8 +466,8 @@ def symbolically_derive_planar_hsa_model(
             Bp = sp.simplify(Bp)
         B = B + Bp
         # potential energy of the platform
-        Up = sp.simplify(mp * g.T @ pCoGp)
-        U = U + Up
+        U_g_p = sp.simplify(-mp * g.T @ pCoGp)
+        U_g = U_g + U_g_p
 
         # update the orientation for the next segment
         th_prev = th.subs(s, l[i])
@@ -507,8 +507,8 @@ def symbolically_derive_planar_hsa_model(
         Bpl = sp.simplify(Bpl)
     B = B + Bpl
     # add the gravitational potential energy of the payload
-    Upl = sp.simplify(mpl * g.T @ pCoGpl)
-    U = U + Upl
+    Upl = sp.simplify(- mpl * g.T @ pCoGpl)
+    U_g = U_g + Upl
 
     # simplify mass matrix
     if simplify:
@@ -519,7 +519,7 @@ def symbolically_derive_planar_hsa_model(
     print("C =\n", C)
 
     # compute the gravity force vector
-    G = -U.jacobian(xi).transpose()
+    G = U_g.jacobian(xi).transpose()
     if simplify:
         G = sp.simplify(G)
     print("G =\n", G)

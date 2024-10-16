@@ -132,8 +132,8 @@ def factory(
     G_lambda = sp.lambdify(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["G"], "jax"
     )
-    U_lambda = sp.lambdify(
-        params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["U"], "jax"
+    U_g_lambda = sp.lambdify(
+        params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["U_g"], "jax"
     )
 
     compute_stiffness_matrix_for_all_segments_fn = vmap(
@@ -299,10 +299,9 @@ def factory(
         Ib = A**2 / (4 * jnp.pi)
 
         # elastic and shear modulus
-        E, G = params["E"], params["G"]
-
+        elastic_modulus, shear_modulus = params["E"], params["G"]
         # stiffness matrix of shape (num_segments, 3, 3)
-        S = compute_stiffness_matrix_for_all_segments_fn(A, Ib, E, G)
+        S = compute_stiffness_matrix_for_all_segments_fn(A, Ib, elastic_modulus, shear_modulus)
 
         # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
         K = blk_diag(S)
@@ -375,7 +374,7 @@ def factory(
 
         # gravitational potential energy
         params_for_lambdify = select_params_for_lambdify_fn(params)
-        U_G = U_lambda(*params_for_lambdify, *xi_epsed)
+        U_G = U_g_lambda(*params_for_lambdify, *xi_epsed)
 
         # total potential energy
         U = (U_G + U_K).squeeze()

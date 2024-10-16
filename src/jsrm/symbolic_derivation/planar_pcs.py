@@ -64,7 +64,7 @@ def symbolically_derive_planar_pcs_model(
     # inertia matrix
     B = sp.zeros(num_dof, num_dof)
     # potential energy
-    U = sp.Matrix([[0]])
+    U_g = sp.Matrix([[0]])
 
     # symbol for the point coordinate
     s = sp.symbols("s", real=True, nonnegative=True)
@@ -134,15 +134,15 @@ def symbolically_derive_planar_pcs_model(
         B = B + B_i
 
         # derivative of the potential energy with respect to the point coordinate s
-        dU_ds = rho[i] * A[i] * g.T @ p
+        dU_g_ds = -rho[i] * A[i] * g.T @ p
         if simplify_expressions:
-            dU_ds = sp.simplify(dU_ds)
-        # potential energy of the current segment
-        U_i = sp.integrate(dU_ds, (s, 0, l[i]))
+            dU_g_ds = sp.simplify(dU_g_ds)
+        # gravitational potential energy of the current segment
+        U_gi = sp.integrate(dU_g_ds, (s, 0, l[i]))
         if simplify_expressions:
-            U_i = sp.simplify(U_i)
+            U_gi = sp.simplify(U_gi)
         # add potential energy of segment to previous segments
-        U = U + U_i
+        U_g = U_g + U_gi
 
         # update the orientation for the next segment
         th_prev = th.subs(s, l[i])
@@ -155,11 +155,11 @@ def symbolically_derive_planar_pcs_model(
         B = sp.simplify(B)
     print("B =\n", B)
 
-    C = compute_coriolis_matrix(B, xi, xi_d)
+    C = compute_coriolis_matrix(B, xi, xi_d, simplify=simplify_expressions)
     print("C =\n", C)
 
     # compute the gravity force vector
-    G = -U.jacobian(xi).transpose()
+    G = U_g.jacobian(xi).transpose()
     if simplify_expressions:
         G = sp.simplify(G)
     print("G =\n", G)
@@ -190,7 +190,7 @@ def symbolically_derive_planar_pcs_model(
             "B": B,  # mass matrix
             "C": C,  # coriolis matrix
             "G": G,  # gravity vector
-            "U": U,  # gravitational potential energy
+            "U_g": U_g,  # gravitational potential energy
         },
     }
 
