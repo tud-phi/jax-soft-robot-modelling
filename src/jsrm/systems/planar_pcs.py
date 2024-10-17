@@ -199,6 +199,31 @@ def factory(
 
         return segment_idx, s_segment
 
+    def stiffness_fn(params: Dict[str, Array], formulate_in_strain_space: bool = False) -> Array:
+        """
+        Compute the stiffness matrix of the system.
+        Args:
+            params: Dictionary of robot parameters
+
+        Returns:
+            K: elastic matrix of shape (n_q, n_q) if formulate_in_strain_space is False or (n_xi, n_xi) otherwise
+        """
+        # cross-sectional area and second moment of area
+        A = jnp.pi * params["r"] ** 2
+        Ib = A ** 2 / (4 * jnp.pi)
+
+        # elastic and shear modulus
+        E, G = params["E"], params["G"]
+        # stiffness matrix of shape (num_segments, 3, 3)
+        S = compute_stiffness_matrix_for_all_segments_fn(A, Ib, E, G)
+        # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
+        K = blk_diag(S)
+
+        if not formulate_in_strain_space:
+            K = B_xi.T @ K @ B_xi
+
+        return K
+
     @jit
     def forward_kinematics_fn(
         params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
@@ -295,17 +320,8 @@ def factory(
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains(xi, eps)
 
-        # cross-sectional area and second moment of area
-        A = jnp.pi * params["r"] ** 2
-        Ib = A**2 / (4 * jnp.pi)
-
-        # elastic and shear modulus
-        elastic_modulus, shear_modulus = params["E"], params["G"]
-        # stiffness matrix of shape (num_segments, 3, 3)
-        S = compute_stiffness_matrix_for_all_segments_fn(A, Ib, elastic_modulus, shear_modulus)
-
-        # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
-        K = blk_diag(S)
+        # compute the stiffness matrix
+        K = stiffness_fn(params, formulate_in_strain_space=True)
 
         # dissipative matrix from the parameters
         D = params.get("D", jnp.zeros((n_xi, n_xi)))
@@ -360,16 +376,8 @@ def factory(
         # add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains(xi, eps)
 
-        # cross-sectional area and second moment of area
-        A = jnp.pi * params["r"] ** 2
-        Ib = A**2 / (4 * jnp.pi)
-
-        # elastic and shear modulus
-        E, G = params["E"], params["G"]
-        # stiffness matrix of shape (num_segments, 3, 3)
-        S = compute_stiffness_matrix_for_all_segments_fn(A, Ib, E, G)
-        # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
-        K = blk_diag(S)
+        # compute the stiffness matrix
+        K = stiffness_fn(params, formulate_in_strain_space=True)
         # elastic energy
         U_K = (xi - xi_eq).T @ K @ (xi - xi_eq)  # evaluate K(xi) = K @ xi
 
@@ -476,6 +484,8 @@ def factory(
 
     auxiliary_fns = {
         "apply_eps_to_bend_strains": apply_eps_to_bend_strains,
+        "classify_segment": classify_segment,
+        "stiffness_fn": stiffness_fn,
         "jacobian_fn": jacobian_fn,
         "kinetic_energy_fn": kinetic_energy_fn,
         "potential_energy_fn": potential_energy_fn,

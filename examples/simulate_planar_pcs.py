@@ -151,6 +151,7 @@ if __name__ == "__main__":
     plt.grid(True)
     plt.xlabel("End-effector x [m]")
     plt.ylabel("End-effector y [m]")
+    plt.tight_layout()
     plt.show()
     # plot end-effector position vs time
     plt.figure()
@@ -161,6 +162,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.box(True)
+    plt.tight_layout()
     plt.show()
 
     # plot the energy along the trajectory
@@ -176,6 +178,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.box(True)
+    plt.tight_layout()
     plt.show()
 
     # create video
