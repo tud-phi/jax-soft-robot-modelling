@@ -1,6 +1,7 @@
 import dill
 from jax import Array, jit, lax, vmap
 from jax import numpy as jnp
+import numpy as onp
 import sympy as sp
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple, Union
@@ -404,7 +405,7 @@ def factory(
         s: Array,
         B: Array,
         C: Array,
-        operational_space_selector = jnp.array([True, True, True]),
+        operational_space_selector: Tuple = (True, True, True),
         eps: float = 1e4 * global_eps,
     ) -> Tuple[Array, Array, Array, Array, Array]:
         """
@@ -418,8 +419,8 @@ def factory(
             s: point coordinate along the robot in the interval [0, L].
             B: inertia matrix in the generalized coordinates of shape (n_q, n_q)
             C: coriolis matrix derived with Christoffer symbols in the generalized coordinates of shape (n_q, n_q)
-            operational_space_selector: boolean array of shape (3,) to select the operational space variables.
-                For examples, jnp.array([True, True, False]) selects only the positional components of the operational space.
+            operational_space_selector: tuple of shape (3,) to select the operational space variables.
+                For examples, (True, True, False) selects only the positional components of the operational space.
             eps: small number to avoid singularities (e.g., division by zero)
         Returns:
             Lambda: inertia matrix in the operational space of shape (3, 3)
@@ -442,6 +443,9 @@ def factory(
 
         # convert the dictionary of parameters to a list, which we can pass to the lambda function
         params_for_lambdify = select_params_for_lambdify_fn(params)
+
+        # make operational_space_selector a boolean array
+        operational_space_selector = onp.array(operational_space_selector, dtype=bool)
 
         # Jacobian and its time-derivative
         J = lax.switch(
