@@ -1,5 +1,6 @@
 """Routines for numerical differentiation."""
-__all__ = ['approx_derivative']
+
+__all__ = ["approx_derivative"]
 import functools
 import jax.numpy as jnp
 
@@ -35,9 +36,9 @@ def _adjust_scheme_to_bounds(x0, h, num_steps, scheme, lb, ub):
         Whether to switch to one-sided scheme. Informative only for
         ``scheme='2-sided'``.
     """
-    if scheme == '1-sided':
+    if scheme == "1-sided":
         use_one_sided = jnp.ones_like(h, dtype=bool)
-    elif scheme == '2-sided':
+    elif scheme == "2-sided":
         h = jnp.abs(h)
         use_one_sided = jnp.zeros_like(h, dtype=bool)
     else:
@@ -52,7 +53,7 @@ def _adjust_scheme_to_bounds(x0, h, num_steps, scheme, lb, ub):
     lower_dist = x0 - lb
     upper_dist = ub - x0
 
-    if scheme == '1-sided':
+    if scheme == "1-sided":
         x = x0 + h_total
         violated = (x < lb) | (x > ub)
         fitting = jnp.abs(h_total) <= jnp.maximum(lower_dist, upper_dist)
@@ -62,21 +63,23 @@ def _adjust_scheme_to_bounds(x0, h, num_steps, scheme, lb, ub):
         h_adjusted[forward] = upper_dist[forward] / num_steps
         backward = (upper_dist < lower_dist) & ~fitting
         h_adjusted[backward] = -lower_dist[backward] / num_steps
-    elif scheme == '2-sided':
+    elif scheme == "2-sided":
         central = (lower_dist >= h_total) & (upper_dist >= h_total)
 
         forward = (upper_dist >= lower_dist) & ~central
         h_adjusted[forward] = jnp.minimum(
-            h[forward], 0.5 * upper_dist[forward] / num_steps)
+            h[forward], 0.5 * upper_dist[forward] / num_steps
+        )
         use_one_sided[forward] = True
 
         backward = (upper_dist < lower_dist) & ~central
         h_adjusted[backward] = -jnp.minimum(
-            h[backward], 0.5 * lower_dist[backward] / num_steps)
+            h[backward], 0.5 * lower_dist[backward] / num_steps
+        )
         use_one_sided[backward] = True
 
         min_dist = jnp.minimum(upper_dist, lower_dist) / num_steps
-        adjusted_central = (~central & (jnp.abs(h_adjusted) <= min_dist))
+        adjusted_central = ~central & (jnp.abs(h_adjusted) <= min_dist)
         h_adjusted[adjusted_central] = min_dist[adjusted_central]
         use_one_sided[adjusted_central] = False
 
@@ -131,10 +134,11 @@ def _eps_for_method(x0_dtype, f0_dtype, method):
     if method in ["2-point"]:
         return EPS**0.5
     elif method in ["3-point"]:
-        return EPS**(1/3)
+        return EPS ** (1 / 3)
     else:
-        raise RuntimeError("Unknown step method, should be one of "
-                           "{'2-point', '3-point'}")
+        raise RuntimeError(
+            "Unknown step method, should be one of " "{'2-point', '3-point'}"
+        )
 
 
 def _compute_absolute_step(rel_step, x0, f0, method):
@@ -178,10 +182,10 @@ def _compute_absolute_step(rel_step, x0, f0, method):
 
         # however we don't want an abs_step of 0, which can happen if
         # rel_step is 0, or x0 is 0. Instead, substitute a realistic step
-        dx = ((x0 + abs_step) - x0)
-        abs_step = jnp.where(dx == 0,
-                            rstep * sign_x0 * jnp.maximum(1.0, jnp.abs(x0)),
-                            abs_step)
+        dx = (x0 + abs_step) - x0
+        abs_step = jnp.where(
+            dx == 0, rstep * sign_x0 * jnp.maximum(1.0, jnp.abs(x0)), abs_step
+        )
 
     return abs_step
 
@@ -207,8 +211,17 @@ def _prepare_bounds(bounds, x0):
     return lb, ub
 
 
-def approx_derivative(fun, x0, method='3-point', rel_step=None, abs_step=None,
-                      f0=None, bounds=(-jnp.inf, jnp.inf), args=(), kwargs={}):
+def approx_derivative(
+    fun,
+    x0,
+    method="3-point",
+    rel_step=None,
+    abs_step=None,
+    f0=None,
+    bounds=(-jnp.inf, jnp.inf),
+    args=(),
+    kwargs={},
+):
     """Compute finite difference approximation of the derivatives of a
     vector-valued function.
 
@@ -327,7 +340,7 @@ def approx_derivative(fun, x0, method='3-point', rel_step=None, abs_step=None,
     >>> approx_derivative(g, x0, bounds=(1.0, jnp.inf))
     array([ 2.])
     """
-    if method not in ['2-point', '3-point']:
+    if method not in ["2-point", "3-point"]:
         raise ValueError("Unknown method '%s'. " % method)
 
     if x0.ndim > 1:
@@ -358,21 +371,22 @@ def approx_derivative(fun, x0, method='3-point', rel_step=None, abs_step=None,
 
         # cannot have a zero step. This might happen if x0 is very large
         # or small. In which case fall back to relative step.
-        dx = ((x0 + h) - x0)
-        h = jnp.where(dx == 0,
-                     _eps_for_method(x0.dtype, f0.dtype, method) *
-                     sign_x0 * jnp.maximum(1.0, jnp.abs(x0)),
-                     h)
+        dx = (x0 + h) - x0
+        h = jnp.where(
+            dx == 0,
+            _eps_for_method(x0.dtype, f0.dtype, method)
+            * sign_x0
+            * jnp.maximum(1.0, jnp.abs(x0)),
+            h,
+        )
 
-    if method == '2-point':
-        h, use_one_sided = _adjust_scheme_to_bounds(
-            x0, h, 1, '1-sided', lb, ub)
-    elif method == '3-point':
-        h, use_one_sided = _adjust_scheme_to_bounds(
-            x0, h, 1, '2-sided', lb, ub)
+    if method == "2-point":
+        h, use_one_sided = _adjust_scheme_to_bounds(x0, h, 1, "1-sided", lb, ub)
+    elif method == "3-point":
+        h, use_one_sided = _adjust_scheme_to_bounds(x0, h, 1, "2-sided", lb, ub)
 
-    return _dense_difference(fun_wrapped, x0, f0, h,
-                             use_one_sided, method)
+    return _dense_difference(fun_wrapped, x0, f0, h, use_one_sided, method)
+
 
 def _dense_difference(fun, x0, f0, h, use_one_sided, method):
     m = f0.shape[-1]
@@ -380,18 +394,20 @@ def _dense_difference(fun, x0, f0, h, use_one_sided, method):
 
     J_T_rows = []
     for i in range(h.size):
-        if method == '2-point':
+        if method == "2-point":
             x1 = x0 + jnp.concat(
                 [
-                    jnp.zeros((i, ), ),
-                    h[i: i + 1],
-                    jnp.zeros((n - i - 1, )),
+                    jnp.zeros(
+                        (i,),
+                    ),
+                    h[i : i + 1],
+                    jnp.zeros((n - i - 1,)),
                 ],
                 axis=-1,
             )
             dx = h[i]
             df = fun(x1) - f0
-        elif method == '3-point' and use_one_sided[i]:
+        elif method == "3-point" and use_one_sided[i]:
             x1[i] += h[i]
             x2[i] += 2 * h[i]
             dx = x2[i] - x0[i]
@@ -402,7 +418,7 @@ def _dense_difference(fun, x0, f0, h, use_one_sided, method):
             dx01 = jnp.concat(
                 [
                     jnp.zeros((i,)),
-                    h[i: i + 1],
+                    h[i : i + 1],
                     jnp.zeros((n - i - 1,)),
                 ],
                 axis=-1,
@@ -413,12 +429,12 @@ def _dense_difference(fun, x0, f0, h, use_one_sided, method):
             f1 = fun(x1)
             f2 = fun(x2)
             df = -3.0 * f0 + 4 * f1 - f2
-        elif method == '3-point' and not use_one_sided[i]:
+        elif method == "3-point" and not use_one_sided[i]:
             dx02 = jnp.concat(
                 [
-                    jnp.zeros((i, )),
-                    h[i: i + 1],
-                    jnp.zeros((n - i - 1, )),
+                    jnp.zeros((i,)),
+                    h[i : i + 1],
+                    jnp.zeros((n - i - 1,)),
                 ],
                 axis=-1,
             )

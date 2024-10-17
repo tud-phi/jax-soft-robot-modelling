@@ -43,7 +43,7 @@ strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
 strain_selector = jnp.array([True, False, False])
 
 # define initial configuration
-q0 = jnp.array([10 * jnp.pi])
+q0 = jnp.array([5 * jnp.pi])
 # number of generalized coordinates
 n_q = q0.shape[0]
 
@@ -95,8 +95,8 @@ def draw_robot(
 
 
 if __name__ == "__main__":
-    strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = planar_pcs.factory(
-        sym_exp_filepath, strain_selector
+    strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
+        planar_pcs.factory(sym_exp_filepath, strain_selector)
     )
     batched_forward_kinematics = vmap(
         forward_kinematics_fn, in_axes=(None, None, 0), out_axes=-1
@@ -142,9 +142,38 @@ if __name__ == "__main__":
     # the evolution of the generalized velocities
     q_d_ts = sol.ys[:, n_q:]
 
+    # evaluate the forward kinematics along the trajectory
+    chi_ee_ts = vmap(forward_kinematics_fn, in_axes=(None, 0, None))(
+        params, q_ts, jnp.array([jnp.sum(params["l"])])
+    )
+    # plot the end-effector position along the trajectory
+    plt.figure()
+    plt.plot(chi_ee_ts[0, :], chi_ee_ts[1, :])
+    plt.axis("equal")
+    plt.grid(True)
+    plt.xlabel("End-effector x [m]")
+    plt.ylabel("End-effector y [m]")
+    plt.tight_layout()
+    plt.show()
+    # plot end-effector position vs time
+    plt.figure()
+    plt.plot(video_ts, chi_ee_ts[:, 0], label="x")
+    plt.plot(video_ts, chi_ee_ts[:, 1], label="y")
+    plt.xlabel("Time [s]")
+    plt.ylabel("End-effector Position [m]")
+    plt.legend()
+    plt.grid(True)
+    plt.box(True)
+    plt.tight_layout()
+    plt.show()
+
     # plot the energy along the trajectory
-    kinetic_energy_fn_vmapped = vmap(partial(auxiliary_fns["kinetic_energy_fn"], params))
-    potential_energy_fn_vmapped = vmap(partial(auxiliary_fns["potential_energy_fn"], params))
+    kinetic_energy_fn_vmapped = vmap(
+        partial(auxiliary_fns["kinetic_energy_fn"], params)
+    )
+    potential_energy_fn_vmapped = vmap(
+        partial(auxiliary_fns["potential_energy_fn"], params)
+    )
     U_ts = potential_energy_fn_vmapped(q_ts)
     T_ts = kinetic_energy_fn_vmapped(q_ts, q_d_ts)
     plt.figure()
@@ -155,6 +184,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.box(True)
+    plt.tight_layout()
     plt.show()
 
     # create video

@@ -3,11 +3,13 @@ from pathlib import Path
 import sympy as sp
 from typing import Callable, Dict, Optional, Tuple, Union
 
-from .symbolic_utils import compute_coriolis_matrix
+from .symbolic_utils import compute_coriolis_matrix, compute_dAdt
 
 
 def symbolically_derive_planar_pcs_model(
-    num_segments: int, filepath: Optional[Union[str, Path]] = None, simplify_expressions: bool = True
+    num_segments: int,
+    filepath: Optional[Union[str, Path]] = None,
+    simplify_expressions: bool = True,
 ) -> Dict:
     """
     Symbolically derive the kinematics and dynamics of a planar continuum soft robot modelled with
@@ -55,8 +57,8 @@ def symbolically_derive_planar_pcs_model(
 
     # matrix with symbolic expressions to derive the poses along each segment
     chi_sms = []
-    # Jacobians (positional + orientation) in each segment as a function of the point coordinate s
-    J_sms = []
+    # Jacobians (positional + orientation) in each segment as a function of the point coordinate s and its time derivative
+    J_sms, J_d_sms = [], []
     # cross-sectional area of each segment
     A = sp.zeros(num_segments)
     # second area moment of inertia of each segment
@@ -64,7 +66,7 @@ def symbolically_derive_planar_pcs_model(
     # inertia matrix
     B = sp.zeros(num_dof, num_dof)
     # potential energy
-    U = sp.Matrix([[0]])
+    U_g = sp.Matrix([[0]])
 
     # symbol for the point coordinate
     s = sp.symbols("s", real=True, nonnegative=True)
@@ -118,6 +120,10 @@ def symbolically_derive_planar_pcs_model(
         J = Jp.col_join(Jo)
         J_sms.append(J)
 
+        # compute the time derivative of the Jacobian
+        J_d = compute_dAdt(J, xi, xi_d)  # time derivative of the end-effector Jacobian
+        J_d_sms.append(J_d)
+
         # derivative of mass matrix with respect to the point coordinate s
         dB_ds = rho[i] * A[i] * Jp.T @ Jp + rho[i] * I[i] * Jo.T @ Jo
         if simplify_expressions:
@@ -130,15 +136,15 @@ def symbolically_derive_planar_pcs_model(
         B = B + B_i
 
         # derivative of the potential energy with respect to the point coordinate s
-        dU_ds = rho[i] * A[i] * g.T @ p
+        dU_g_ds = -rho[i] * A[i] * g.T @ p
         if simplify_expressions:
-            dU_ds = sp.simplify(dU_ds)
-        # potential energy of the current segment
-        U_i = sp.integrate(dU_ds, (s, 0, l[i]))
+            dU_g_ds = sp.simplify(dU_g_ds)
+        # gravitational potential energy of the current segment
+        U_gi = sp.integrate(dU_g_ds, (s, 0, l[i]))
         if simplify_expressions:
-            U_i = sp.simplify(U_i)
+            U_gi = sp.simplify(U_gi)
         # add potential energy of segment to previous segments
-        U = U + U_i
+        U_g = U_g + U_gi
 
         # update the orientation for the next segment
         th_prev = th.subs(s, l[i])
@@ -151,11 +157,11 @@ def symbolically_derive_planar_pcs_model(
         B = sp.simplify(B)
     print("B =\n", B)
 
-    C = compute_coriolis_matrix(B, xi, xi_d)
+    C = compute_coriolis_matrix(B, xi, xi_d, simplify=simplify_expressions)
     print("C =\n", C)
 
     # compute the gravity force vector
-    G = -U.jacobian(xi).transpose()
+    G = U_g.jacobian(xi).transpose()
     if simplify_expressions:
         G = sp.simplify(G)
     print("G =\n", G)
@@ -179,12 +185,18 @@ def symbolically_derive_planar_pcs_model(
             "chiee": chi_sms[-1].subs(
                 s, l[-1]
             ),  # expression for end-effector pose of shape (3, )
-            "J_sms": J_sms,
-            "Jee": J_sms[-1].subs(s, l[-1]),
+            "J_sms": J_sms,  # list of Jacobians (for each segment) of shape (3, num_dof)
+            "Jee": J_sms[-1].subs(
+                s, l[-1]
+            ),  # end-effector Jacobian of shape (3, num_dof)
+            "J_d_sms": J_d_sms,  # list of time derivatives of Jacobians (for each segment)
+            "Jee_d": J_d_sms[-1].subs(
+                s, l[-1]
+            ),  # time derivative of end-effector Jacobian of shape (3, num_dof)
             "B": B,  # mass matrix
             "C": C,  # coriolis matrix
             "G": G,  # gravity vector
-            "U": U,  # gravitational potential energy
+            "U_g": U_g,  # gravitational potential energy
         },
     }
 
