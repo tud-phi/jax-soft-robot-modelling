@@ -175,7 +175,7 @@ def factory(
 
         return xi_epsed
 
-    def classify_segment(params: Dict[str, Array], s: Array) -> Tuple[Array, Array] :
+    def classify_segment(params: Dict[str, Array], s: Array) -> Tuple[Array, Array]:
         """
         Classify the point along the robot to the corresponding segment
         Args:
@@ -192,14 +192,16 @@ def factory(
         # determine in which segment the point is located
         # use argmax to find the last index where the condition is true
         segment_idx = (
-                l_cum.shape[0] - 1 - jnp.argmax((s >= l_cum_padded[:-1])[::-1]).astype(int)
+            l_cum.shape[0] - 1 - jnp.argmax((s >= l_cum_padded[:-1])[::-1]).astype(int)
         )
         # point coordinate along the segment in the interval [0, l_segment]
         s_segment = s - l_cum_padded[segment_idx]
 
         return segment_idx, s_segment
 
-    def stiffness_fn(params: Dict[str, Array], formulate_in_strain_space: bool = False) -> Array:
+    def stiffness_fn(
+        params: Dict[str, Array], formulate_in_strain_space: bool = False
+    ) -> Array:
         """
         Compute the stiffness matrix of the system.
         Args:
@@ -210,7 +212,7 @@ def factory(
         """
         # cross-sectional area and second moment of area
         A = jnp.pi * params["r"] ** 2
-        Ib = A ** 2 / (4 * jnp.pi)
+        Ib = A**2 / (4 * jnp.pi)
 
         # elastic and shear modulus
         E, G = params["E"], params["G"]
@@ -260,7 +262,7 @@ def factory(
 
     @jit
     def jacobian_fn(
-            params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
+        params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
     ) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
@@ -341,7 +343,6 @@ def factory(
         alpha = B_xi.T @ jnp.identity(n_xi) @ B_xi
 
         return B, C, G, K, D, alpha
-    
 
     def kinetic_energy_fn(params: Dict[str, Array], q: Array, q_d: Array) -> Array:
         """
@@ -357,11 +358,12 @@ def factory(
 
         # kinetic energy
         T = (0.5 * q_d.T @ B @ q_d).squeeze()
-        
+
         return T
 
-    
-    def potential_energy_fn(params: Dict[str, Array], q: Array, eps: float = 1e4 * global_eps) -> Array:
+    def potential_energy_fn(
+        params: Dict[str, Array], q: Array, eps: float = 1e4 * global_eps
+    ) -> Array:
         """
         Compute the potential energy of the system.
         Args:
@@ -460,7 +462,12 @@ def factory(
             segment_idx, J_lambda_sms, *params_for_lambdify, *xi_epsed, s_segment
         ).squeeze()
         J_d = lax.switch(
-            segment_idx, J_d_lambda_sms, *params_for_lambdify, *xi_epsed, *xi_d, s_segment
+            segment_idx,
+            J_d_lambda_sms,
+            *params_for_lambdify,
+            *xi_epsed,
+            *xi_d,
+            s_segment,
         ).squeeze()
         # apply the operational_space_selector and strain basis to the J and J_d
         J = J[operational_space_selector, :] @ B_xi

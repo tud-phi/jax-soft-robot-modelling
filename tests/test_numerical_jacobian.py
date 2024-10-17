@@ -7,7 +7,7 @@ from jax import numpy as jnp
 from jsrm.utils.numerical_jacobian import approx_derivative
 
 
-def test_finite_differences(method = "2-point"):
+def test_finite_differences(method="2-point"):
     def fun(x: Array):
         return jnp.stack([x[0] * jnp.sin(x[1]), x[0] * jnp.cos(x[1])])
 
@@ -21,7 +21,14 @@ def test_finite_differences(method = "2-point"):
 
         jac_autodiff = jac_autodiff_fn(x)
         jac_numdiff = jac_numdiff_fn(x)
-        print("x = ", x, "\njac_autodiff = \n", jac_autodiff, "\njac_numdiff = \n", jac_numdiff)
+        print(
+            "x = ",
+            x,
+            "\njac_autodiff = \n",
+            jac_autodiff,
+            "\njac_numdiff = \n",
+            jac_numdiff,
+        )
 
         error_jac = jnp.linalg.norm(jac_autodiff - jac_numdiff)
         print("error_jac = ", error_jac)

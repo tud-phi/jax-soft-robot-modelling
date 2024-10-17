@@ -26,7 +26,9 @@ sym_exp_filepath = (
 )
 
 
-def factory_fn(params: Dict[str, Array], verbose: bool = False) -> Tuple[Callable, Callable]:
+def factory_fn(
+    params: Dict[str, Array], verbose: bool = False
+) -> Tuple[Callable, Callable]:
     """
     Factory function for the planar HSA.
     Args:
@@ -45,7 +47,9 @@ def factory_fn(params: Dict[str, Array], verbose: bool = False) -> Tuple[Callabl
         sys_helpers,
     ) = planar_hsa.factory(sym_exp_filepath, strain_selector)
     dynamical_matrices_fn = partial(dynamical_matrices_fn, params)
-    forward_kinematics_end_effector_fn = jit(partial(forward_kinematics_end_effector_fn, params))
+    forward_kinematics_end_effector_fn = jit(
+        partial(forward_kinematics_end_effector_fn, params)
+    )
     jacobian_end_effector_fn = jit(partial(jacobian_end_effector_fn, params))
 
     def residual_fn(q: Array, phi: Array) -> Array:
@@ -64,7 +68,9 @@ def factory_fn(params: Dict[str, Array], verbose: bool = False) -> Tuple[Callabl
     print("Compiling jac_residual_fn...")
     print(jac_residual_fn(jnp.zeros((3,)), jnp.zeros((2,))))
 
-    def phi2q_static_model_fn(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
+    def phi2q_static_model_fn(
+        phi: Array, q0: Array = jnp.zeros((3,))
+    ) -> Tuple[Array, Dict[str, Array]]:
         """
         A static model mapping the motor angles to the planar HSA configuration using scipy.optimize.minimize.
         Arguments:
@@ -82,7 +88,12 @@ def factory_fn(params: Dict[str, Array], verbose: bool = False) -> Tuple[Callabl
             options={"disp": True} if verbose else None,
         )
         if verbose:
-         print("Optimization converged after", sol.nit, "iterations with residual", sol.fun)
+            print(
+                "Optimization converged after",
+                sol.nit,
+                "iterations with residual",
+                sol.fun,
+            )
 
         # configuration that minimizes the residual
         q = jnp.array(sol.x)
@@ -95,7 +106,9 @@ def factory_fn(params: Dict[str, Array], verbose: bool = False) -> Tuple[Callabl
 
         return q, aux
 
-    def phi2chi_static_model_fn(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
+    def phi2chi_static_model_fn(
+        phi: Array, q0: Array = jnp.zeros((3,))
+    ) -> Tuple[Array, Dict[str, Array]]:
         """
         A static model mapping the motor angles to the planar end-effector pose.
         Arguments:
@@ -110,7 +123,9 @@ def factory_fn(params: Dict[str, Array], verbose: bool = False) -> Tuple[Callabl
         aux["chi"] = chi
         return chi, aux
 
-    def jac_phi2chi_static_model_fn(phi: Array, q0: Array = jnp.zeros((3, ))) -> Tuple[Array, Dict[str, Array]]:
+    def jac_phi2chi_static_model_fn(
+        phi: Array, q0: Array = jnp.zeros((3,))
+    ) -> Tuple[Array, Dict[str, Array]]:
         """
         Compute the Jacobian between the actuation space and the task-space.
         Arguments:
@@ -157,12 +172,7 @@ if __name__ == "__main__":
                 phi = jnp.array([1.0, 1.0])
             case _:
                 rng, subkey = random.split(rng)
-                phi = random.uniform(
-                    subkey,
-                    phi_max.shape,
-                    minval=0.0,
-                    maxval=phi_max
-                )
+                phi = random.uniform(subkey, phi_max.shape, minval=0.0, maxval=phi_max)
 
         print("i", i)
 

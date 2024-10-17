@@ -507,7 +507,7 @@ def symbolically_derive_planar_hsa_model(
         Bpl = sp.simplify(Bpl)
     B = B + Bpl
     # add the gravitational potential energy of the payload
-    Upl = sp.simplify(- mpl * g.T @ pCoGpl)
+    Upl = sp.simplify(-mpl * g.T @ pCoGpl)
     U_g = U_g + Upl
 
     # simplify mass matrix

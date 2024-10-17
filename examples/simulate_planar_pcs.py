@@ -95,8 +95,8 @@ def draw_robot(
 
 
 if __name__ == "__main__":
-    strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = planar_pcs.factory(
-        sym_exp_filepath, strain_selector
+    strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
+        planar_pcs.factory(sym_exp_filepath, strain_selector)
     )
     batched_forward_kinematics = vmap(
         forward_kinematics_fn, in_axes=(None, None, 0), out_axes=-1
@@ -143,7 +143,9 @@ if __name__ == "__main__":
     q_d_ts = sol.ys[:, n_q:]
 
     # evaluate the forward kinematics along the trajectory
-    chi_ee_ts = vmap(forward_kinematics_fn, in_axes=(None, 0, None))(params, q_ts, jnp.array([jnp.sum(params["l"])]))
+    chi_ee_ts = vmap(forward_kinematics_fn, in_axes=(None, 0, None))(
+        params, q_ts, jnp.array([jnp.sum(params["l"])])
+    )
     # plot the end-effector position along the trajectory
     plt.figure()
     plt.plot(chi_ee_ts[0, :], chi_ee_ts[1, :])
@@ -166,8 +168,12 @@ if __name__ == "__main__":
     plt.show()
 
     # plot the energy along the trajectory
-    kinetic_energy_fn_vmapped = vmap(partial(auxiliary_fns["kinetic_energy_fn"], params))
-    potential_energy_fn_vmapped = vmap(partial(auxiliary_fns["potential_energy_fn"], params))
+    kinetic_energy_fn_vmapped = vmap(
+        partial(auxiliary_fns["kinetic_energy_fn"], params)
+    )
+    potential_energy_fn_vmapped = vmap(
+        partial(auxiliary_fns["potential_energy_fn"], params)
+    )
     U_ts = potential_energy_fn_vmapped(q_ts)
     T_ts = kinetic_energy_fn_vmapped(q_ts, q_d_ts)
     plt.figure()

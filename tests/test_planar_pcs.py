@@ -27,8 +27,8 @@ def test_planar_pcs_one_segment():
     # activate all strains (i.e. bending, shear, and axial)
     strain_selector = jnp.ones((3,), dtype=bool)
 
-    strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = planar_pcs.factory(
-        sym_exp_filepath, strain_selector
+    strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
+        planar_pcs.factory(sym_exp_filepath, strain_selector)
     )
     forward_dynamics_fn = partial(
         euler_lagrangian.forward_dynamics, dynamical_matrices_fn

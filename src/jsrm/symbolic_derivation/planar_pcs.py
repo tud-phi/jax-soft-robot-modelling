@@ -7,7 +7,9 @@ from .symbolic_utils import compute_coriolis_matrix, compute_dAdt
 
 
 def symbolically_derive_planar_pcs_model(
-    num_segments: int, filepath: Optional[Union[str, Path]] = None, simplify_expressions: bool = True
+    num_segments: int,
+    filepath: Optional[Union[str, Path]] = None,
+    simplify_expressions: bool = True,
 ) -> Dict:
     """
     Symbolically derive the kinematics and dynamics of a planar continuum soft robot modelled with
@@ -184,9 +186,13 @@ def symbolically_derive_planar_pcs_model(
                 s, l[-1]
             ),  # expression for end-effector pose of shape (3, )
             "J_sms": J_sms,  # list of Jacobians (for each segment) of shape (3, num_dof)
-            "Jee": J_sms[-1].subs(s, l[-1]),  # end-effector Jacobian of shape (3, num_dof)
+            "Jee": J_sms[-1].subs(
+                s, l[-1]
+            ),  # end-effector Jacobian of shape (3, num_dof)
             "J_d_sms": J_d_sms,  # list of time derivatives of Jacobians (for each segment)
-            "Jee_d": J_d_sms[-1].subs(s, l[-1]),  # time derivative of end-effector Jacobian of shape (3, num_dof)
+            "Jee_d": J_d_sms[-1].subs(
+                s, l[-1]
+            ),  # time derivative of end-effector Jacobian of shape (3, num_dof)
             "B": B,  # mass matrix
             "C": C,  # coriolis matrix
             "G": G,  # gravity vector
