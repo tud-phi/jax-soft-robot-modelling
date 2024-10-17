@@ -404,6 +404,7 @@ def factory(
         s: Array,
         B: Array,
         C: Array,
+        operational_space_selector = jnp.array([True, True, True]),
         eps: float = 1e4 * global_eps,
     ) -> Tuple[Array, Array, Array, Array, Array]:
         """
@@ -417,6 +418,8 @@ def factory(
             s: point coordinate along the robot in the interval [0, L].
             B: inertia matrix in the generalized coordinates of shape (n_q, n_q)
             C: coriolis matrix derived with Christoffer symbols in the generalized coordinates of shape (n_q, n_q)
+            operational_space_selector: boolean array of shape (3,) to select the operational space variables.
+                For examples, jnp.array([True, True, False]) selects only the positional components of the operational space.
             eps: small number to avoid singularities (e.g., division by zero)
         Returns:
             Lambda: inertia matrix in the operational space of shape (3, 3)
@@ -447,9 +450,9 @@ def factory(
         J_d = lax.switch(
             segment_idx, J_d_lambda_sms, *params_for_lambdify, *xi_epsed, *xi_d, s_segment
         ).squeeze()
-        # apply the strain basis to the J and J_d
-        J = J @ B_xi
-        J_d = J_d @ B_xi
+        # apply the operational_space_selector and strain basis to the J and J_d
+        J = J[operational_space_selector, :] @ B_xi
+        J_d = J_d[operational_space_selector, :] @ B_xi
 
         # inverse of the inertia matrix in the configuration space
         B_inv = jnp.linalg.inv(B)
