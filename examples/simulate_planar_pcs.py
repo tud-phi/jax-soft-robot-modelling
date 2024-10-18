@@ -3,7 +3,7 @@ from functools import partial
 import jax
 
 jax.config.update("jax_enable_x64", True)  # double precision
-from diffrax import diffeqsolve, Dopri5, Euler, ODETerm, SaveAt
+from diffrax import diffeqsolve, Euler, ODETerm, SaveAt, Tsit5
 from jax import Array, vmap
 from jax import numpy as jnp
 import matplotlib.pyplot as plt
@@ -26,7 +26,7 @@ sym_exp_filepath = (
 
 # set parameters
 rho = 1070 * jnp.ones((num_segments,))  # Volumetric density of Dragon Skin 20 [kg/m^3]
-D = 1e-5 * jnp.diag(
+D = 1e-4 * jnp.diag(
     jnp.repeat(
         jnp.array([[1e0, 1e3, 1e3]]), num_segments, axis=0
     ).flatten(),
@@ -44,15 +44,14 @@ params = {
 
 # activate all strains (i.e. bending, shear, and axial)
 strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
-strain_selector = jnp.array([True, False, False])
 
 # define initial configuration
-q0 = jnp.array([5 * jnp.pi])
+q0 = jnp.repeat(jnp.array([5.0 * jnp.pi, 0.1, 0.2])[None, :], num_segments, axis=0).flatten()
 # number of generalized coordinates
 n_q = q0.shape[0]
 
 # set simulation parameters
-dt = 1e-3  # time step
+dt = 1e-4  # time step
 ts = jnp.arange(0.0, 2, dt)  # time steps
 skip_step = 10  # how many time steps to skip in between video frames
 video_ts = ts[::skip_step]  # time steps for video
@@ -122,8 +121,7 @@ if __name__ == "__main__":
     # cv2.waitKey()
     # cv2.destroyWindow(window_name)
 
-    x0 = jnp.zeros((2 * q0.shape[0],))  # initial condition
-    x0 = x0.at[: q0.shape[0]].set(q0)  # set initial configuration
+    x0 = jnp.concatenate([q0, jnp.zeros_like(q0)])  # initial condition
     tau = jnp.zeros_like(q0)  # torques
 
     ode_fn = ode_factory(dynamical_matrices_fn, params, tau)
@@ -131,7 +129,7 @@ if __name__ == "__main__":
 
     sol = diffeqsolve(
         term,
-        solver=Dopri5(),
+        solver=Tsit5(),
         t0=ts[0],
         t1=ts[-1],
         dt0=dt,
@@ -150,13 +148,25 @@ if __name__ == "__main__":
     chi_ee_ts = vmap(forward_kinematics_fn, in_axes=(None, 0, None))(
         params, q_ts, jnp.array([jnp.sum(params["l"])])
     )
-    # plot the end-effector position along the trajectory
+    # plot the configuration vs time
     plt.figure()
-    plt.plot(chi_ee_ts[0, :], chi_ee_ts[1, :])
-    plt.axis("equal")
+    for segment_idx in range(num_segments):
+        plt.plot(
+            video_ts, q_ts[:, 3 * segment_idx + 0],
+            label=r"$\kappa_\mathrm{be," + str(segment_idx + 1) + "}$ [rad/m]"
+        )
+        plt.plot(
+            video_ts, q_ts[:, 3 * segment_idx + 1],
+            label=r"$\sigma_\mathrm{sh," + str(segment_idx + 1) + "}$ [-]"
+        )
+        plt.plot(
+            video_ts, q_ts[:, 3 * segment_idx + 2],
+            label=r"$\sigma_\mathrm{el," + str(segment_idx + 1) + "}$ [-]"
+        )
+    plt.xlabel("Time [s]")
+    plt.ylabel("Configuration")
+    plt.legend()
     plt.grid(True)
-    plt.xlabel("End-effector x [m]")
-    plt.ylabel("End-effector y [m]")
     plt.tight_layout()
     plt.show()
     # plot end-effector position vs time
@@ -170,6 +180,24 @@ if __name__ == "__main__":
     plt.box(True)
     plt.tight_layout()
     plt.show()
+    # plot the end-effector position in the x-y plane as a scatter plot with the time as the color
+    plt.figure()
+    plt.scatter(chi_ee_ts[:, 0], chi_ee_ts[:, 1], c=video_ts, cmap="viridis")
+    plt.axis("equal")
+    plt.grid(True)
+    plt.xlabel("End-effector x [m]")
+    plt.ylabel("End-effector y [m]")
+    plt.colorbar(label="Time [s]")
+    plt.tight_layout()
+    plt.show()
+    # plt.figure()
+    # plt.plot(chi_ee_ts[:, 0], chi_ee_ts[:, 1])
+    # plt.axis("equal")
+    # plt.grid(True)
+    # plt.xlabel("End-effector x [m]")
+    # plt.ylabel("End-effector y [m]")
+    # plt.tight_layout()
+    # plt.show()
 
     # plot the energy along the trajectory
     kinetic_energy_fn_vmapped = vmap(
