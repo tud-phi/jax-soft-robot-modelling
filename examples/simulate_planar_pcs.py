@@ -26,7 +26,11 @@ sym_exp_filepath = (
 
 # set parameters
 rho = 1070 * jnp.ones((num_segments,))  # Volumetric density of Dragon Skin 20 [kg/m^3]
-D = 5e-6 * jnp.diag(jnp.array([1e0, 1e3, 1e3]))  # Damping coefficient
+D = 1e-5 * jnp.diag(
+    jnp.repeat(
+        jnp.array([[1e0, 1e3, 1e3]]), num_segments, axis=0
+    ).flatten(),
+)
 params = {
     "th0": jnp.array(0.0),  # initial orientation angle [rad]
     "l": 1e-1 * jnp.ones((num_segments,)),
