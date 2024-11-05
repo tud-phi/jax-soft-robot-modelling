@@ -101,6 +101,8 @@ if __name__ == "__main__":
     strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
         planar_pcs.factory(sym_exp_filepath, strain_selector)
     )
+    # jit the functions
+    dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn, include_coriolis=True))
     batched_forward_kinematics = vmap(
         forward_kinematics_fn, in_axes=(None, None, 0), out_axes=-1
     )
@@ -241,3 +243,4 @@ if __name__ == "__main__":
         video.write(img)
 
     video.release()
+    print(f"Video saved at {video_path}")
