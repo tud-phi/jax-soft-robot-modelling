@@ -102,7 +102,7 @@ if __name__ == "__main__":
         planar_pcs.factory(sym_exp_filepath, strain_selector)
     )
     # jit the functions
-    dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn, include_coriolis=True))
+    dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn))
     batched_forward_kinematics = vmap(
         forward_kinematics_fn, in_axes=(None, None, 0), out_axes=-1
     )
