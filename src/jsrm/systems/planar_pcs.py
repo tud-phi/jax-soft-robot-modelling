@@ -4,7 +4,7 @@ from jax import numpy as jnp
 import numpy as onp
 import sympy as sp
 from pathlib import Path
-from typing import Callable, Dict, List, Tuple, Union
+from typing import Callable, Dict, List, Tuple, Union, Optional
 
 from .utils import (
     concatenate_params_syms,
@@ -17,7 +17,8 @@ from jsrm.math_utils import blk_diag
 def factory(
     filepath: Union[str, Path],
     strain_selector: Array = None,
-    xi_eq: Array = None,
+    xi_eq: Optional[Array] = None,
+    stiffness_fn: Optional[Callable] = None,
     global_eps: float = 1e-6,
 ) -> Tuple[
     Array,
@@ -35,6 +36,8 @@ def factory(
         strain_selector: array of shape (n_xi, ) with boolean values indicating which components of the
                 strain are active / non-zero
         xi_eq: array of shape (3 * num_segments) with the rest strains of the rod
+        stiffness_fn: function to compute the stiffness matrix of the system. Should have the signature
+            stiffness_fn(params: Dict[str, Array], formulate_in_strain_space: bool) -> Array
         global_eps: small number to avoid singularities (e.g., division by zero)
     Returns:
         B_xi: strain basis matrix of shape (3 * num_segments, n_q)
@@ -199,32 +202,33 @@ def factory(
 
         return segment_idx, s_segment
 
-    def stiffness_fn(
-        params: Dict[str, Array], formulate_in_strain_space: bool = False
-    ) -> Array:
-        """
-        Compute the stiffness matrix of the system.
-        Args:
-            params: Dictionary of robot parameters
+    if stiffness_fn is None:
+        def stiffness_fn(
+            params: Dict[str, Array], formulate_in_strain_space: bool = False
+        ) -> Array:
+            """
+            Compute the stiffness matrix of the system.
+            Args:
+                params: Dictionary of robot parameters
+                formulate_in_strain_space: whether to formulate the elastic matrix in the strain space
+            Returns:
+                K: elastic matrix of shape (n_q, n_q) if formulate_in_strain_space is False or (n_xi, n_xi) otherwise
+            """
+            # cross-sectional area and second moment of area
+            A = jnp.pi * params["r"] ** 2
+            Ib = A**2 / (4 * jnp.pi)
 
-        Returns:
-            K: elastic matrix of shape (n_q, n_q) if formulate_in_strain_space is False or (n_xi, n_xi) otherwise
-        """
-        # cross-sectional area and second moment of area
-        A = jnp.pi * params["r"] ** 2
-        Ib = A**2 / (4 * jnp.pi)
+            # elastic and shear modulus
+            E, G = params["E"], params["G"]
+            # stiffness matrix of shape (num_segments, 3, 3)
+            S = compute_stiffness_matrix_for_all_segments_fn(A, Ib, E, G)
+            # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
+            K = blk_diag(S)
 
-        # elastic and shear modulus
-        E, G = params["E"], params["G"]
-        # stiffness matrix of shape (num_segments, 3, 3)
-        S = compute_stiffness_matrix_for_all_segments_fn(A, Ib, E, G)
-        # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
-        K = blk_diag(S)
+            if not formulate_in_strain_space:
+                K = B_xi.T @ K @ B_xi
 
-        if not formulate_in_strain_space:
-            K = B_xi.T @ K @ B_xi
-
-        return K
+            return K
 
     @jit
     def forward_kinematics_fn(
