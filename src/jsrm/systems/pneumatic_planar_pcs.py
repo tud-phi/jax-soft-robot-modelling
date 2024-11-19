@@ -8,10 +8,60 @@ from typing import Dict, Tuple, Union
 from .planar_pcs import factory as planar_pcs_factory
 
 def factory(
-    *args, **kwargs
+    num_segments: int,
+    *args,
+    segment_actuation_selector: Optional[Array] = None,
+    **kwargs
 ):
+    """
+    Factory function for the planar PCS.
+    Args:
+        segment_actuation_selector: actuation selector for the segments as boolean array of shape (num_segments,)
+            True entries signify that the segment is actuated, False entries signify that the segment is passive
+    Returns:
+    """
+    if segment_actuation_selector is None:
+        segment_actuation_selector = jnp.ones(num_segments, dtype=bool)
+
+    # number of input pressures
+    actuation_dim = segment_actuation_selector.sum() * 2
+
+    # matrix that maps the (possibly) underactuated actuation space to a full actuation space
+    actuation_basis = jnp.eye(num_segments)[segment_actuation_selector]
+
+    def actuation_mapping_fn(
+        params: Dict[str, Array],
+        B_xi: Array,
+        q: Array,
+    ) -> Array:
+        """
+        Returns the actuation matrix that maps the actuation space to the configuration space.
+        Args:
+            params: dictionary with robot parameters
+            B_xi: strain basis matrix
+            q: configuration of the robot
+        Returns:
+            A: actuation matrix of shape (n_xi, n_act) where n_xi is the number of strains and
+                n_act is the number of actuators
+        """
+        # map the configurations to strains
+        xi = B_xi @ q
+
+        # number of strains
+        n_xi = xi.shape[0]
+
+        for i in range(num_segments):
+            pass
+
+        A = jnp.zeros((n_xi, 2 * num_segments))
+
+        # apply the actuation_basis
+        A = A @ actuation_basis
+
+        return A
+
     return planar_pcs_factory(
-        *args, stiffness_fn=stiffness_fn, **kwargs
+        *args, stiffness_fn=stiffness_fn, actuation_mapping_fn=actuation_mapping_fn, **kwargs
     )
 
 def _compute_stiffness_matrix_for_segment(
