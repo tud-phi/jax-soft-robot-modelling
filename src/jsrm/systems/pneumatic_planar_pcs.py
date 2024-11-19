@@ -3,7 +3,7 @@ from jax import Array, vmap
 import jax.numpy as jnp
 from jsrm.math_utils import blk_diag
 import numpy as onp
-from typing import Dict, Optional, Tuple, Union
+from typing import Callable, Dict, Optional, Tuple, Union
 
 from .planar_pcs import factory as planar_pcs_factory
 
@@ -37,6 +37,8 @@ def factory(
             actuation_basis = actuation_basis.at[2 * i + 1, j + 1].set(1.0)
 
     def actuation_mapping_fn(
+        forward_kinematics_fn: Callable,
+        jacobian_fn: Callable,
         params: Dict[str, Array],
         B_xi: Array,
         q: Array,
@@ -44,6 +46,8 @@ def factory(
         """
         Returns the actuation matrix that maps the actuation space to the configuration space.
         Args:
+            forward_kinematics_fn: function to compute the forward kinematics
+            jacobian_fn: function to compute the Jacobian
             params: dictionary with robot parameters
             B_xi: strain basis matrix
             q: configuration of the robot
@@ -57,8 +61,32 @@ def factory(
         # number of strains
         n_xi = xi.shape[0]
 
-        for i in range(num_segments):
-            pass
+        # all segment bases and tips
+        sms = jnp.concat([jnp.zeros((1,)), jnp.cumsum(params["l"])], axis=0)
+        print("sms =\n", sms)
+
+        # compute the poses of all segment tips
+        chi_sms = vmap(forward_kinematics_fn, in_axes=(None, None, 0))(params, q, sms)
+
+        # compute the Jacobian for all segment tips
+        J_sms = vmap(jacobian_fn, in_axes=(None, None, 0))(params, q, sms)
+
+        def compute_actuation_matrix_for_segment(
+            chi_sm: Array, J_sm: Array, xi: Array
+        ) -> Array:
+            """
+            Compute the actuation matrix for a single segment.
+            Args:
+                chi_sm: tip position of the segment
+                J_sm: Jacobian of the segment
+                xi: strains of the segment
+            Returns:
+                A_sm: actuation matrix of shape (n_xi, 2)
+            """
+            # compute the actuation matrix for a single segment
+            A_sm = jnp.zeros((n_xi, 2))
+            return A_sm
+
 
         A = jnp.zeros((n_xi, 2 * num_segments))
 
