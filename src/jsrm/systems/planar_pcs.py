@@ -19,6 +19,7 @@ def factory(
     strain_selector: Array = None,
     xi_eq: Optional[Array] = None,
     stiffness_fn: Optional[Callable] = None,
+    actuation_mapping_fn: Optional[Callable] = None,
     global_eps: float = 1e-6,
 ) -> Tuple[
     Array,
@@ -38,6 +39,8 @@ def factory(
         xi_eq: array of shape (3 * num_segments) with the rest strains of the rod
         stiffness_fn: function to compute the stiffness matrix of the system. Should have the signature
             stiffness_fn(params: Dict[str, Array], B_xi, formulate_in_strain_space: bool) -> Array
+        actuation_mapping_fn: function to compute the actuation matrix that maps the actuation space to the
+            configuration space.
         global_eps: small number to avoid singularities (e.g., division by zero)
     Returns:
         B_xi: strain basis matrix of shape (3 * num_segments, n_q)
@@ -233,6 +236,26 @@ def factory(
 
             return K
 
+    if actuation_mapping_fn is None:
+        def actuation_mapping_fn(
+            params: Dict[str, Array],
+            B_xi: Array,
+            q: Array,
+        ) -> Array:
+            """
+            Returns the actuation matrix that maps the actuation space to the configuration space.
+            Assumes the fully actuated and identity actuation matrix.
+            Args:
+                params: dictionary with robot parameters
+                B_xi: strain basis matrix
+                q: configuration of the robot
+            Returns:
+                A: actuation matrix of shape (n_xi, n_xi) where n_xi is the number of strains.
+            """
+            A = jnp.identity(n_xi) @ B_xi
+
+            return A
+
     @jit
     def forward_kinematics_fn(
         params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
@@ -331,6 +354,8 @@ def factory(
 
         # compute the stiffness matrix
         K = stiffness_fn(params, B_xi, formulate_in_strain_space=True)
+        # compute the actuation matrix
+        A = actuation_mapping_fn(params, B_xi, q)
 
         # dissipative matrix from the parameters
         D = params.get("D", jnp.zeros((n_xi, n_xi)))
@@ -347,7 +372,7 @@ def factory(
         D = B_xi.T @ D @ B_xi
 
         # apply the strain basis to the actuation matrix
-        alpha = B_xi.T @ jnp.identity(n_xi) @ B_xi
+        alpha = B_xi.T @ A
 
         return B, C, G, K, D, alpha
 
@@ -500,6 +525,7 @@ def factory(
         "apply_eps_to_bend_strains": apply_eps_to_bend_strains,
         "classify_segment": classify_segment,
         "stiffness_fn": stiffness_fn,
+        "actuation_mapping_fn": actuation_mapping_fn,
         "jacobian_fn": jacobian_fn,
         "kinetic_energy_fn": kinetic_energy_fn,
         "potential_energy_fn": potential_energy_fn,
