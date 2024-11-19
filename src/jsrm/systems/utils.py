@@ -121,6 +121,6 @@ def compute_planar_stiffness_matrix(l: Array, A: Array, Ib: Array, E: Array, G: 
     Returns:
         S: stiffness matrix of shape (3, 3)
     """
-    S = l* jnp.diag(jnp.stack([Ib * E, 4 / 3 * A * G, A * E], axis=0))
+    S = l * jnp.diag(jnp.stack([Ib * E, 4 / 3 * A * G, A * E], axis=0))
 
     return S

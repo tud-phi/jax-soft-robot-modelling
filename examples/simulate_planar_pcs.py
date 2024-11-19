@@ -162,7 +162,7 @@ if __name__ == "__main__":
         )
         plt.plot(
             video_ts, q_ts[:, 3 * segment_idx + 2],
-            label=r"$\sigma_\mathrm{el," + str(segment_idx + 1) + "}$ [-]"
+            label=r"$\sigma_\mathrm{ax," + str(segment_idx + 1) + "}$ [-]"
         )
     plt.xlabel("Time [s]")
     plt.ylabel("Configuration")
