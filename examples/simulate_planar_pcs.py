@@ -26,21 +26,20 @@ sym_exp_filepath = (
 
 # set parameters
 rho = 1070 * jnp.ones((num_segments,))  # Volumetric density of Dragon Skin 20 [kg/m^3]
-D = 1e-4 * jnp.diag(
-    jnp.repeat(
-        jnp.array([[1e0, 1e3, 1e3]]), num_segments, axis=0
-    ).flatten(),
-)
 params = {
     "th0": jnp.array(0.0),  # initial orientation angle [rad]
     "l": 1e-1 * jnp.ones((num_segments,)),
     "r": 2e-2 * jnp.ones((num_segments,)),
     "rho": rho,
     "g": jnp.array([0.0, 9.81]),
-    "E": 2e2 * jnp.ones((num_segments,)),  # Elastic modulus [Pa]
-    "G": 1e2 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
-    "D": D,
+    "E": 2e3 * jnp.ones((num_segments,)),  # Elastic modulus [Pa]
+    "G": 1e3 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
 }
+params["D"] = 1e-3 * jnp.diag(
+    jnp.repeat(
+        jnp.array([[1e0, 1e3, 1e3]]), num_segments, axis=0
+    ).flatten(),
+) * params["l"]
 
 # activate all strains (i.e. bending, shear, and axial)
 strain_selector = jnp.ones((3 * num_segments,), dtype=bool)

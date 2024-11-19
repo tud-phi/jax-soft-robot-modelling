@@ -141,7 +141,7 @@ def factory(
     )
 
     compute_stiffness_matrix_for_all_segments_fn = vmap(
-        compute_planar_stiffness_matrix, in_axes=(0, 0, 0, 0), out_axes=0
+        compute_planar_stiffness_matrix
     )
 
     @jit
@@ -214,6 +214,8 @@ def factory(
             Returns:
                 K: elastic matrix of shape (n_q, n_q) if formulate_in_strain_space is False or (n_xi, n_xi) otherwise
             """
+            # length of the segments
+            l = params["l"]
             # cross-sectional area and second moment of area
             A = jnp.pi * params["r"] ** 2
             Ib = A**2 / (4 * jnp.pi)
@@ -221,7 +223,7 @@ def factory(
             # elastic and shear modulus
             E, G = params["E"], params["G"]
             # stiffness matrix of shape (num_segments, 3, 3)
-            S = compute_stiffness_matrix_for_all_segments_fn(A, Ib, E, G)
+            S = compute_stiffness_matrix_for_all_segments_fn(l, A, Ib, E, G)
             # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
             K = blk_diag(S)
 

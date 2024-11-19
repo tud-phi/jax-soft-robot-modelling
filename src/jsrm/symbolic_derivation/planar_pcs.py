@@ -79,7 +79,7 @@ def symbolically_derive_planar_pcs_model(
         kappa = xi[3 * i]
         # shear strain
         sigma_x = xi[3 * i + 1]
-        # elongation strain
+        # axial strain
         sigma_y = xi[3 * i + 2]
 
         # compute the cross-sectional area of the rod

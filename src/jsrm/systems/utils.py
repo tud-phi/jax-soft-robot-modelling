@@ -108,10 +108,11 @@ def compute_strain_basis(
 
 
 @jit
-def compute_planar_stiffness_matrix(A: Array, Ib: Array, E: Array, G: Array) -> Array:
+def compute_planar_stiffness_matrix(l: Array, A: Array, Ib: Array, E: Array, G: Array) -> Array:
     """
     Compute the stiffness matrix of the system.
     Args:
+        l: length of the segment of shape ()
         A: cross-sectional area of shape ()
         Ib: second moment of area of shape ()
         E: Elastic modulus of shape ()
@@ -120,6 +121,6 @@ def compute_planar_stiffness_matrix(A: Array, Ib: Array, E: Array, G: Array) -> 
     Returns:
         S: stiffness matrix of shape (3, 3)
     """
-    S = jnp.diag(jnp.stack([Ib * E, 4 / 3 * A * G, A * E], axis=0))
+    S = l* jnp.diag(jnp.stack([Ib * E, 4 / 3 * A * G, A * E], axis=0))
 
     return S

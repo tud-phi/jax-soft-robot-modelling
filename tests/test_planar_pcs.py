@@ -21,8 +21,8 @@ def test_planar_pcs_one_segment():
         "r": jnp.array([2e-2]),
         "rho": 1000 * jnp.ones((1,)),
         "g": jnp.array([0.0, -9.81]),
-        "E": 1e7 * jnp.ones((1,)),  # Elastic modulus [Pa]
-        "G": 1e6 * jnp.ones((1,)),  # Shear modulus [Pa]
+        "E": 1e8 * jnp.ones((1,)),  # Elastic modulus [Pa]
+        "G": 1e7 * jnp.ones((1,)),  # Shear modulus [Pa]
     }
     # activate all strains (i.e. bending, shear, and axial)
     strain_selector = jnp.ones((3,), dtype=bool)
