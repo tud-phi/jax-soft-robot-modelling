@@ -36,10 +36,10 @@ params = {
     "G": 1e3 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
 }
 params["D"] = 1e-3 * jnp.diag(
-    jnp.repeat(
+    (jnp.repeat(
         jnp.array([[1e0, 1e3, 1e3]]), num_segments, axis=0
-    ).flatten(),
-) * params["l"]
+    ) * params["l"][:, None]).flatten()
+)
 
 # activate all strains (i.e. bending, shear, and axial)
 strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
