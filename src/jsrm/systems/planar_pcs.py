@@ -409,7 +409,7 @@ def factory(
         Returns:
             E: total energy of shape ()
         """
-        T = kinetic_energy_fn(params, q_d)
+        T = kinetic_energy_fn(params, q, q_d)
         U = potential_energy_fn(params, q)
         E = T + U
 
