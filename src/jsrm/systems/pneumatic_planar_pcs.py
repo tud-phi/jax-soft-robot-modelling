@@ -72,21 +72,35 @@ def factory(
         J_sms = vmap(jacobian_fn, in_axes=(None, None, 0))(params, q, sms)
 
         def compute_actuation_matrix_for_segment(
-            chi_sm: Array, J_sm: Array, xi: Array
+            r_cham_in: Array, r_cham_out: Array, varphi_cham: Array,
+            chi_pe: Array, chi_de: Array,
+            J_pe: Array, J_de: Array, xi: Array
         ) -> Array:
             """
             Compute the actuation matrix for a single segment.
             Args:
-                chi_sm: tip position of the segment
-                J_sm: Jacobian of the segment
+                r_cham_in: inner radius of each segment chamber
+                r_cham_out: outer radius of each segment chamber
+                varphi_cham: sector angle of each segment chamber
+                chi_pe: pose of the proximal end (i.e., the base) of the segment as array of shape (3,)
+                chi_de: pose of the distal end (i.e., the tip) of the segment as array of shape (3,)
+                J_pe: Jacobian of the proximal end of the segment as array of shape (3, n_q)
+                J_de: Jacobian of the distal end of the segment as array of shape (3, n_q)
                 xi: strains of the segment
             Returns:
                 A_sm: actuation matrix of shape (n_xi, 2)
             """
+            # rotation matrix from the robot base to the segment base
+            R_pe = jnp.array([[jnp.cos(chi_pe[2]), -jnp.sin(chi_pe[2])], [jnp.sin(chi_pe[2]), jnp.cos(chi_pe[2])]])
+            # rotation matrix from the robot base to the segment tip
+            R_de = jnp.array([[jnp.cos(chi_de[2]), -jnp.sin(chi_de[2])], [jnp.sin(chi_de[2]), jnp.cos(chi_de[2])]])
+
+
             # compute the actuation matrix for a single segment
             A_sm = jnp.zeros((n_xi, 2))
             return A_sm
 
+        A_sms = vmap(compute_actuation_matrix_for_segment)(chi_sms, J_sms, xi)
 
         A = jnp.zeros((n_xi, 2 * num_segments))
 
