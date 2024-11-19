@@ -3,7 +3,7 @@ from jax import Array, vmap
 import jax.numpy as jnp
 from jsrm.math_utils import blk_diag
 import numpy as onp
-from typing import Dict, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
 from .planar_pcs import factory as planar_pcs_factory
 
@@ -16,6 +16,7 @@ def factory(
     """
     Factory function for the planar PCS.
     Args:
+        num_segments: number of segments
         segment_actuation_selector: actuation selector for the segments as boolean array of shape (num_segments,)
             True entries signify that the segment is actuated, False entries signify that the segment is passive
     Returns:
@@ -27,7 +28,13 @@ def factory(
     actuation_dim = segment_actuation_selector.sum() * 2
 
     # matrix that maps the (possibly) underactuated actuation space to a full actuation space
-    actuation_basis = jnp.eye(num_segments)[segment_actuation_selector]
+    actuation_basis = jnp.zeros((2 * num_segments, actuation_dim))
+    actuation_basis_cumsum = jnp.cumsum(segment_actuation_selector)
+    for i in range(num_segments):
+        j = int(actuation_basis_cumsum[i].item()) - 1
+        if segment_actuation_selector[i].item() is True:
+            actuation_basis = actuation_basis.at[2 * i, j].set(1.0)
+            actuation_basis = actuation_basis.at[2 * i + 1, j + 1].set(1.0)
 
     def actuation_mapping_fn(
         params: Dict[str, Array],

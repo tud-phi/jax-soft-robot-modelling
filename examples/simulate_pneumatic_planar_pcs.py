@@ -47,6 +47,18 @@ params["D"] = 1e-3 * jnp.diag(
 # strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
 strain_selector = jnp.array([True, False, True])[None, :].repeat(num_segments, axis=0).flatten()
 
+B_xi, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
+    pneumatic_planar_pcs.factory(num_segments, sym_exp_filepath, strain_selector)
+)
+# jit the functions
+dynamical_matrices_fn = jax.jit(dynamical_matrices_fn)
+actuation_mapping_fn = auxiliary_fns["actuation_mapping_fn"]
+
+def sweep_actuation_mapping():
+    q = jnp.zeros((2 * num_segments,))
+    A = actuation_mapping_fn(params, B_xi, q)
+    print("A =\n", A)
+
 
 def simulate_robot():
     # define initial configuration
@@ -58,12 +70,6 @@ def simulate_robot():
     dt = 1e-3  # time step
     sim_dt = 5e-5  # simulation time step
     ts = jnp.arange(0.0, 2, dt)  # time steps
-
-    strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-        pneumatic_planar_pcs.factory(sym_exp_filepath, strain_selector)
-    )
-    # jit the functions
-    dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn))
 
     x0 = jnp.concatenate([q0, jnp.zeros_like(q0)])  # initial condition
     tau = jnp.zeros_like(q0)  # torques
@@ -160,4 +166,5 @@ def simulate_robot():
     plt.show()
 
 if __name__ == "__main__":
+    sweep_actuation_mapping()
     simulate_robot()
