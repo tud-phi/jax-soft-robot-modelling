@@ -256,7 +256,7 @@ def factory(
             Returns:
                 A: actuation matrix of shape (n_xi, n_xi) where n_xi is the number of strains.
             """
-            A = jnp.identity(n_xi) @ B_xi
+            A = B_xi.T @ jnp.identity(n_xi) @ B_xi
 
             return A
 
@@ -359,7 +359,7 @@ def factory(
         # compute the stiffness matrix
         K = stiffness_fn(params, B_xi, formulate_in_strain_space=True)
         # compute the actuation matrix
-        A = actuation_mapping_fn(forward_kinematics_fn, actuation_mapping_fn, params, B_xi, q)
+        A = actuation_mapping_fn(forward_kinematics_fn, jacobian_fn, params, B_xi, q)
 
         # dissipative matrix from the parameters
         D = params.get("D", jnp.zeros((n_xi, n_xi)))
@@ -376,7 +376,7 @@ def factory(
         D = B_xi.T @ D @ B_xi
 
         # apply the strain basis to the actuation matrix
-        alpha = B_xi.T @ A
+        alpha = A
 
         return B, C, G, K, D, alpha
 

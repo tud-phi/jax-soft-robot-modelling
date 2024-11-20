@@ -37,7 +37,7 @@ params = {
     "r_cham_out": 2e-2 - 2e-3 * jnp.ones((num_segments,)),
     "varphi_cham": jnp.pi/2 * jnp.ones((num_segments,)),
 }
-params["D"] = 1e-3 * jnp.diag(
+params["D"] = 5e-4 * jnp.diag(
     (jnp.repeat(
         jnp.array([[1e0, 1e3, 1e3]]), num_segments, axis=0
     ) * params["l"][:, None]).flatten()
@@ -52,29 +52,88 @@ B_xi, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
 )
 # jit the functions
 dynamical_matrices_fn = jax.jit(dynamical_matrices_fn)
-actuation_mapping_fn = auxiliary_fns["actuation_mapping_fn"]
+actuation_mapping_fn = partial(
+    auxiliary_fns["actuation_mapping_fn"],
+    forward_kinematics_fn,
+    auxiliary_fns["jacobian_fn"],
+)
 
 def sweep_actuation_mapping():
+    # evaluate the actuation matrix for a straight backbone
     q = jnp.zeros((2 * num_segments,))
     A = actuation_mapping_fn(params, B_xi, q)
-    print("A =\n", A)
+    print("Evaluating actuation matrix for straight backbone: A =\n", A)
+
+    kappa_be_pts = jnp.linspace(-jnp.pi, jnp.pi, 500)
+    sigma_ax_pts = jnp.zeros_like(kappa_be_pts)
+    q_pts = jnp.stack([kappa_be_pts, sigma_ax_pts], axis=-1)
+    A_pts = vmap(actuation_mapping_fn, in_axes=(None, None, 0))(params, B_xi, q_pts)
+    # plot the mapping on the bending strain for various bending strains
+    fig, ax = plt.subplots(num="pneumatic_planar_pcs_actuation_mapping_bending_torque_vs_bending_strain")
+    plt.title(r"Actuation mapping from $u_1$ to $\tau_\mathrm{be}$")
+    ax.plot(kappa_be_pts, A_pts[:, 0, 0], linewidth=2)
+    # shade the region where the actuation mapping is negative as we are not able to bend the robot further
+    ax.axhspan(A_pts[:, 0, 0].min(), 0.0, facecolor='red', alpha=0.5)
+    ax.set_xlabel(r"$\kappa_\mathrm{be}$ [rad/m]")
+    ax.set_ylabel(r"$\frac{\partial \tau_\mathrm{be}}{\partial u_1}$")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    # create grid for bending and axial strains
+    kappa_be_grid, sigma_ax_grid = jnp.meshgrid(
+        jnp.linspace(-jnp.pi, jnp.pi, 20),
+        jnp.linspace(-0.2, 0.2, 20),
+    )
+    q_pts = jnp.stack([kappa_be_grid.flatten(), sigma_ax_grid.flatten()], axis=-1)
+
+    # evaluate the actuation mapping on the grid
+    A_pts = vmap(actuation_mapping_fn, in_axes=(None, None, 0))(params, B_xi, q_pts)
+    # reshape A_pts to match the grid shape
+    A_grid = A_pts.reshape(kappa_be_grid.shape[:2] + A_pts.shape[-2:])
+
+    # plot the mapping on the bending strain
+    fig, ax = plt.subplots(num="pneumatic_planar_pcs_actuation_mapping_bending_torque_vs_axial_vs_bending_strain")
+    plt.title(r"Actuation mapping from $u_1$ to $\tau_\mathrm{be}$")
+    # contourf plot
+    c = ax.contourf(kappa_be_grid, sigma_ax_grid, A_grid[..., 0, 0], levels=100)
+    fig.colorbar(c, ax=ax, label=r"$\frac{\partial \tau_\mathrm{be}}{\partial u_1}$")
+    # contour plot
+    ax.contour(kappa_be_grid, sigma_ax_grid, A_grid[..., 0, 0], levels=20, colors="k", linewidths=0.5)
+    ax.set_xlabel(r"$\kappa_\mathrm{be}$ [rad/m]")
+    ax.set_ylabel(r"$\sigma_\mathrm{ax}$ [-]")
+    plt.tight_layout()
+    plt.show()
+
+    # plot the mapping on the axial strain
+    fig, ax = plt.subplots(num="pneumatic_planar_pcs_actuation_mapping_axial_torque_vs_axial_vs_bending_strain")
+    plt.title(r"Actuation mapping from $u_1$ to $\tau_\mathrm{ax}$")
+    # contourf plot
+    c = ax.contourf(kappa_be_grid, sigma_ax_grid, A_grid[..., 1, 0], levels=100)
+    fig.colorbar(c, ax=ax, label=r"$\frac{\partial \tau_\mathrm{ax}}{\partial u_1}$")
+    # contour plot
+    ax.contour(kappa_be_grid, sigma_ax_grid, A_grid[..., 1, 0], levels=20, colors="k", linewidths=0.5)
+    ax.set_xlabel(r"$\kappa_\mathrm{be}$ [rad/m]")
+    ax.set_ylabel(r"$\sigma_\mathrm{ax}$ [-]")
+    plt.tight_layout()
+    plt.show()
 
 
 def simulate_robot():
     # define initial configuration
-    q0 = jnp.repeat(jnp.array([5.0 * jnp.pi, 0.2])[None, :], num_segments, axis=0).flatten()
+    q0 = jnp.repeat(jnp.array([-5.0 * jnp.pi, -0.2])[None, :], num_segments, axis=0).flatten()
     # number of generalized coordinates
     n_q = q0.shape[0]
 
     # set simulation parameters
     dt = 1e-3  # time step
     sim_dt = 5e-5  # simulation time step
-    ts = jnp.arange(0.0, 2, dt)  # time steps
+    ts = jnp.arange(0.0, 7.0, dt)  # time steps
 
     x0 = jnp.concatenate([q0, jnp.zeros_like(q0)])  # initial condition
-    tau = jnp.zeros_like(q0)  # torques
+    u = jnp.array([1.2e3, 0e0])  # control inputs (pressures in the right and left chambers)
 
-    ode_fn = ode_factory(dynamical_matrices_fn, params, tau)
+    ode_fn = ode_factory(dynamical_matrices_fn, params, u)
     term = ODETerm(ode_fn)
 
     sol = diffeqsolve(

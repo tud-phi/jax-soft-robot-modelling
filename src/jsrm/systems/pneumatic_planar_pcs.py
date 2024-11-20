@@ -55,15 +55,8 @@ def factory(
             A: actuation matrix of shape (n_xi, n_act) where n_xi is the number of strains and
                 n_act is the number of actuators
         """
-        # map the configurations to strains
-        xi = B_xi @ q
-
-        # number of strains
-        n_xi = xi.shape[0]
-
         # all segment bases and tips
         sms = jnp.concat([jnp.zeros((1,)), jnp.cumsum(params["l"])], axis=0)
-        print("sms =\n", sms)
 
         # compute the poses of all segment tips
         chi_sms = vmap(forward_kinematics_fn, in_axes=(None, None, 0))(params, q, sms)
@@ -74,10 +67,20 @@ def factory(
         def compute_actuation_matrix_for_segment(
             r_cham_in: Array, r_cham_out: Array, varphi_cham: Array,
             chi_pe: Array, chi_de: Array,
-            J_pe: Array, J_de: Array, xi: Array
+            J_pe: Array, J_de: Array,
         ) -> Array:
             """
             Compute the actuation matrix for a single segment.
+            We assume that each segment contains four identical and symmetric pneumatic chambers with pressures
+            p1, p2, p3, and p4, where p1 and p3 are the right and left chamber pressures respectively, and
+            p2 and p4 are the back and front chamber pressures respectively. The front and back chambers
+            do not exert a level arm (i.e., a bending moment) on the segment.
+            We map the control inputs u1 and u2 as follows to the pressures:
+                p1 = u1 (right chamber)
+                p2 = (u1 + u2) / 2
+                p3 = u2 (left chamber)
+                p4 = (u1 + u2) / 2
+
             Args:
                 r_cham_in: inner radius of each segment chamber
                 r_cham_out: outer radius of each segment chamber
@@ -86,23 +89,45 @@ def factory(
                 chi_de: pose of the distal end (i.e., the tip) of the segment as array of shape (3,)
                 J_pe: Jacobian of the proximal end of the segment as array of shape (3, n_q)
                 J_de: Jacobian of the distal end of the segment as array of shape (3, n_q)
-                xi: strains of the segment
             Returns:
                 A_sm: actuation matrix of shape (n_xi, 2)
             """
-            # rotation matrix from the robot base to the segment base
-            R_pe = jnp.array([[jnp.cos(chi_pe[2]), -jnp.sin(chi_pe[2])], [jnp.sin(chi_pe[2]), jnp.cos(chi_pe[2])]])
-            # rotation matrix from the robot base to the segment tip
-            R_de = jnp.array([[jnp.cos(chi_de[2]), -jnp.sin(chi_de[2])], [jnp.sin(chi_de[2]), jnp.cos(chi_de[2])]])
+            # orientation of the proximal and distal ends of the segment
+            th_pe, th_de = chi_pe[2], chi_de[2]
 
+            # compute the area of each pneumatic chamber (we assume identical chambers within a segment)
+            A_cham = 0.5 * varphi_cham * (r_cham_out ** 2 - r_cham_in ** 2)
+            # compute the center of pressure of the pneumatic chamber
+            r_cop = (
+                2 / 3 * jnp.sinc(0.5 * varphi_cham) * (r_cham_out ** 3 - r_cham_in ** 3) / (r_cham_out ** 2 - r_cham_in ** 2)
+            )
 
-            # compute the actuation matrix for a single segment
-            A_sm = jnp.zeros((n_xi, 2))
+            # compute the actuation matrix that collects the contributions of the pneumatic chambers in the given segment
+            # first we consider the contribution of the distal end
+            A_sm_de = J_de.T @ jnp.array([
+                [-2 * A_cham * jnp.sin(th_de), -2 * A_cham * jnp.sin(th_de)],
+                [2 * A_cham * jnp.cos(th_de), 2 * A_cham * jnp.cos(th_de)],
+                [A_cham * r_cop, -A_cham * r_cop]
+            ])
+            # then, we consider the contribution of the proximal end
+            A_sm_pe = J_pe.T @ jnp.array([
+                [2 * A_cham * jnp.sin(th_pe), 2 * A_cham * jnp.sin(th_pe)],
+                [-2 * A_cham * jnp.cos(th_pe), -2 * A_cham * jnp.cos(th_pe)],
+                [-A_cham * r_cop, A_cham * r_cop]
+            ])
+
+            # sum the contributions of the distal and proximal ends
+            A_sm = A_sm_de + A_sm_pe
+
             return A_sm
 
-        A_sms = vmap(compute_actuation_matrix_for_segment)(chi_sms, J_sms, xi)
-
-        A = jnp.zeros((n_xi, 2 * num_segments))
+        A_sms = vmap(compute_actuation_matrix_for_segment)(
+            params["r_cham_in"], params["r_cham_out"], params["varphi_cham"],
+            chi_pe=chi_sms[:-1], chi_de=chi_sms[1:],
+            J_pe=J_sms[:-1], J_de=J_sms[1:],
+        )
+        # we need to sum the contributions of the actuation of each segment
+        A = jnp.sum(A_sms, axis=0)
 
         # apply the actuation_basis
         A = A @ actuation_basis
