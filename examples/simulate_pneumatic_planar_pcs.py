@@ -99,15 +99,21 @@ def sweep_actuation_mapping():
     A = actuation_mapping_fn(params, B_xi, q)
     print("Evaluating actuation matrix for straight backbone: A =\n", A)
 
-    kappa_be_pts = jnp.linspace(-jnp.pi, jnp.pi, 500)
+    kappa_be_pts = jnp.linspace(-3*jnp.pi, 3*jnp.pi, 500)
     sigma_ax_pts = jnp.zeros_like(kappa_be_pts)
     q_pts = jnp.stack([kappa_be_pts, sigma_ax_pts], axis=-1)
     A_pts = vmap(actuation_mapping_fn, in_axes=(None, None, 0))(params, B_xi, q_pts)
+    # mark the points that are not controllable as the u1 and u2 terms share the same sign
+    non_controllable_selector = A_pts[..., 0, 0] * A_pts[..., 0, 1] >= 0.0
+    non_controllable_indices = jnp.where(non_controllable_selector)[0]
+    non_controllable_boundary_indices = jnp.where(non_controllable_selector[:-1] != non_controllable_selector[1:])[0]
     # plot the mapping on the bending strain for various bending strains
     fig, ax = plt.subplots(num="pneumatic_planar_pcs_actuation_mapping_bending_torque_vs_bending_strain")
     plt.title(r"Actuation mapping from $u$ to $\tau_\mathrm{be}$")
-    # shade the region where the actuation mapping is negative as we are not able to bend the robot further
-    ax.axhspan(A_pts[:, 0, 0:2].min(), 0.0, facecolor='red', alpha=0.2)
+    # # shade the region where the actuation mapping is negative as we are not able to bend the robot further
+    # ax.axhspan(A_pts[:, 0, 0:2].min(), 0.0, facecolor='red', alpha=0.2)
+    for idx in non_controllable_indices:
+        ax.axvspan(kappa_be_pts[idx], kappa_be_pts[idx+1], facecolor='red', alpha=0.2)
     ax.plot(kappa_be_pts, A_pts[:, 0, 0], linewidth=2, label=r"$\frac{\partial \tau_\mathrm{be}}{\partial u_1}$")
     ax.plot(kappa_be_pts, A_pts[:, 0, 1], linewidth=2, label=r"$\frac{\partial \tau_\mathrm{ax}}{\partial u_2}$")
     ax.set_xlabel(r"$\kappa_\mathrm{be}$ [rad/m]")
