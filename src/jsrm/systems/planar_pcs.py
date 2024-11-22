@@ -19,6 +19,7 @@ def factory(
     strain_selector: Array = None,
     xi_eq: Optional[Array] = None,
     stiffness_fn: Optional[Callable] = None,
+    actuation_mapping_fn: Optional[Callable] = None,
     global_eps: float = 1e-6,
 ) -> Tuple[
     Array,
@@ -37,7 +38,9 @@ def factory(
                 strain are active / non-zero
         xi_eq: array of shape (3 * num_segments) with the rest strains of the rod
         stiffness_fn: function to compute the stiffness matrix of the system. Should have the signature
-            stiffness_fn(params: Dict[str, Array], formulate_in_strain_space: bool) -> Array
+            stiffness_fn(params: Dict[str, Array], B_xi, formulate_in_strain_space: bool) -> Array
+        actuation_mapping_fn: function to compute the actuation matrix that maps the actuation space to the
+            configuration space.
         global_eps: small number to avoid singularities (e.g., division by zero)
     Returns:
         B_xi: strain basis matrix of shape (3 * num_segments, n_q)
@@ -204,12 +207,13 @@ def factory(
 
     if stiffness_fn is None:
         def stiffness_fn(
-            params: Dict[str, Array], formulate_in_strain_space: bool = False
+            params: Dict[str, Array], B_xi: Array, formulate_in_strain_space: bool = False
         ) -> Array:
             """
             Compute the stiffness matrix of the system.
             Args:
                 params: Dictionary of robot parameters
+                B_xi: Strain basis matrix
                 formulate_in_strain_space: whether to formulate the elastic matrix in the strain space
             Returns:
                 K: elastic matrix of shape (n_q, n_q) if formulate_in_strain_space is False or (n_xi, n_xi) otherwise
@@ -231,6 +235,30 @@ def factory(
                 K = B_xi.T @ K @ B_xi
 
             return K
+
+    if actuation_mapping_fn is None:
+        def actuation_mapping_fn(
+            forward_kinematics_fn: Callable,
+            jacobian_fn: Callable,
+            params: Dict[str, Array],
+            B_xi: Array,
+            q: Array,
+        ) -> Array:
+            """
+            Returns the actuation matrix that maps the actuation space to the configuration space.
+            Assumes the fully actuated and identity actuation matrix.
+            Args:
+                forward_kinematics_fn: function to compute the forward kinematics
+                jacobian_fn: function to compute the Jacobian
+                params: dictionary with robot parameters
+                B_xi: strain basis matrix
+                q: configuration of the robot
+            Returns:
+                A: actuation matrix of shape (n_xi, n_xi) where n_xi is the number of strains.
+            """
+            A = B_xi.T @ jnp.identity(n_xi) @ B_xi
+
+            return A
 
     @jit
     def forward_kinematics_fn(
@@ -329,7 +357,9 @@ def factory(
         xi_epsed = apply_eps_to_bend_strains(xi, eps)
 
         # compute the stiffness matrix
-        K = stiffness_fn(params, formulate_in_strain_space=True)
+        K = stiffness_fn(params, B_xi, formulate_in_strain_space=True)
+        # compute the actuation matrix
+        A = actuation_mapping_fn(forward_kinematics_fn, jacobian_fn, params, B_xi, q)
 
         # dissipative matrix from the parameters
         D = params.get("D", jnp.zeros((n_xi, n_xi)))
@@ -346,7 +376,7 @@ def factory(
         D = B_xi.T @ D @ B_xi
 
         # apply the strain basis to the actuation matrix
-        alpha = B_xi.T @ jnp.identity(n_xi) @ B_xi
+        alpha = A
 
         return B, C, G, K, D, alpha
 
@@ -385,7 +415,7 @@ def factory(
         xi_epsed = apply_eps_to_bend_strains(xi, eps)
 
         # compute the stiffness matrix
-        K = stiffness_fn(params, formulate_in_strain_space=True)
+        K = stiffness_fn(params, B_xi, formulate_in_strain_space=True)
         # elastic energy
         U_K = (xi - xi_eq).T @ K @ (xi - xi_eq)  # evaluate K(xi) = K @ xi
 
@@ -408,7 +438,7 @@ def factory(
         Returns:
             E: total energy of shape ()
         """
-        T = kinetic_energy_fn(params, q_d)
+        T = kinetic_energy_fn(params, q, q_d)
         U = potential_energy_fn(params, q)
         E = T + U
 
@@ -499,6 +529,7 @@ def factory(
         "apply_eps_to_bend_strains": apply_eps_to_bend_strains,
         "classify_segment": classify_segment,
         "stiffness_fn": stiffness_fn,
+        "actuation_mapping_fn": actuation_mapping_fn,
         "jacobian_fn": jacobian_fn,
         "kinetic_energy_fn": kinetic_energy_fn,
         "potential_energy_fn": potential_energy_fn,
