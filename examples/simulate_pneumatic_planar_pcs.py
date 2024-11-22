@@ -204,11 +204,11 @@ def simulate_robot():
     plt.figure()
     for segment_idx in range(num_segments):
         plt.plot(
-            ts, q_ts[:, 3 * segment_idx + 0],
+            ts, q_ts[:, 2 * segment_idx + 0],
             label=r"$\kappa_\mathrm{be," + str(segment_idx + 1) + "}$ [rad/m]"
         )
         plt.plot(
-            ts, q_ts[:, 3 * segment_idx + 1],
+            ts, q_ts[:, 2 * segment_idx + 1],
             label=r"$\sigma_\mathrm{ax," + str(segment_idx + 1) + "}$ [-]"
         )
     plt.xlabel("Time [s]")
