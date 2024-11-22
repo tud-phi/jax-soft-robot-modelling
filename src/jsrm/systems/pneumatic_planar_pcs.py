@@ -56,7 +56,7 @@ def factory(
                 n_act is the number of actuators
         """
         # all segment bases and tips
-        sms = jnp.concat([jnp.zeros((1,)), jnp.cumsum(params["l"])], axis=0)
+        sms = jnp.concatenate([jnp.zeros((1,)), jnp.cumsum(params["l"])], axis=0)
 
         # compute the poses of all segment tips
         chi_sms = vmap(forward_kinematics_fn, in_axes=(None, None, 0))(params, q, sms)
