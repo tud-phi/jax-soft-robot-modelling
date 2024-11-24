@@ -58,40 +58,6 @@ actuation_mapping_fn = partial(
     auxiliary_fns["jacobian_fn"],
 )
 
-def sweep_local_tip_force_to_bending_torque_mapping():
-    def compute_bending_torque(q: Array) -> Array:
-        # backbone coordinate of the end-effector
-        s_ee = jnp.sum(params["l"])
-        # compute the pose of the end-effector
-        chi_ee = forward_kinematics_fn(params, q, s_ee)
-        # orientation of the end-effector
-        th_ee = chi_ee[2]
-        # compute the jacobian of the end-effector
-        J_ee = auxiliary_fns["jacobian_fn"](params, q, s_ee)
-        # local tip force
-        f_ee_local = jnp.array([0.0, 1.0])
-        # tip force in inertial frame
-        f_ee = jnp.array([[jnp.cos(th_ee), -jnp.sin(th_ee)], [jnp.sin(th_ee), jnp.cos(th_ee)]]) @ f_ee_local
-        # compute the generalized torque
-        tau_be = J_ee[:2, 0].T @ f_ee
-        return tau_be
-
-    kappa_be_pts = jnp.arange(-2*jnp.pi, 2*jnp.pi, 0.01)
-    sigma_ax_pts = jnp.zeros_like(kappa_be_pts)
-    q_pts = jnp.stack([kappa_be_pts, sigma_ax_pts], axis=-1)
-
-    tau_be_pts = vmap(compute_bending_torque)(q_pts)
-
-    # plot the mapping on the bending strain
-    fig, ax = plt.subplots(num="planar_pcs_local_tip_force_to_bending_torque_mapping")
-    plt.title(r"Mapping from $f_\mathrm{ee}$ to $\tau_\mathrm{be}$")
-    ax.plot(kappa_be_pts, tau_be_pts, linewidth=2.5)
-    ax.set_xlabel(r"$\kappa_\mathrm{be}$ [rad/m]")
-    ax.set_ylabel(r"$\tau_\mathrm{be}$ [N m]")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
 
 def sweep_actuation_mapping():
     # evaluate the actuation matrix for a straight backbone
@@ -285,6 +251,5 @@ def simulate_robot():
     plt.show()
 
 if __name__ == "__main__":
-    sweep_local_tip_force_to_bending_torque_mapping()
     sweep_actuation_mapping()
     simulate_robot()
