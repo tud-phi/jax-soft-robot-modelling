@@ -123,6 +123,23 @@ def sweep_actuation_mapping():
     plt.tight_layout()
     plt.show()
 
+    # plot the actuation mapping of u1 vs. the bending strain for various segment radii
+    r_pts = jnp.linspace(1e-2, 1e-1, 10)
+    r_cham_out_pts = r_pts - 2e-3
+    fig, ax = plt.subplots(num="pneumatic_planar_pcs_actuation_mapping_bending_torque_vs_bending_strain_4segment_radii")
+    for r, r_cham_out in zip(r_pts, r_cham_out_pts):
+        _params = params.copy()
+        _params["r"] = r * jnp.ones((num_segments,))
+        _params["r_cham_out"] = r_cham_out * jnp.ones((num_segments,))
+        A_pts = vmap(actuation_mapping_fn, in_axes=(None, None, 0))(_params, B_xi, q_pts)
+        ax.plot(kappa_be_pts, A_pts[:, 0, 0], label=r"$R = " + str(r) + "$")
+    ax.set_xlabel(r"$\kappa_\mathrm{be}$ [rad/m]")
+    ax.set_ylabel(r"$\frac{\partial \tau_\mathrm{be}}{\partial u_1}$")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
     # create grid for bending and axial strains
     kappa_be_grid, sigma_ax_grid = jnp.meshgrid(
         jnp.linspace(-jnp.pi, jnp.pi, 20),
