@@ -216,7 +216,7 @@ def factory(
                 B_xi: Strain basis matrix
                 formulate_in_strain_space: whether to formulate the elastic matrix in the strain space
             Returns:
-                K: elastic matrix of shape (n_q, n_q) if formulate_in_strain_space is False or (n_xi, n_xi) otherwise
+                S: elastic matrix of shape (n_q, n_q) if formulate_in_strain_space is False or (n_xi, n_xi) otherwise
             """
             # length of the segments
             l = params["l"]
@@ -227,14 +227,14 @@ def factory(
             # elastic and shear modulus
             E, G = params["E"], params["G"]
             # stiffness matrix of shape (num_segments, 3, 3)
-            S = compute_stiffness_matrix_for_all_segments_fn(l, A, Ib, E, G)
+            S_sms = compute_stiffness_matrix_for_all_segments_fn(l, A, Ib, E, G)
             # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
-            K = blk_diag(S)
+            S = blk_diag(S_sms)
 
             if not formulate_in_strain_space:
-                K = B_xi.T @ K @ B_xi
+                S = B_xi.T @ S @ B_xi
 
-            return K
+            return S
 
     if actuation_mapping_fn is None:
         def actuation_mapping_fn(

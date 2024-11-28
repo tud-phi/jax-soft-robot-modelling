@@ -11,6 +11,7 @@ def factory(
     num_segments: int,
     *args,
     segment_actuation_selector: Optional[Array] = None,
+    simplified_actuation_mapping: bool = False,
     **kwargs
 ):
     """
@@ -19,6 +20,7 @@ def factory(
         num_segments: number of segments
         segment_actuation_selector: actuation selector for the segments as boolean array of shape (num_segments,)
             True entries signify that the segment is actuated, False entries signify that the segment is passive
+        simplified_actuation_mapping: flag to use a simplified actuation mapping (i.e., a constant actuation matrix)
     Returns:
     """
     if segment_actuation_selector is None:
@@ -102,22 +104,29 @@ def factory(
                 2 / 3 * jnp.sinc(0.5 * varphi_cham) * (r_cham_out ** 3 - r_cham_in ** 3) / (r_cham_out ** 2 - r_cham_in ** 2)
             )
 
-            # compute the actuation matrix that collects the contributions of the pneumatic chambers in the given segment
-            # first we consider the contribution of the distal end
-            A_sm_de = J_de.T @ jnp.array([
-                [-2 * A_cham * jnp.sin(th_de), -2 * A_cham * jnp.sin(th_de)],
-                [2 * A_cham * jnp.cos(th_de), 2 * A_cham * jnp.cos(th_de)],
-                [A_cham * r_cop, -A_cham * r_cop]
-            ])
-            # then, we consider the contribution of the proximal end
-            A_sm_pe = J_pe.T @ jnp.array([
-                [2 * A_cham * jnp.sin(th_pe), 2 * A_cham * jnp.sin(th_pe)],
-                [-2 * A_cham * jnp.cos(th_pe), -2 * A_cham * jnp.cos(th_pe)],
-                [-A_cham * r_cop, A_cham * r_cop]
-            ])
+            if simplified_actuation_mapping:
+                A_sm = B_xi.T @ jnp.array([
+                    [A_cham * r_cop, -A_cham * r_cop],
+                    [0.0, 0.0],
+                    [2 * A_cham, 2 * A_cham],
+                ])
+            else:
+                # compute the actuation matrix that collects the contributions of the pneumatic chambers in the given segment
+                # first we consider the contribution of the distal end
+                A_sm_de = J_de.T @ jnp.array([
+                    [-2 * A_cham * jnp.sin(th_de), -2 * A_cham * jnp.sin(th_de)],
+                    [2 * A_cham * jnp.cos(th_de), 2 * A_cham * jnp.cos(th_de)],
+                    [A_cham * r_cop, -A_cham * r_cop]
+                ])
+                # then, we consider the contribution of the proximal end
+                A_sm_pe = J_pe.T @ jnp.array([
+                    [2 * A_cham * jnp.sin(th_pe), 2 * A_cham * jnp.sin(th_pe)],
+                    [-2 * A_cham * jnp.cos(th_pe), -2 * A_cham * jnp.cos(th_pe)],
+                    [-A_cham * r_cop, A_cham * r_cop]
+                ])
 
-            # sum the contributions of the distal and proximal ends
-            A_sm = A_sm_de + A_sm_pe
+                # sum the contributions of the distal and proximal ends
+                A_sm = A_sm_de + A_sm_pe
 
             return A_sm
 
@@ -173,18 +182,18 @@ def stiffness_fn(
         B_xi: Strain basis matrix
         formulate_in_strain_space: whether to formulate the elastic matrix in the strain space
     Returns:
-        K: elastic matrix of shape (n_q, n_q) if formulate_in_strain_space is False or (n_xi, n_xi) otherwise
+        S: elastic matrix of shape (n_q, n_q) if formulate_in_strain_space is False or (n_xi, n_xi) otherwise
     """
     # stiffness matrix of shape (num_segments, 3, 3)
-    S = vmap(
+    S_sms = vmap(
     _compute_stiffness_matrix_for_segment
     )(
         params["l"], params["r"], params["r_cham_in"], params["r_cham_out"], params["varphi_cham"], params["E"]
     )
-    # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = K @ xi where K is equal to
-    K = blk_diag(S)
+    # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = S @ xi where K is equal to
+    S = blk_diag(S_sms)
 
     if not formulate_in_strain_space:
-        K = B_xi.T @ K @ B_xi
+        S = B_xi.T @ S @ B_xi
 
-    return K
+    return S

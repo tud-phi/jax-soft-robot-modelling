@@ -3,7 +3,6 @@ import jax
 jax.config.update("jax_enable_x64", True)  # double precision
 from jax import Array, jacfwd, jacrev, jit, random, vmap
 from jax import numpy as jnp
-from jaxopt import GaussNewton, LevenbergMarquardt
 from functools import partial
 import numpy as onp
 from pathlib import Path

@@ -48,7 +48,9 @@ params["D"] = 5e-4 * jnp.diag(
 strain_selector = jnp.array([True, False, True])[None, :].repeat(num_segments, axis=0).flatten()
 
 B_xi, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-    pneumatic_planar_pcs.factory(num_segments, sym_exp_filepath, strain_selector)
+    pneumatic_planar_pcs.factory(
+        num_segments, sym_exp_filepath, strain_selector, # simplified_actuation_mapping=True
+    )
 )
 # jit the functions
 dynamical_matrices_fn = jax.jit(dynamical_matrices_fn)
@@ -57,6 +59,7 @@ actuation_mapping_fn = partial(
     forward_kinematics_fn,
     auxiliary_fns["jacobian_fn"],
 )
+print("A=", actuation_mapping_fn(params, B_xi, jnp.zeros((2 * num_segments,))))
 
 
 def sweep_actuation_mapping():
