@@ -417,7 +417,7 @@ def factory(
         # compute the stiffness matrix
         K = stiffness_fn(params, B_xi, formulate_in_strain_space=True)
         # elastic energy
-        U_K = (xi - xi_eq).T @ K @ (xi - xi_eq)  # evaluate K(xi) = K @ xi
+        U_K = 0.5 * (xi - xi_eq).T @ K @ (xi - xi_eq)  # evaluate K(xi) = K @ xi
 
         # gravitational potential energy
         params_for_lambdify = select_params_for_lambdify_fn(params)
