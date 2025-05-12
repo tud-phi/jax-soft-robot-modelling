@@ -13,16 +13,21 @@ from typing import Callable, Dict
 
 import jsrm
 from jsrm import ode_factory
-from jsrm.systems import planar_pcs
+from jsrm.systems import planar_pcs, planar_pcs_num
 
-num_segments = 1
+import time
 
-# filepath to symbolic expressions
-sym_exp_filepath = (
-    Path(jsrm.__file__).parent
-    / "symbolic_expressions"
-    / f"planar_pcs_ns-{num_segments}.dill"
-)
+num_segments = 2
+
+type_of_derivation = "numeric" #"symbolic" #
+
+if type_of_derivation == "symbolic":
+    # filepath to symbolic expressions
+    sym_exp_filepath = (
+        Path(jsrm.__file__).parent
+        / "symbolic_expressions"
+        / f"planar_pcs_ns-{num_segments}.dill"
+    )
 
 # set parameters
 rho = 1070 * jnp.ones((num_segments,))  # Volumetric density of Dragon Skin 20 [kg/m^3]
@@ -49,6 +54,9 @@ q0 = jnp.repeat(jnp.array([5.0 * jnp.pi, 0.1, 0.2])[None, :], num_segments, axis
 # number of generalized coordinates
 n_q = q0.shape[0]
 
+# ===================================================
+# For video generation
+# ======================
 # set simulation parameters
 dt = 1e-4  # time step
 ts = jnp.arange(0.0, 2, dt)  # time steps
@@ -57,8 +65,7 @@ video_ts = ts[::skip_step]  # time steps for video
 
 # video settings
 video_width, video_height = 700, 700  # img height and width
-video_path = Path(__file__).parent / "videos" / f"planar_pcs_ns-{num_segments}.mp4"
-
+video_path = Path(__file__).parent / "videos" / f"planar_pcs_ns-{num_segments}-{('symb' if type_of_derivation == 'symbolic' else 'num')}.mp4"
 
 def draw_robot(
     batched_forward_kinematics_fn: Callable,
@@ -95,39 +102,62 @@ def draw_robot(
 
     return img
 
+# ===================================================
+# For figure saving
+# ======================
+figures_path_parent = Path(__file__).parent / "figures" 
+extension = f"planar_pcs_ns-{num_segments}-{('symb' if type_of_derivation == 'symbolic' else 'num')}"
+figures_path_parent.mkdir(parents=True, exist_ok=True)
 
 if __name__ == "__main__":
-    strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-        planar_pcs.factory(sym_exp_filepath, strain_selector)
-    )
+    print("Type of derivation:", type_of_derivation)
+    print("Number of segments:", num_segments, "\n")
+    
+    print("Importing the planar PCS model...")
+    timer_start = time.time()
+    # import jsrm
+    if type_of_derivation == "symbolic":
+        strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
+            planar_pcs.factory(sym_exp_filepath, strain_selector)
+        )
+        
+    elif type_of_derivation == "numeric":
+        strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
+            planar_pcs_num.factory(num_segments, strain_selector)
+        )
+    else:
+        raise ValueError("type_of_derivation must be 'symbolic' or 'numeric'")
+        
     # jit the functions
     dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn))
     batched_forward_kinematics = vmap(
         forward_kinematics_fn, in_axes=(None, None, 0), out_axes=-1
     )
+    timer_end = time.time()
+    print(f"Importing the planar PCS model took {timer_end - timer_start:.2f} seconds. \n")
 
-    # import matplotlib.pyplot as plt
-    # plt.plot(chi_ps[0, :], chi_ps[1, :])
-    # plt.axis("equal")
-    # plt.grid(True)
-    # plt.xlabel("x [m]")
-    # plt.ylabel("y [m]")
-    # plt.show()
-
-    # Displaying the image
-    # window_name = f"Planar PCS with {num_segments} segments"
-    # img = draw_robot(batched_forward_kinematics, params, q0, video_width, video_height)
-    # cv2.namedWindow(window_name)
-    # cv2.imshow(window_name, img)
-    # cv2.waitKey()
-    # cv2.destroyWindow(window_name)
+    print("Evaluating the dynamical matrices...")
+    timer_start = time.time()
+    B, C, G, K, D, A = dynamical_matrices_fn(params, q0, jnp.zeros_like(q0))
+    print("B =\n", B)
+    print("C =\n", C)
+    print("G =\n", G)
+    print("K =\n", K)
+    print("D =\n", D)
+    print("A =\n", A)
+    timer_end = time.time()
+    print(f"Evaluating the dynamical matrices took {timer_end - timer_start:.2f} seconds. \n")
 
     x0 = jnp.concatenate([q0, jnp.zeros_like(q0)])  # initial condition
     tau = jnp.zeros_like(q0)  # torques
 
+    timer_start = time.time()
     ode_fn = ode_factory(dynamical_matrices_fn, params, tau)
     term = ODETerm(ode_fn)
+    timer_end = time.time()
 
+    print("Solving the ODE...")
+    timer_start = time.time()
     sol = diffeqsolve(
         term,
         solver=Tsit5(),
@@ -144,13 +174,22 @@ if __name__ == "__main__":
     q_ts = sol.ys[:, :n_q]
     # the evolution of the generalized velocities
     q_d_ts = sol.ys[:, n_q:]
+    
+    timer_end = time.time()
+    print(f"Solving the ODE took {timer_end - timer_start:.2f} seconds. \n")
 
+    print("Evaluating the forward kinematics...")
+    timer_start = time.time()
     # evaluate the forward kinematics along the trajectory
     chi_ee_ts = vmap(forward_kinematics_fn, in_axes=(None, 0, None))(
         params, q_ts, jnp.array([jnp.sum(params["l"])])
     )
+    timer_end = time.time()
+    print(f"Evaluating the forward kinematics took {timer_end - timer_start:.2f} seconds. ")
+    
     # plot the configuration vs time
     plt.figure()
+    plt.title("Configuration vs Time")
     for segment_idx in range(num_segments):
         plt.plot(
             video_ts, q_ts[:, 3 * segment_idx + 0],
@@ -169,9 +208,15 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
+    plt.savefig(
+        figures_path_parent / f"config_vs_time_{extension}.png", bbox_inches="tight", dpi=300
+    )
+    print("Figures saved at", figures_path_parent / f"config_vs_time_{extension}.png")
     plt.show()
+    
     # plot end-effector position vs time
     plt.figure()
+    plt.title("End-effector position vs Time")
     plt.plot(video_ts, chi_ee_ts[:, 0], label="x")
     plt.plot(video_ts, chi_ee_ts[:, 1], label="y")
     plt.xlabel("Time [s]")
@@ -180,9 +225,15 @@ if __name__ == "__main__":
     plt.grid(True)
     plt.box(True)
     plt.tight_layout()
+    plt.savefig(
+        figures_path_parent / f"end_effector_position_vs_time_{extension}.png", bbox_inches="tight", dpi=300
+    )
+    print("Figures saved at", figures_path_parent / f"end_effector_position_vs_time_{extension}.png ")
     plt.show()
+    
     # plot the end-effector position in the x-y plane as a scatter plot with the time as the color
     plt.figure()
+    plt.title("End-effector position in the x-y plane")
     plt.scatter(chi_ee_ts[:, 0], chi_ee_ts[:, 1], c=video_ts, cmap="viridis")
     plt.axis("equal")
     plt.grid(True)
@@ -190,16 +241,14 @@ if __name__ == "__main__":
     plt.ylabel("End-effector y [m]")
     plt.colorbar(label="Time [s]")
     plt.tight_layout()
+    plt.savefig(
+        figures_path_parent / f"end_effector_position_xy_{extension}.png", bbox_inches="tight", dpi=300
+    )
+    print("Figures saved at", figures_path_parent / f"end_effector_position_xy_{extension}.png \n")
     plt.show()
-    # plt.figure()
-    # plt.plot(chi_ee_ts[:, 0], chi_ee_ts[:, 1])
-    # plt.axis("equal")
-    # plt.grid(True)
-    # plt.xlabel("End-effector x [m]")
-    # plt.ylabel("End-effector y [m]")
-    # plt.tight_layout()
-    # plt.show()
-
+    
+    print("Evaluating the energy...")
+    timer_start = time.time()
     # plot the energy along the trajectory
     kinetic_energy_fn_vmapped = vmap(
         partial(auxiliary_fns["kinetic_energy_fn"], params)
@@ -209,7 +258,13 @@ if __name__ == "__main__":
     )
     U_ts = potential_energy_fn_vmapped(q_ts)
     T_ts = kinetic_energy_fn_vmapped(q_ts, q_d_ts)
+    timer_end = time.time()
+    print(f"Evaluating the energy took {timer_end - timer_start:.2f} seconds.")
+    
+    # plot the energy vs time
     plt.figure()
+    plt.title("Energy vs Time")
+    plt.plot(video_ts, U_ts + T_ts, label="Total energy")
     plt.plot(video_ts, U_ts, label="Potential energy")
     plt.plot(video_ts, T_ts, label="Kinetic energy")
     plt.xlabel("Time [s]")
@@ -218,8 +273,14 @@ if __name__ == "__main__":
     plt.grid(True)
     plt.box(True)
     plt.tight_layout()
+    plt.savefig(
+        figures_path_parent / f"energy_vs_time_{extension}.png", bbox_inches="tight", dpi=300
+    )
+    print("Figures saved at", figures_path_parent / f"energy_vs_time_{extension}.png \n")
     plt.show()
 
+    print("Drawing the robot...")
+    timer_start = time.time()
     # create video
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     video_path.parent.mkdir(parents=True, exist_ok=True)
@@ -242,4 +303,8 @@ if __name__ == "__main__":
         video.write(img)
 
     video.release()
-    print(f"Video saved at {video_path}")
+    timer_end = time.time()
+    print(f"Drawing the robot took {timer_end - timer_start:.2f} seconds.")
+    print(f"Video saved at {video_path}. \n")
+    
+    
