@@ -472,7 +472,7 @@ def factory(
             Lambda: inertia matrix in the operational space of shape (3, 3)
             mu: matrix with corioli and centrifugal terms in the operational space of shape (3, 3)
             J: Jacobian of the Cartesian pose with respect to the generalized coordinates of shape (3, n_q)
-            J: time-derivative of the Jacobian of the end-effector pose with respect to the generalized coordinates
+            J_d: time-derivative of the Jacobian of the end-effector pose with respect to the generalized coordinates
                 of shape (3, n_q)
             JB_pinv: Dynamically-consistent pseudo-inverse of the Jacobian. Allows the mapping of torques
                 from the generalized coordinates to the operational space: f = JB_pinv.T @ tau_q

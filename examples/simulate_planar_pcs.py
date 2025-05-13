@@ -17,9 +17,19 @@ from jsrm.systems import planar_pcs, planar_pcs_num
 
 import time
 
+# ==================================================
+# Simulation parameters
+# ==================================================
 num_segments = 2
 
 type_of_derivation = "numeric" #"symbolic" #
+type_of_integration = "trapezoid" #"gauss" #
+
+if type_of_derivation == "numeric":
+    if type_of_integration == "gauss":
+        param_integration = 30
+    elif type_of_integration == "trapezoid":
+        param_integration = 100
 
 if type_of_derivation == "symbolic":
     # filepath to symbolic expressions
@@ -59,13 +69,20 @@ n_q = q0.shape[0]
 # ======================
 # set simulation parameters
 dt = 1e-4  # time step
-ts = jnp.arange(0.0, 2, dt)  # time steps
+ts = jnp.arange(0.0, 1, dt)  # time steps
 skip_step = 10  # how many time steps to skip in between video frames
 video_ts = ts[::skip_step]  # time steps for video
 
 # video settings
-video_width, video_height = 700, 700  # img height and width
-video_path = Path(__file__).parent / "videos" / f"planar_pcs_ns-{num_segments}-{('symb' if type_of_derivation == 'symbolic' else 'num')}.mp4"
+video_width, video_height = 700, 700  # img height and width"
+video_path_parent = Path(__file__).parent / "videos" 
+video_path_parent.mkdir(parents=True, exist_ok=True)
+extension = f"planar_pcs_ns-{num_segments}-{('symb' if type_of_derivation == 'symbolic' else 'num')}"
+if type_of_derivation == "numeric":
+    extension += f"-{type_of_integration}-{param_integration}"
+elif type_of_derivation == "symbolic":
+    extension += "-symb"
+video_path = video_path_parent / f"{extension}.mp4"
 
 def draw_robot(
     batched_forward_kinematics_fn: Callable,
@@ -107,15 +124,19 @@ def draw_robot(
 # ======================
 figures_path_parent = Path(__file__).parent / "figures" 
 extension = f"planar_pcs_ns-{num_segments}-{('symb' if type_of_derivation == 'symbolic' else 'num')}"
+if type_of_derivation == "numeric":
+    extension += f"-{type_of_integration}-{param_integration}"
 figures_path_parent.mkdir(parents=True, exist_ok=True)
 
 if __name__ == "__main__":
     print("Type of derivation:", type_of_derivation)
+    if type_of_derivation == "numeric":
+        print("Type of integration:", type_of_integration)
+        print("Parameter for integration:", param_integration)
     print("Number of segments:", num_segments, "\n")
     
     print("Importing the planar PCS model...")
     timer_start = time.time()
-    # import jsrm
     if type_of_derivation == "symbolic":
         strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
             planar_pcs.factory(sym_exp_filepath, strain_selector)
@@ -123,12 +144,13 @@ if __name__ == "__main__":
         
     elif type_of_derivation == "numeric":
         strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-            planar_pcs_num.factory(num_segments, strain_selector)
+            planar_pcs_num.factory(num_segments, strain_selector, integration_type=type_of_integration, param_integration=param_integration)
         )
     else:
         raise ValueError("type_of_derivation must be 'symbolic' or 'numeric'")
         
     # jit the functions
+    print("JIT-compiling the dynamical matrices function ...")
     dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn))
     batched_forward_kinematics = vmap(
         forward_kinematics_fn, in_axes=(None, None, 0), out_axes=-1
@@ -148,35 +170,43 @@ if __name__ == "__main__":
     timer_end = time.time()
     print(f"Evaluating the dynamical matrices took {timer_end - timer_start:.2f} seconds. \n")
 
+    # Parameter for the simulation
     x0 = jnp.concatenate([q0, jnp.zeros_like(q0)])  # initial condition
     tau = jnp.zeros_like(q0)  # torques
 
-    timer_start = time.time()
     ode_fn = ode_factory(dynamical_matrices_fn, params, tau)
     term = ODETerm(ode_fn)
-    timer_end = time.time()
 
-    print("Solving the ODE...")
+    # jit the functions
+    print("JIT-compiling the ODE function...")
+    diffeqsolve_fn = jax.jit(
+        partial(diffeqsolve, 
+                term, 
+                solver=Tsit5(), 
+                t0=ts[0], 
+                t1=ts[-1], 
+                dt0=dt, 
+                y0=x0, 
+                max_steps=None, 
+                saveat=SaveAt(ts=video_ts)))
+    
+    print("Solving the ODE for the first time (JIT-compilation)...")
     timer_start = time.time()
-    sol = diffeqsolve(
-        term,
-        solver=Tsit5(),
-        t0=ts[0],
-        t1=ts[-1],
-        dt0=dt,
-        y0=x0,
-        max_steps=None,
-        saveat=SaveAt(ts=video_ts),
-    )
-
+    sol = diffeqsolve_fn()
     print("sol.ys =\n", sol.ys)
+    timer_end = time.time()
     # the evolution of the generalized coordinates
     q_ts = sol.ys[:, :n_q]
     # the evolution of the generalized velocities
     q_d_ts = sol.ys[:, n_q:]
-    
-    timer_end = time.time()
     print(f"Solving the ODE took {timer_end - timer_start:.2f} seconds. \n")
+    
+    print("Solving the ODE for the second time (after JIT-compilation)...")
+    timer_start = time.time()
+    sol = diffeqsolve_fn()
+    print("sol.ys =\n", sol.ys)
+    timer_end = time.time()
+    print(f"Solving the ODE for a second time took {timer_end - timer_start:.2f} seconds. \n")
 
     print("Evaluating the forward kinematics...")
     timer_start = time.time()
@@ -184,6 +214,7 @@ if __name__ == "__main__":
     chi_ee_ts = vmap(forward_kinematics_fn, in_axes=(None, 0, None))(
         params, q_ts, jnp.array([jnp.sum(params["l"])])
     )
+    print("chi_ee_ts =\n", chi_ee_ts)
     timer_end = time.time()
     print(f"Evaluating the forward kinematics took {timer_end - timer_start:.2f} seconds. ")
     
@@ -264,7 +295,6 @@ if __name__ == "__main__":
     # plot the energy vs time
     plt.figure()
     plt.title("Energy vs Time")
-    plt.plot(video_ts, U_ts + T_ts, label="Total energy")
     plt.plot(video_ts, U_ts, label="Potential energy")
     plt.plot(video_ts, T_ts, label="Kinetic energy")
     plt.xlabel("Time [s]")
@@ -283,7 +313,6 @@ if __name__ == "__main__":
     timer_start = time.time()
     # create video
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    video_path.parent.mkdir(parents=True, exist_ok=True)
     video = cv2.VideoWriter(
         str(video_path),
         fourcc,

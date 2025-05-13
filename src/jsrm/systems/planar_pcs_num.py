@@ -231,7 +231,10 @@ def factory(
         l = params["l"] # length of each segment [m]
         
         # Classify the point along the robot to the corresponding segment
-        segment_idx, s_segment = classify_segment(params, s)
+        segment_idx, _ = classify_segment(params, s)
+        
+        # Compute the cumulative length of the segments starting with 0
+        l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
             
         chi_O = jnp.array([0.0, 0.0, th0])  # Initial pose of the robot
         
@@ -247,29 +250,18 @@ def factory(
             kappa = xi[3 * i]
             sigma_x = xi[3 * i + 1]
             sigma_y = xi[3 * i + 2]
-
+            
+            # Compute the length of the current segment to integrate
+            s_i = jnp.min(jnp.array([l_cum[i+1], s.squeeze()]))
+            length_i = s_i - l_cum[i]  
+            
             # Compute the orientation angle for the current segment
-            dth = lax.cond(i == segment_idx,
-                           lambda : (s_segment * kappa).reshape(()),
-                           lambda : (l[i] * kappa).reshape(())
-                           )
+            dth = kappa * length_i  # Angle increment for the current segment
             th = th_prev + dth
 
-            # Compute the integrals for the transformation matrix
-            int_cos_th = lax.cond(kappa == 0, 
-                lambda : lax.cond(i==segment_idx, 
-                                    lambda : (-s_segment * jnp.sin(th_prev)).reshape(()), 
-                                    lambda : (-l[i] * jnp.sin(th_prev)).reshape(())
-                                    ), 
-                lambda : ((jnp.sin(th) - jnp.sin(th_prev)) / kappa).reshape(())
-                )
-            int_sin_th = lax.cond(kappa == 0,
-                lambda : lax.cond(i==segment_idx, 
-                                    lambda : (s_segment * jnp.cos(th_prev)).reshape(()), 
-                                    lambda : (l[i] * jnp.cos(th_prev)).reshape(())
-                                    ), 
-                lambda : ((jnp.cos(th_prev) - jnp.cos(th)) / kappa).reshape(())
-                )
+            # Compute the integrals for the transformation matrix       
+            int_cos_th = ((jnp.sin(th) - jnp.sin(th_prev)) / kappa).reshape(())
+            int_sin_th = ((jnp.cos(th_prev) - jnp.cos(th)) / kappa).reshape(())
             
             # Transformation matrix
             R = jnp.array([[int_cos_th, -int_sin_th],
@@ -279,17 +271,9 @@ def factory(
             p = p_prev + (R @ jnp.array([sigma_x, sigma_y]).T).T
             
             return jnp.concatenate([p, jnp.array([th])])
-        
-        def chi_scan_body(carry, i):
-            chi = chi_i(i, carry)
-            output = chi
-            return chi_i(i, carry), output
 
-        # Currently: Scan too many elements to calculate i = segment_idx in particular, 
-        # without having to pass segment_idx as an argument (dynamic). (JAX does not support dynamic shapes).
-        # TODO: check if there is a way to avoid this.
         chi, chi_list = lax.scan(
-            f = chi_scan_body, 
+            f = lambda carry, i: (chi_i(i, carry), chi_i(i, carry)),
             init = chi_O, 
             xs = jnp.arange(num_segments + 1))
         
@@ -330,7 +314,8 @@ def factory(
     def jacobian_fn_xi(
         params: Dict[str, Array], 
         xi: Array, 
-        s: Array
+        s: Array,
+        eps: float = global_eps
     ) -> Array:
         """
         Compute the Jacobian of the forward kinematics function with respect to the strain vector.
@@ -339,11 +324,14 @@ def factory(
             params (Dict[str, Array]): dictionary of robot parameters.
             xi (Array): strain vector of the robot.
             s (Array): point coordinate along the robot in the interval [0, L].
+            eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
             Array: Jacobian of the forward kinematics function with respect to the strain vector.
         """
-
+        # Add a small number to the bending strain to avoid singularities
+        xi = apply_eps_to_bend_strains(xi, eps)
+        
         # Compute the Jacobian of chi_fn with respect to xi
         J = jacobian(lambda xi: chi_fn_xi(params, xi, s))(xi)
 
@@ -357,7 +345,8 @@ def factory(
         params: Dict[str, Array], 
         xi: Array, 
         xi_d: Array,
-        s: Array
+        s: Array, 
+        eps: float = global_eps
     ) -> Tuple[Array, Array]:
         """
         Compute the Jacobian of the forward kinematics function and its time-derivative.
@@ -367,13 +356,16 @@ def factory(
             xi (Array): strain vector of the robot.
             xi_d (Array): velocity vector of the robot.
             s (Array): point coordinate along the robot in the interval [0, L].
+            eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
             Tuple[Array, Array]: 
                 - J (Array): Jacobian of the forward kinematics function.
                 - J_d (Array): time-derivative of the Jacobian of the forward kinematics function.
         """
-
+        # Add a small number to the bending strain to avoid singularities
+        xi = apply_eps_to_bend_strains(xi, eps)
+        
         # Compute the Jacobian of chi_fn with respect to xi
         J = jacobian(lambda xi: chi_fn_xi(params, xi, s))(xi)
         
@@ -440,19 +432,12 @@ def factory(
         # Usefull derived quantities
         A = jnp.pi * r**2  # cross-sectional area of each segment [m^2]
         Ib = A**2 / (4 * jnp.pi) # second moment of area of each segment [m^4]
-        
-        B_0 = jnp.zeros((n_xi, n_xi)) # Initialize the mass / inertia matrix
 
-        l_succ = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
-        # Iteration function
-        def B_i(
-            i: int, 
-            B_i_prev: Array
-        ) -> Array:
-            
+        l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
+        # Compute each integral
+        def compute_integral(i):
             if integration_type == "gauss":
-                Xs, Ws, nGauss = gauss_quadrature(N_GQ=param_integration, a=l_succ[i], b=l_succ[i + 1])
-                
+                Xs, Ws, nGauss = gauss_quadrature(N_GQ=param_integration, a=l_cum[i], b=l_cum[i + 1])
                 J_all = vmap(lambda s: jacobian_fn_xi(params, xi, s))(Xs)
                 Jp_all = J_all[:, :2, :]
                 Jo_all = J_all[:, 2:, :]
@@ -463,28 +448,24 @@ def factory(
                 integral_Jp = jnp.sum(Ws[:, None, None] * integrand_JpT_Jp, axis=0)
                 integral_Jo = jnp.sum(Ws[:, None, None] * integrand_JoT_Jo, axis=0)
             else:
-                s_values = jnp.linspace(l_succ[i], l_succ[i + 1], param_integration)
+                xs = jnp.linspace(l_cum[i], l_cum[i + 1], param_integration)
                 
-                J_all = vmap(lambda s: jacobian_fn_xi(params, xi, s))(s_values)
+                J_all = vmap(lambda s: jacobian_fn_xi(params, xi, s))(xs)
                 Jp_all = J_all[:, :2, :]
                 Jo_all = J_all[:, 2:, :]
 
                 integrand_JpT_Jp = jnp.einsum("nij,nik->njk", Jp_all, Jp_all)
                 integrand_JoT_Jo = jnp.einsum("nij,nik->njk", Jo_all, Jo_all)
                 
-                integral_Jp = jscipy.integrate.trapezoid(integrand_JpT_Jp, x=s_values, axis=0)
-                integral_Jo = jscipy.integrate.trapezoid(integrand_JoT_Jo, x=s_values, axis=0)  
-             
-            B = B_i_prev + rho[i] * A[i] * integral_Jp + rho[i] * Ib[i] * integral_Jo
-            return B
+                integral_Jp = jscipy.integrate.trapezoid(integrand_JpT_Jp, x=xs, axis=0)
+                integral_Jo = jscipy.integrate.trapezoid(integrand_JoT_Jo, x=xs, axis=0)  
+            return rho[i] * A[i] * integral_Jp + rho[i] * Ib[i] * integral_Jo
         
-        # Loop over the segments
-        B = lax.fori_loop(
-            lower=0,
-            upper=num_segments,
-            body_fun=lambda i, val: B_i(i, val),
-            init_val=B_0,
-        )
+        # Compute the cumulative integral
+        indices = jnp.arange(num_segments + 1)
+        integrals = vmap(compute_integral)(indices)
+        
+        B = jnp.sum(integrals, axis=0)
         
         return B
         
@@ -531,7 +512,8 @@ def factory(
     @jit 
     def U_g_fn_xi(
         params: Dict[str, Array], 
-        xi: Array
+        xi: Array, 
+        eps: float = global_eps
     ) -> Array:
         """
         Compute the gravity vector of the robot.
@@ -539,10 +521,14 @@ def factory(
         Args:
             params (Dict[str, Array]): dictionary of robot parameters.
             xi (Array): strain vector of the robot.
+            eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
             Array: gravity vector of the robot.
         """
+        # Add a small number to the bending strain to avoid singularities
+        xi = apply_eps_to_bend_strains(xi, eps)
+        
         # Extract the parameters
         g = params["g"] # gravity vector [m/s^2]
         rho = params["rho"] # density of each segment [kg/m^3]
@@ -551,42 +537,28 @@ def factory(
         
         # Usefull derived quantitie
         A = jnp.pi * r**2  # cross-sectional area of each segment [m^2]
-
-        U_g_0 = 0 # Initialize the mass / inertia matrix
         
-        l_succ = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
-        # Iteration function
-        def U_g_i(
-            i: int, 
-            U_g_i_prev: Array
-        ) -> Array:
+        l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
+        # Compute each integral
+        def compute_integral(i):
             if integration_type == "gauss":
-                Xs, Ws, nGauss = gauss_quadrature(N_GQ=param_integration, a=l_succ[i], b=l_succ[i + 1])
-                
+                Xs, Ws, nGauss = gauss_quadrature(N_GQ=param_integration, a=l_cum[i], b=l_cum[i + 1])
                 chi_s = vmap(lambda s: chi_fn_xi(params, xi, s))(Xs)
-                p_s = chi_s[:,:2]
-                
-                integrand = -rho[i] * A[i] * jnp.dot(p_s, g)
-                integral = jnp.sum(Ws * integrand)
+                p_s = chi_s[:, :2]
+                integrand = -rho[i] * A[i] * jnp.einsum("ij,j->i", p_s, g)
+                return jnp.sum(Ws * integrand)
             else:
-                xs = jnp.linspace(l_succ[i], l_succ[i+1], param_integration)
-                
+                xs = jnp.linspace(l_cum[i], l_cum[i + 1], param_integration)
                 chi_s = vmap(lambda s: chi_fn_xi(params, xi, s))(xs)
-                p_s = chi_s[:,:2]
-                
-                integrand = -rho[i] * A[i] * jnp.dot(p_s, g)
-                integral = jscipy.integrate.trapezoid(integrand, x=xs)
-            
-            U_g = U_g_i_prev + integral
-            return U_g
+                p_s = chi_s[:, :2]
+                integrand = -rho[i] * A[i] * jnp.einsum("ij,j->i", p_s, g)
+                return jscipy.integrate.trapezoid(integrand, x=xs)
         
-        # Loop over the segments
-        U_g = lax.fori_loop(
-            lower=0,
-            upper=num_segments,
-            body_fun=lambda i, val: U_g_i(i, val),
-            init_val=U_g_0,
-        )
+        # Compute the cumulative integral
+        indices = jnp.arange(num_segments + 1)
+        integrals = vmap(compute_integral)(indices)
+
+        U_g = jnp.sum(integrals)
         
         return U_g
     
@@ -787,8 +759,10 @@ def factory(
         operational_space_selector = onp.array(operational_space_selector, dtype=bool)
 
         # Jacobian and its time-derivative
-        # J = jacobian_fn_xi(params, xi_epsed, s_segment).squeeze() #TODO: check this
-        J, J_d = J_Jd(params, xi_epsed, xi_d, s_segment).squeeze()
+        J, J_d = J_Jd(params, xi_epsed, xi_d, s_segment)
+        J = jnp.squeeze(J)
+        J_d = jnp.squeeze(J_d)
+
         J = J[operational_space_selector, :]
         J_d = J_d[operational_space_selector, :]
 
