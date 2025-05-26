@@ -3,7 +3,7 @@ from pathlib import Path
 import jsrm
 from jsrm.symbolic_derivation.planar_pcs import symbolically_derive_planar_pcs_model
 
-NUM_SEGMENTS = 1
+NUM_SEGMENTS = 2
 
 if __name__ == "__main__":
     sym_exp_filepath = (

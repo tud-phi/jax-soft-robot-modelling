@@ -40,6 +40,7 @@ def symbolically_derive_planar_pcs_model(
         sp.symbols(f"r1:{num_segments + 1}", nonnegative=True)
     )  # radius of each segment [m]
     g_syms = list(sp.symbols(f"g1:3"))  # gravity vector
+    d = sp.symbols("d", real=True, nonnegative=True)  # # distance of the tendon from the neutral axis
 
     # planar strains and their derivatives
     xi_syms = list(sp.symbols(f"xi1:{num_dof + 1}", nonzero=True))  # strains
@@ -59,6 +60,10 @@ def symbolically_derive_planar_pcs_model(
     chi_sms = []
     # Jacobians (positional + orientation) in each segment as a function of the point coordinate s and its time derivative
     J_sms, J_d_sms = [], []
+    # tendon lengths for each segment as a function of the point coordinate s
+    L_tend_sms = []
+    # tendon length jacobians for each segment as a function of the point coordinate s
+    J_tend_sms = []
     # cross-sectional area of each segment
     A = sp.zeros(num_segments)
     # second area moment of inertia of each segment
@@ -74,13 +79,14 @@ def symbolically_derive_planar_pcs_model(
     # initialize
     th_prev = th0
     p_prev = sp.Matrix([0, 0])
+    L_tend = 0  # tendon length
     for i in range(num_segments):
         # bending strain
-        kappa = xi[3 * i]
+        kappa_be = xi[3 * i]
         # shear strain
-        sigma_x = xi[3 * i + 1]
+        sigma_sh = xi[3 * i + 1]
         # axial strain
-        sigma_y = xi[3 * i + 2]
+        sigma_ax = xi[3 * i + 2]
 
         # compute the cross-sectional area of the rod
         A[i] = sp.pi * r[i] ** 2
@@ -89,13 +95,13 @@ def symbolically_derive_planar_pcs_model(
         I[i] = A[i] ** 2 / (4 * sp.pi)
 
         # planar orientation of robot as a function of the point s
-        th = th_prev + s * kappa
+        th = th_prev + s * kappa_be
 
         # absolute rotation of link
         R = sp.Matrix([[sp.cos(th), -sp.sin(th)], [sp.sin(th), sp.cos(th)]])
 
         # derivative of Cartesian position as function of the point s
-        dp_ds = R @ sp.Matrix([sigma_x, sigma_y])
+        dp_ds = R @ sp.Matrix([sigma_sh, sigma_ax])
 
         # position along the current rod as a function of the point s
         p = p_prev + sp.integrate(dp_ds, (s, 0.0, s))
@@ -146,11 +152,23 @@ def symbolically_derive_planar_pcs_model(
         # add potential energy of segment to previous segments
         U_g = U_g + U_gi
 
+        # simplify derived tendon length
+        L_tend = L_tend + s * (1 + kappa_be * d) * sp.sqrt(sigma_sh**2 + sigma_ax**2)
+        L_tend_sms.append(L_tend)
+        print(f"L_tend of segment {i+1}:\n", L_tend)
+        # take the derivative of the tendon length with respect to the configuration
+        J_tend = sp.simplify(sp.Matrix([L_tend]).jacobian(xi))
+        J_tend_sms.append(J_tend)
+        print(f"J_tend of segment {i+1}:\n", J_tend)
+
         # update the orientation for the next segment
         th_prev = th.subs(s, l[i])
 
         # update the position for the next segment
         p_prev = p.subs(s, l[i])
+
+        # previous tendon length
+        L_tend = L_tend.subs(s, l[i])
 
     if simplify_expressions:
         # simplify mass matrix
@@ -174,6 +192,7 @@ def symbolically_derive_planar_pcs_model(
             "r": r_syms,
             "rho": rho_syms,
             "g": g_syms,
+            "d": d,
         },
         "state_syms": {
             "xi": xi_syms,
@@ -197,6 +216,8 @@ def symbolically_derive_planar_pcs_model(
             "C": C,  # coriolis matrix
             "G": G,  # gravity vector
             "U_g": U_g,  # gravitational potential energy
+            "L_tend_sms": L_tend_sms,  # list of tendon lengths for each segment
+            "J_tend_sms": J_tend_sms,  # list of tendon length Jacobians for each segment
         },
     }
 
