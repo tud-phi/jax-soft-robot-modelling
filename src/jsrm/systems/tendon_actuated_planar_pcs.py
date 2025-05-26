@@ -5,7 +5,7 @@ from jsrm.math_utils import blk_diag
 import numpy as onp
 from typing import Callable, Dict, Optional, Tuple, Union
 
-from .planar_pcs import factory as planar_pcs_factory, stifffness_fn
+from .planar_pcs import factory as planar_pcs_factory
 
 def factory(
     num_segments: int,
@@ -61,6 +61,8 @@ def factory(
         l = params["l"]
         # map the configuration to the strains
         xi = xi_eq + B_xi @ q
+        # segment indices
+        segment_indices = jnp.arange(num_segments)
 
         def compute_actuation_matrix_for_segment(
             segment_idx, d_sm: Array,
@@ -70,7 +72,8 @@ def factory(
             We assume that each segment is actuated by num_segment_tendons that are routed at a distance of d from the segment's backbone, 
             respectively, and attached to the segment's distal end. We assume that the motor is located at the base of the robot and that the 
             tendons are routed through all proximal segments.
-            The control inputs u1 and u2 are the tensions (i.e., forces) applied by the two tendons.
+            The positive control inputs u1 and u2 are the tensions (i.e., forces) applied by the two tendons.
+            At a straight configuration with a positive d1, a positive u1 and zero u2 should cause the bend negatively (to the right) and contract its length.
 
             Args:
                 segment_idx: index of the segment
@@ -78,53 +81,51 @@ def factory(
             Returns:
                 A_sm: actuation matrix of shape (n_xi, num_segment_tendons)
             """
-            num_segment_tendons = d_sm.shape[0]
-        
-            A_sm = []
-            for j in range(num_segment_tendons):
-                d = d_sm[j]
-                
+            def compute_A_d(d: Array) -> Array:
                 """
-                A_d = []
-                for i in range(0, segment_idx + 1):
-                    # length of the i-th segment
-                    l_i = l[i]
-                    # strain of the i-th segment
-                    xi_i = xi[3 * i:3 * (i + 1)]
-                    A_d.append(jnp.array([
-                        d * l_i * jnp.sqrt(xi_i[1]**2 + xi_i[2]**2),  # the derivative of the tendon length with respect to the bending strain of the i-th segment
-                        l_i * xi_i[1] * (1 + d * xi_i[0]) / jnp.sqrt(xi_i[1]**2 + xi_i[2]**2),  # the derivative of the tendon length with respect to the shear strain of the i-th segment
-                        l_i * xi_i[2] * (1 + d * xi_i[0]) / jnp.sqrt(xi_i[1]**2 + xi_i[2]**2),  # the derivative of the tendon length with respect to the axial strain of the i-th segment
-                    ]))
+                Compute the actuation matrix for a single actuator/tendon with respect to the soft robot's strains.
+                Args:
+                    d: distance of the tendon from the centerline
+                Returns:
+                    A_d: actuation matrix of shape (n_xi, ) where n_xi is the number of strains
                 """
-                def compute_A_d(l_i: Array, xi_i: Array) -> Array:
-                    print("l_i.shape", l_i.shape, "xi_i.shape", xi_i.shape)
+                def compute_A_d_wrt_xi_i(i: Array, l_i: Array, xi_i: Array) -> Array:
+                    """
+                    Compute the actuation matrix for a single actuator with respect to the strains of a single segment.
+                    Args:
+                        i: index of the segment
+                        l_i: length of the segment
+                        xi_i: strains for the segment
+                    Returns:
+                        A_d_segment: actuation matrix for the segment of shape (3, 3)
+                    """
                     sigma_norm = jnp.sqrt(xi_i[1] ** 2 + xi_i[2] ** 2)
-                    return jnp.array([
+                    A_d_wrt_xi_i = - jnp.array([
                         d * l_i * sigma_norm,
                         l_i * xi_i[1] * (1 + d * xi_i[0]) / sigma_norm,
                         l_i * xi_i[2] * (1 + d * xi_i[0]) / sigma_norm,
                     ])
-                A_d = vmap(compute_A_d)(l[:j+1], xi[: 3 * (j + 1)].reshape(-1, 3))
-                
+                    return jnp.where(
+                        i <= segment_idx,
+                        A_d_wrt_xi_i,
+                        jnp.zeros_like(A_d_wrt_xi_i)
+                    )
+
+                A_d = vmap(compute_A_d_wrt_xi_i)(segment_indices, l, xi.reshape(-1, 3))
+
                 # concatenate the derivatives for all segments
                 A_d = jnp.concatenate(A_d, axis=0)
-                A_sm.append(A_d)
-
-            # stack the actuation matrices for all tendons
-            A_sm = jnp.stack(A_sm, axis=1)
-            print("A_sm.shape", A_sm.shape)
+                return A_d
+                
+            A_sm = vmap(compute_A_d, in_axes=0, out_axes=1)(d_sm)
 
             return A_sm
 
-        segment_indices = jnp.arange(num_segments)
         A_sms = vmap(compute_actuation_matrix_for_segment)(
             segment_indices, params["d"],
         )
-        print("A_sms.shape", A_sms.shape)
         # concatenate the actuation matrices for all tendons
         A = jnp.concatenate(A_sms, axis=1)
-        print("A.shape", A.shape)
 
         # apply the actuation_basis
         A = A @ actuation_basis

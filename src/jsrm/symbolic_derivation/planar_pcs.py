@@ -192,7 +192,6 @@ def symbolically_derive_planar_pcs_model(
             "r": r_syms,
             "rho": rho_syms,
             "g": g_syms,
-            "d": d,
         },
         "state_syms": {
             "xi": xi_syms,

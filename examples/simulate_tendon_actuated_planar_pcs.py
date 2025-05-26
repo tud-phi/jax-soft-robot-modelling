@@ -36,7 +36,6 @@ params = {
     "G": 1e3 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
     "d": 2e-2 * jnp.array([[1.0, -1.0]]).repeat(num_segments, axis=0),  # distance of tendons from the central axis [m]
 }
-print("params d =\n", params["d"])
 params["D"] = 1e-3 * jnp.diag(
     (jnp.repeat(
         jnp.array([[1e0, 1e3, 1e3]]), num_segments, axis=0
@@ -53,7 +52,7 @@ n_q = q0.shape[0]
 
 # set simulation parameters
 dt = 1e-4  # time step
-ts = jnp.arange(0.0, 2, dt)  # time steps
+ts = jnp.arange(0.0, 10.0, dt)  # time steps
 skip_step = 10  # how many time steps to skip in between video frames
 video_ts = ts[::skip_step]  # time steps for video
 
@@ -100,34 +99,34 @@ def draw_robot(
 
 if __name__ == "__main__":
     strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-        planar_pcs.factory(sym_exp_filepath, strain_selector)
+        planar_pcs.factory(num_segments, sym_exp_filepath, strain_selector)
     )
+    actuation_mapping_fn = auxiliary_fns["actuation_mapping_fn"]
     # jit the functions
     dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn))
     batched_forward_kinematics = vmap(
         forward_kinematics_fn, in_axes=(None, None, 0), out_axes=-1
     )
 
-    # import matplotlib.pyplot as plt
-    # plt.plot(chi_ps[0, :], chi_ps[1, :])
-    # plt.axis("equal")
-    # plt.grid(True)
-    # plt.xlabel("x [m]")
-    # plt.ylabel("y [m]")
-    # plt.show()
-
-    # Displaying the image
-    # window_name = f"Planar PCS with {num_segments} segments"
-    # img = draw_robot(batched_forward_kinematics, params, q0, video_width, video_height)
-    # cv2.namedWindow(window_name)
-    # cv2.imshow(window_name, img)
-    # cv2.waitKey()
-    # cv2.destroyWindow(window_name)
+    # test the actuation mapping function
+    xi_eq = jnp.array([0.0, 0.0, 1.0])[None].repeat(num_segments, axis=0).flatten()
+    B_xi = strain_basis
+    # call the actuation mapping function
+    A = actuation_mapping_fn(
+        forward_kinematics_fn,
+        auxiliary_fns["jacobian_fn"],
+        params,
+        B_xi,
+        xi_eq,
+        jnp.zeros_like(q0),
+    )
+    print("A =\n", A)
 
     x0 = jnp.concatenate([q0, jnp.zeros_like(q0)])  # initial condition
-    tau = jnp.zeros_like(q0)  # torques
+    u = 1e0 * jnp.array([1.0, 1.0])[None].repeat(num_segments, axis=0).flatten()  # tendon tensions
+    print("u =\n", u)
 
-    ode_fn = ode_factory(dynamical_matrices_fn, params, tau)
+    ode_fn = ode_factory(dynamical_matrices_fn, params, u)
     term = ODETerm(ode_fn)
 
     sol = diffeqsolve(
