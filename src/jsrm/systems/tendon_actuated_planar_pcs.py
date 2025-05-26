@@ -1,5 +1,5 @@
 __all__ = ["factory", "stiffness_fn"]
-from jax import Array, lax, vmap
+from jax import Array, debug, lax, vmap
 import jax.numpy as jnp
 from jsrm.math_utils import blk_diag
 import numpy as onp
@@ -24,17 +24,10 @@ def factory(
     if segment_actuation_selector is None:
         segment_actuation_selector = jnp.ones(num_segments, dtype=bool)
 
-    # number of input pressures
-    actuation_dim = segment_actuation_selector.sum() * 2
-
-    # matrix that maps the (possibly) underactuated actuation space to a full actuation space
-    actuation_basis = jnp.zeros((2 * num_segments, actuation_dim))
-    actuation_basis_cumsum = jnp.cumsum(segment_actuation_selector)
-    for i in range(num_segments):
-        j = int(actuation_basis_cumsum[i].item()) - 1
-        if segment_actuation_selector[i].item() is True:
-            actuation_basis = actuation_basis.at[2 * i, j].set(1.0)
-            actuation_basis = actuation_basis.at[2 * i + 1, j + 1].set(1.0)
+    # number of system inputs
+    actuation_dim = segment_actuation_selector.sum()
+    actuation_dim = 2 * num_segments
+    actuation_basis = jnp.eye(actuation_dim)
 
     def actuation_mapping_fn(
         forward_kinematics_fn: Callable,
@@ -106,26 +99,22 @@ def factory(
                         l_i * xi_i[2] * (1 + d * xi_i[0]) / sigma_norm,
                     ])
                     return jnp.where(
-                        i <= segment_idx,
+                        i * jnp.ones((3, )) <= segment_idx * jnp.ones((3, )),
                         A_d_wrt_xi_i,
                         jnp.zeros_like(A_d_wrt_xi_i)
                     )
 
-                A_d = vmap(compute_A_d_wrt_xi_i)(segment_indices, l, xi.reshape(-1, 3))
+                A_d = vmap(compute_A_d_wrt_xi_i)(segment_indices, l, xi.reshape(-1, 3)).reshape(-1)
 
-                # concatenate the derivatives for all segments
-                A_d = jnp.concatenate(A_d, axis=0)
                 return A_d
                 
-            A_sm = vmap(compute_A_d, in_axes=0, out_axes=1)(d_sm)
+            A_sm = vmap(compute_A_d, in_axes=0, out_axes=-1)(d_sm)
 
             return A_sm
 
-        A_sms = vmap(compute_actuation_matrix_for_segment)(
+        A = vmap(compute_actuation_matrix_for_segment, in_axes=(0, 0), out_axes=0)(
             segment_indices, params["d"],
-        )
-        # concatenate the actuation matrices for all tendons
-        A = jnp.concatenate(A_sms, axis=1)
+        ).transpose((1, 0, 2)).reshape(xi.shape[0], -1)
 
         # apply the actuation_basis
         A = A @ actuation_basis

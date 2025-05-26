@@ -123,7 +123,8 @@ if __name__ == "__main__":
     print("A =\n", A)
 
     x0 = jnp.concatenate([q0, jnp.zeros_like(q0)])  # initial condition
-    u = 1e0 * jnp.array([1.0, 1.0])[None].repeat(num_segments, axis=0).flatten()  # tendon tensions
+    u = jnp.array([1.0, 1.0])[None].repeat(num_segments, axis=0).flatten()  # tendon tensions
+    # u = 2e-1 * jnp.array([2.0, 0.0, 0.0, 1.0])
     print("u =\n", u)
 
     ode_fn = ode_factory(dynamical_matrices_fn, params, u)
