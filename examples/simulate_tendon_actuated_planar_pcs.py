@@ -44,6 +44,9 @@ params["D"] = 1e-3 * jnp.diag(
 
 # activate all strains (i.e. bending, shear, and axial)
 strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
+# actuation selector for the segments
+segment_actuation_selector = jnp.ones((num_segments,), dtype=bool)
+# segment_actuation_selector = jnp.array([False, True]) # only the last segment is actuated
 
 # define initial configuration
 q0 = jnp.repeat(jnp.array([5.0 * jnp.pi, 0.1, 0.2])[None, :], num_segments, axis=0).flatten()
@@ -99,7 +102,7 @@ def draw_robot(
 
 if __name__ == "__main__":
     strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-        planar_pcs.factory(num_segments, sym_exp_filepath, strain_selector)
+        planar_pcs.factory(num_segments, sym_exp_filepath, strain_selector, segment_actuation_selector=segment_actuation_selector)
     )
     actuation_mapping_fn = auxiliary_fns["actuation_mapping_fn"]
     # jit the functions

@@ -24,11 +24,6 @@ def factory(
     if segment_actuation_selector is None:
         segment_actuation_selector = jnp.ones(num_segments, dtype=bool)
 
-    # number of system inputs
-    actuation_dim = segment_actuation_selector.sum()
-    actuation_dim = 2 * num_segments
-    actuation_basis = jnp.eye(actuation_dim)
-
     def actuation_mapping_fn(
         forward_kinematics_fn: Callable,
         jacobian_fn: Callable,
@@ -112,12 +107,17 @@ def factory(
 
             return A_sm
 
+        # compute the actuation matrix for all segments
+        # will have shape (num_segments, n_xi, num_segment_tendons)
         A = vmap(compute_actuation_matrix_for_segment, in_axes=(0, 0), out_axes=0)(
             segment_indices, params["d"],
-        ).transpose((1, 0, 2)).reshape(xi.shape[0], -1)
+        )
+        
+        # deactivate the actuation for some segments
+        A = A[segment_actuation_selector]
 
-        # apply the actuation_basis
-        A = A @ actuation_basis
+        # reshape the actuation matrix to have shape (n_xi, n_act)
+        A = A.transpose((1, 0, 2)).reshape(xi.shape[0], -1)
 
         return A
 
