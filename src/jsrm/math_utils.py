@@ -1,9 +1,10 @@
 from jax import numpy as jnp
 from jax import Array, lax, jit
 
-
 @jit
-def blk_diag(a: Array) -> Array:
+def blk_diag(
+    a: Array
+) -> Array:
     """
     Create a block diagonal matrix from a tensor of blocks
     Args:
@@ -31,7 +32,7 @@ def blk_diag(a: Array) -> Array:
 
     # Implement for loop to assign each block in `a` to the block-diagonal of `b`
     # Hint: use `jax.lax.fori_loop` and pass `assign_block_diagonal` as an argument
-    b = jnp.zeros((a.shape[0] * a.shape[1], a.shape[0] * a.shape[2]))
+    b = jnp.zeros((a.shape[0] * a.shape[1], a.shape[0] * a.shape[2]), dtype=a.dtype)
     b = lax.fori_loop(
         lower=0,
         upper=a.shape[0],
@@ -40,3 +41,33 @@ def blk_diag(a: Array) -> Array:
     )
 
     return b
+
+@jit
+def blk_concat(
+    a: Array
+) -> Array:
+    """
+    Concatenate the matrices along the first axis
+
+    Args:
+        a (Array): matrices to be concatenated of shape (N, a, b)
+
+    Returns:
+        Array: concatenated matrix of shape (a, b * N)
+    """
+    b = a.transpose(1, 0, 2).reshape(a.shape[1], -1)
+    return b
+
+if __name__ == "__main__":
+    # Example usage
+    a = jnp.array([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+    print("Original array:")
+    print(a)
+    
+    b = blk_diag(a)
+    print("Block diagonal matrix:")
+    print(b)
+    
+    c = blk_concat(a)
+    print("Concatenated matrix:")
+    print(c)
