@@ -140,10 +140,9 @@ def gauss_quadrature(
         b (float, optional): The upper bound of the interval. Default is 1.0.
 
     Returns:
-        tuple: A tuple containing:
-            - Xs (Array): The Gauss nodes on [a, b].
-            - Ws (Array): The Gauss weights on [a, b].
-            - nGauss (int): The number of Gauss points including boundary points, i.e., N_GQ + 2.
+        Xs (Array): The Gauss nodes on [a, b].
+        Ws (Array): The Gauss weights on [a, b].
+        nGauss (int): The number of Gauss points including boundary points, i.e., N_GQ + 2.
     """
     
     N = N_GQ - 1
@@ -156,31 +155,25 @@ def gauss_quadrature(
     y = jnp.cos((2 * jnp.arange(N + 1) + 1) * jnp.pi / (2 * N + 2)) + (0.27 / N1) * jnp.sin(jnp.pi * xu * N / N2)
 
     def legendre_iteration(y):
-        #Legendre-Gauss Vandermonde matrix
-        L = jnp.zeros((N1, N2))
-        L = L.at[:, 0].set(1)
-        L = L.at[:, 1].set(y)
-
+        L = [jnp.ones_like(y), y]
         for k in range(2, N1 + 1):
-            L = L.at[:, k].set(((2 * k - 1) * y * L[:, k - 1] - (k - 1) * L[:, k - 2]) / k)
-
-        Lp = (N2) * (L[:, N1 - 1] - y * L[:, N1]) / (1 - y**2)
-        y_new = y - L[:, N1] / Lp
-        return y_new
+            Lk = ((2 * k - 1) * y * L[-1] - (k - 1) * L[-2]) / k
+            L.append(Lk)
+        L = jnp.stack(L, axis=1)
+        Lp = N2 * (L[:, N1 - 1] - y * L[:, N1]) / (1 - y ** 2)
+        return y - L[:, N1] / Lp
 
     def convergence_condition(y):
-        L = jnp.zeros((N1, N2))
-        L = L.at[:, 0].set(1)
-        L = L.at[:, 1].set(y)
-
+        L = [jnp.ones_like(y), y]
         for k in range(2, N1 + 1):
-            L = L.at[:, k].set(((2 * k - 1) * y * L[:, k - 1] - (k - 1) * L[:, k - 2]) / k)
-
-        Lp = (N2) * (L[:, N1 - 1] - y * L[:, N1]) / (1 - y**2)
+            Lk = ((2 * k - 1) * y * L[-1] - (k - 1) * L[-2]) / k
+            L.append(Lk)
+        L = jnp.stack(L, axis=1)
+        Lp = N2 * (L[:, N1 - 1] - y * L[:, N1]) / (1 - y ** 2)
         y_new = y - L[:, N1] / Lp
         return jnp.max(jnp.abs(y_new - y)) > jnp.finfo(float).eps
 
-    y = jax.lax.while_loop(
+    y = jax.lax.while_loop( #TODO
         convergence_condition, 
         legendre_iteration, 
         y)
@@ -188,22 +181,20 @@ def gauss_quadrature(
     # Linear map from [-1, 1] to [a, b]
     Xs = (a * (1 - y) + b * (1 + y)) / 2
     Xs = jnp.flip(Xs)
-    # add the boundary points
+    
+    # Add the boundary points
     Xs = jnp.concatenate([jnp.array([a]), Xs, jnp.array([b])])
 
     # Compute the weights
-    L = jnp.zeros((N1, N2))
-    L = L.at[:, 0].set(1)
-    L = L.at[:, 1].set(y)
-
+    L = [jnp.ones_like(y), y]
     for k in range(2, N1 + 1):
-        L = L.at[:, k].set(((2 * k - 1) * y * L[:, k - 1] - (k - 1) * L[:, k - 2]) / k)
-
-    Lp = (N2) * (L[:, N1 - 1] - y * L[:, N1]) / (1 - y**2)
-    Ws = (b - a) / ((1 - y**2) * Lp**2) * (N2 / N1)**2
-    # add the boundary points
+        Lk = ((2 * k - 1) * y * L[-1] - (k - 1) * L[-2]) / k
+        L.append(Lk)
+    L = jnp.stack(L, axis=1)
+    Lp = N2 * (L[:, N1 - 1] - y * L[:, N1]) / (1 - y ** 2)
+    Ws = (b - a) / ((1 - y ** 2) * Lp ** 2) * (N2 / N1) ** 2
+    
+    # Add the boundary points
     Ws = jnp.concatenate([jnp.array([0.0]), Ws, jnp.array([0.0])])
 
-    nGauss = N_GQ + 2
-
-    return Xs, Ws, nGauss
+    return Xs, Ws, N_GQ + 2

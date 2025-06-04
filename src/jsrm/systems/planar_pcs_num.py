@@ -2,6 +2,8 @@ from jax import Array, jit, lax, vmap
 from jax import jacobian, grad
 from jax import scipy as jscipy
 from jax import numpy as jnp
+from quadax import GaussKronrodRule
+
 import numpy as onp
 from typing import Callable, Dict, Tuple, Optional
 
@@ -27,9 +29,9 @@ def factory(
     stiffness_fn: Optional[Callable] = None,
     actuation_mapping_fn: Optional[Callable] = None,
     global_eps: float = 1e-6, 
-    integration_type: str = "gauss",
+    integration_type: str = "gauss-legendre",
     param_integration: int = None,
-    bool_explicit: bool = True
+    jacobian_type: str = "explicit",
     ) -> Tuple[
     Array,
     Callable[[Dict[str, Array], Array, Array], Array],
@@ -56,12 +58,12 @@ def factory(
             Defaults to None.
         global_eps (float, optional): small number to avoid singularities. 
             Defaults to 1e-6.
-        integration_type (str, optional): type of integration to use: "gauss" or "trapezoid". 
-            Defaults to "gauss" for Gaussian quadrature.
+        integration_type (str, optional): type of integration to use: "gauss-legendre", "gauss-kronrad" or "trapezoid". 
+            Defaults to "gauss-legendre" for Gaussian quadrature.
         param_integration (int, optional): parameter for the integration method. 
             If None, it is set to 30 for Gaussian quadrature and 1000 for trapezoidal integration.
-        bool_explicit (bool, optional): whether to use explicit derivation or not to compute the Jacobian.
-            Defaults to True.
+        jacobian_type (str, optional): type of Jacobian to compute: "explicit" or "autodiff".
+            Defaults to "explicit" for explicit Jacobian computation. 
 
     Returns:
         Callable: forward kinematics function that takes in parameters and configuration vector
@@ -191,14 +193,24 @@ def factory(
     if not isinstance(actuation_mapping_fn, Callable):
         raise TypeError(f"actuation_mapping_fn must be a callable, but got {type(actuation_mapping_fn).__name__}")
     
-    if integration_type == "gauss":
+    if integration_type == "gauss-legendre":
         if param_integration is None:
             param_integration = 30
+    elif integration_type == "gauss-kronrad":
+        if param_integration is None:
+            param_integration = 15
+        if param_integration not in [15, 21, 31, 41, 51, 61]:
+            raise ValueError(
+                f"param_integration must be one of [15, 21, 31, 41, 51, 61] for gauss-kronrad integration, but got {param_integration}"
+            )
     elif integration_type == "trapezoid":
         if param_integration is None:
             param_integration = 1000
     else:
-        raise ValueError(f"integration_type must be either 'gauss' or 'trapezoid', but got {integration_type}")
+        raise ValueError(f"integration_type must be either 'gauss-legendre', 'gauss-kronrad' or 'trapezoid', but got {integration_type}")
+    
+    if jacobian_type not in ["explicit", "autodiff"]:
+        raise ValueError(f"jacobian_type must be either 'explicit' or 'autodiff', but got {jacobian_type}")
     
     # =======================================================================================================================
     # Define the functions
@@ -289,7 +301,7 @@ def factory(
         l = params["l"] # length of each segment [m]
         
         # Classify the point along the robot to the corresponding segment
-        segment_idx, s_local, l_cum = classify_segment(params, s)
+        segment_idx, s_local, _ = classify_segment(params, s)
             
         chi_O = jnp.array([0.0, 0.0, th0])  # Initial pose of the robot
 
@@ -313,7 +325,7 @@ def factory(
             dth = kappa * l_i  # Angle increment for the current segment
             th = th_prev + dth
 
-            # Compute the integrals for the transformation matrix       
+            # Compute the integrals for the transformation matrix
             int_cos_th = ((jnp.sin(th) - jnp.sin(th_prev)) / kappa).reshape(())
             int_sin_th = ((jnp.cos(th_prev) - jnp.cos(th)) / kappa).reshape(())
             
@@ -465,7 +477,6 @@ def factory(
             mat_i_Li = Ad_gi_inv_Li @ T_gi_Li
             mat_i_s = Ad_gi_inv_s @ T_gi_s
             
-            # TODO: check if we better use vmap or einsum and dynamic_update_slice or set
             J_new_s = lax.dynamic_update_slice( 
                 jnp.einsum('ij, njk->nik', Ad_gi_inv_s, J_prev_Lprev),
                 mat_i_s[jnp.newaxis, ...],
@@ -498,12 +509,15 @@ def factory(
         # Get the pose at point s
         px, py, theta = chi_fn_xi(params, xi, s)  
         # Convert the pose to SE(3) representation
-        g_s = jnp.eye(4)  # Initialize as identity matrix
         R = jnp.array([             # Rotation matrix around the z-axis
             [jnp.cos(theta), -jnp.sin(theta)],
             [jnp.sin(theta), jnp.cos(theta) ]
         ])
-        g_s = g_s.at[:2, :2].set(R)  # Set rotation part as a 2D rotation matrix around the z-axis
+        
+        g_s = jnp.block([
+            [R, jnp.zeros((2, 2))],
+            [jnp.zeros((2, 2)), jnp.eye(2)]
+        ])
         Adjoint_g_s = Adjoint_g_SE3(g_s)
         # For each segment, compute the Jacobian in SE(3) coordinates in global frame J_i_global = Adjoint_g_s @ J_i_local
         J_segment_SE3_global = jnp.einsum('ij,njk->nik', Adjoint_g_s, J_segment_SE3_local)  # shape: (n_segments, 6, 6)
@@ -746,33 +760,12 @@ def factory(
         
         return J, J_d
 
-    if bool_explicit:
+    if jacobian_type == "explicit":
         jacobian_fn_xi = J_explicit
         J_Jd = J_Jd_explicit
-    else:
+    elif jacobian_type == "autodiff":
         jacobian_fn_xi = J_autodiff
         J_Jd = J_Jd_autodiff
-
-    @jit
-    def extract_Jp_Jo(
-        J: Array
-    ) -> Tuple[Array, Array]:
-        """
-        Extract the Jacobian of the axial and bending strains.
-
-        Args:
-            J (Array): Jacobian of the forward kinematics function.
-
-        Returns:
-            Tuple[Array, Array]: 
-                - Jp (Array): Jacobian of the axial strains.
-                - Jo (Array): Jacobian of the bending strains.
-        """
-        # Extract the Jacobian of the axial and bending strains
-        Jp = J[:, :2, :]
-        Jo = J[:, 2:, :]
-        
-        return Jp, Jo
 
     @jit
     def jacobian_fn(
@@ -830,11 +823,12 @@ def factory(
         l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
         # Compute each integral
         def compute_integral(i):
-            if integration_type == "gauss":
+            if integration_type == "gauss-legendre":
                 Xs, Ws, nGauss = gauss_quadrature(N_GQ=param_integration, a=l_cum[i], b=l_cum[i + 1])
                 
                 J_all = vmap(lambda s: jacobian_fn_xi(params, xi, s))(Xs)
-                Jp_all, Jo_all = extract_Jp_Jo(J_all)
+                Jp_all = J_all[:, :2, :]
+                Jo_all = J_all[:, 2:, :]
 
                 integrand_JpT_Jp = jnp.einsum("nij,nik->njk", Jp_all, Jp_all)
                 integrand_JoT_Jo = jnp.einsum("nij,nik->njk", Jo_all, Jo_all)
@@ -842,13 +836,24 @@ def factory(
                 integral_Jp = jnp.sum(Ws[:, None, None] * integrand_JpT_Jp, axis=0)
                 integral_Jo = jnp.sum(Ws[:, None, None] * integrand_JoT_Jo, axis=0)
                 
-                return rho[i] * A[i] * integral_Jp + rho[i] * Ib[i] * integral_Jo
-            
+                integral = rho[i] * A[i] * integral_Jp + rho[i] * Ib[i] * integral_Jo
+                
+            elif integration_type == "gauss-kronrad":
+                rule = GaussKronrodRule(order=param_integration)
+                def integrand(s):
+                    J = jacobian_fn_xi(params, xi, s)
+                    Jp = J[:2, :]
+                    Jo = J[2:, :]
+                    return rho[i] * A[i] * Jp.T @ Jp + rho[i] * Ib[i] * Jo.T @ Jo
+
+                integral, _, _, _ = rule.integrate(integrand, l_cum[i], l_cum[i+1], args=())
+
             elif integration_type == "trapezoid":
                 xs = jnp.linspace(l_cum[i], l_cum[i + 1], param_integration)
                 
                 J_all = vmap(lambda s: jacobian_fn_xi(params, xi, s))(xs)
-                Jp_all, Jo_all = extract_Jp_Jo(J_all)
+                Jp_all = J_all[:, :2, :]
+                Jo_all = J_all[:, 2:, :]
 
                 integrand_JpT_Jp = jnp.einsum("nij,nik->njk", Jp_all, Jp_all)
                 integrand_JoT_Jo = jnp.einsum("nij,nik->njk", Jo_all, Jo_all)
@@ -940,7 +945,7 @@ def factory(
         l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
         # Compute each integral
         def compute_integral(i):
-            if integration_type == "gauss":
+            if integration_type == "gauss-legendre":
                 Xs, Ws, nGauss = gauss_quadrature(N_GQ=param_integration, a=l_cum[i], b=l_cum[i + 1])
                 chi_s = vmap(lambda s: chi_fn_xi(params, xi, s))(Xs)
                 p_s = chi_s[:, :2]
@@ -948,6 +953,16 @@ def factory(
                 
                 # Compute the integral
                 integral = jnp.sum(Ws * integrand)
+                
+            elif integration_type == "gauss-kronrad":
+                rule = GaussKronrodRule(order=param_integration)
+                def integrand(s):
+                    chi_s = chi_fn_xi(params, xi, s)
+                    p_s = chi_s[:2]
+                    return -rho[i] * A[i] * jnp.dot(p_s, g)
+                
+                # Compute the integral
+                integral, _, _, _ = rule.integrate(integrand, l_cum[i], l_cum[i+1], args=())
                 
             elif integration_type == "trapezoid":
                 xs = jnp.linspace(l_cum[i], l_cum[i + 1], param_integration)
@@ -1020,11 +1035,11 @@ def factory(
         l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
         # Compute each integral
         def compute_integral(i):
-            if integration_type == "gauss":
+            if integration_type == "gauss-legendre":
                 Xs, Ws, nGauss = gauss_quadrature(N_GQ=param_integration, a=l_cum[i], b=l_cum[i + 1])
                 
                 J_all = vmap(lambda s: J_explicit(params, xi, s))(Xs)
-                Jp_all, _ = extract_Jp_Jo(J_all) # shape: (nGauss, n_segments, 3, 3)
+                Jp_all = J_all[:, :2, :] # shape: (nGauss, n_segments, 3, 3)
                 
                 # Compute the integrand
                 integrand = -rho[i] * A[i] * jnp.einsum("ijk,j->ik", Jp_all, g)
@@ -1034,12 +1049,22 @@ def factory(
 
                 # Compute the integral
                 integral = jnp.sum(weighted_integrand, axis=0)  # sum over the Gauss points
+                
+            elif integration_type == "gauss-kronrad":
+                rule = GaussKronrodRule(order=param_integration)
+                def integrand(s):
+                    J = J_explicit(params, xi, s)
+                    Jp = J[:2, :]
+                    return -rho[i] * A[i] * jnp.dot(g, Jp)
+
+                # Compute the integral
+                integral, _, _, _ = rule.integrate(integrand, l_cum[i], l_cum[i+1], args=())
                 
             elif integration_type == "trapezoid":
                 xs = jnp.linspace(l_cum[i], l_cum[i + 1], param_integration)
                 
                 J_all = vmap(lambda s: J_explicit(params, xi, s))(xs)
-                Jp_all, _ = extract_Jp_Jo(J_all) # shape: (nGauss, n_segments, 3, 3)
+                Jp_all = J_all[:, :2, :] # shape: (nGauss, n_segments, 3, 3)
                 
                 # Compute the integrand
                 integrand = -rho[i] * A[i] * jnp.einsum("ijk,j->ik", Jp_all, g)
@@ -1048,7 +1073,7 @@ def factory(
                 weighted_integrand = jnp.einsum("i, ij->ij", Ws, integrand)
 
                 # Compute the integral
-                integral = jnp.sum(weighted_integrand, axis=0)  # sum over the Gauss points
+                integral = jnp.sum(weighted_integrand, axis=0)
             
             return integral
         
@@ -1059,9 +1084,9 @@ def factory(
         G = jnp.sum(integrals, axis=0)  # sum over the segments
         return G
     
-    if bool_explicit:
+    if jacobian_type == "explicit":
         G_fn_xi = G_fn_xi_explicit
-    else:
+    elif jacobian_type == "autodiff":
         G_fn_xi = G_fn_xi_autodiff
     
     @jit
@@ -1134,7 +1159,7 @@ def factory(
         Returns:
             T: kinetic energy of shape ()
         """
-        B, C, G, K, D, alpha = dynamical_matrices_fn(params, q=q, q_d=q_d)
+        B, _, _, _, _, _ = dynamical_matrices_fn(params, q=q, q_d=q_d)
 
         # Kinetic energy
         T = (0.5 * q_d.T @ B @ q_d).squeeze()

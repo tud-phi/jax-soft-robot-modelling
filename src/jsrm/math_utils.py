@@ -6,7 +6,8 @@ def blk_diag(
     a: Array
 ) -> Array:
     """
-    Create a block diagonal matrix from a tensor of blocks
+    Create a block diagonal matrix from a tensor of blocks.
+
     Args:
         a: matrices to be block diagonalized of shape (m, n, o)
 
@@ -47,13 +48,13 @@ def blk_concat(
     a: Array
 ) -> Array:
     """
-    Concatenate the matrices along the first axis
+    Concatenate horizontally (along the columns) a list of N matrices of size (a, b) to create a single matrix of size (a, b * N).
 
     Args:
         a (Array): matrices to be concatenated of shape (N, a, b)
 
     Returns:
-        Array: concatenated matrix of shape (a, b * N)
+        Array: concatenated matrix of shape (a, N * b)
     """
     b = a.transpose(1, 0, 2).reshape(a.shape[1], -1)
     return b

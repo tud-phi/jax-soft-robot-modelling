@@ -21,9 +21,9 @@ import pickle
 def simulate_planar_pcs(
     num_segments: int,
     type_of_derivation: str = "symbolic",
-    type_of_integration: str = "gauss",
+    type_of_integration: str = "gauss-legendre",
     param_integration: int = None,
-    bool_explicit: bool = True,
+    type_of_jacobian: str = "explicit",
     robot_params: Dict[str, Array] = None,
     strain_selector: Array = None,
     q0: Array = None,
@@ -36,6 +36,7 @@ def simulate_planar_pcs(
     bool_save_video: bool = True,
     bool_save_res: bool = False,
     results_path: str = None, 
+    results_path_extension: str = None
 ) -> Dict:
     """
     Simulate a planar PCS model. Save the video and figures.
@@ -44,12 +45,12 @@ def simulate_planar_pcs(
         num_segments (int): number of segments of the robot.
         type_of_derivation (str, optional): type of derivation ("symbolic" or "numeric"). 
             Defaults to "symbolic".
-        type_of_integration (str, optional): scheme of integration ("gauss" or "trapezoid"). 
-            Defaults to "gauss".
+        type_of_integration (str, optional): scheme of integration ("gauss-legendre", "gauss-kronrad" or "trapezoid"). 
+            Defaults to "gauss-legendre".
         param_integration (int, optional): parameter for the integration scheme (number of points for gauss or number of points for trapezoid). 
             Defaults to 1000 for trapezoid and 5 for gauss.
-        bool_explicit (bool, optional): if True, use explicit expression for the jacobian, else use autodifferentiation to compute the jacobian.
-            Defaults to True.
+        type_of_jacobian (str, optional): type of jacobian ("explicit" or "autodiff").
+            Defaults to "explicit".
         strain_selector (Array, optional): selector for the strains as a boolean array.
             Defaults to all.
         robot_params (Dict[str, Array], optional): parameters of the robot. 
@@ -73,6 +74,8 @@ def simulate_planar_pcs(
         bool_save_res (bool, optional): if True, save the results of the simulation. 
             Defaults to False.
         results_path (str, optional): path to save the dictionary with the simulation results. Must have the suffix .pkl.
+        results_path_extension (str, optional): extension to add to the results path.
+            Defaults to None, which will use the default path.
         
     Returns:
         Dict: simulation results
@@ -118,13 +121,13 @@ def simulate_planar_pcs(
     if not isinstance(type_of_derivation, str):
         raise TypeError(f"type_of_derivation must be a string, but got {type(type_of_derivation).__name__}")
     if type_of_derivation == "numeric":
-        if type_of_integration not in ["gauss", "trapezoid"]:
-            raise ValueError(
-                f"type_of_integration must be 'gauss' or 'trapezoid', but got {type_of_integration}"
-            )
+        if not isinstance(type_of_integration, str):
+            raise TypeError(f"type_of_integration must be a string, but got {type(type_of_integration).__name__}")
         if param_integration is None:
-            if type_of_integration == "gauss":
+            if type_of_integration == "gauss-legendre":
                 param_integration = 5
+            if type_of_integration == "gauss-kronrad":
+                param_integration = 15
             elif type_of_integration == "trapezoid":
                 param_integration = 1000
         if not isinstance(param_integration, int):
@@ -132,10 +135,10 @@ def simulate_planar_pcs(
         if param_integration < 1:
             raise ValueError(f"param_integration must be greater than 0, but got {param_integration}")
         
-        if not isinstance(bool_explicit, bool):
-            raise TypeError(f"bool_explicit must be a boolean, but got {type(bool_explicit).__name__}")
-        
-        
+        if type_of_jacobian not in ["explicit", "autodiff"]:
+            raise ValueError(
+                f"type_of_jacobian must be 'explicit' or 'autodiff', but got {type_of_jacobian}"
+            )    
                 
     elif type_of_derivation == "symbolic":
         # filepath to symbolic expressions
@@ -262,8 +265,15 @@ def simulate_planar_pcs(
                 / f"ns-{num_segments}")
             file_name = f"{('symb' if type_of_derivation == 'symbolic' else 'num')}"
             if type_of_derivation == "numeric":
-                file_name += f"-{type_of_integration}-{param_integration}-{'explicit' if bool_explicit else 'autodiff'}"
-            
+                file_name += f"-{type_of_integration}-{param_integration}-{type_of_jacobian}"
+
+            if results_path_extension is not None:
+                if not isinstance(results_path_extension, str):
+                    raise TypeError(
+                        f"results_path_extension must be a string, but got {type(results_path_extension).__name__}"
+                    )
+                file_name += f"-{results_path_extension}"
+
             results_path = (results_path_parent / file_name).with_suffix(".pkl")
         
         if isinstance(results_path, str) or isinstance(results_path, Path):
@@ -373,7 +383,7 @@ def simulate_planar_pcs(
             "type_of_derivation": type_of_derivation,
             "type_of_integration": type_of_integration,
             "param_integration": param_integration,
-            "bool_explicit": bool_explicit,
+            "type_of_jacobian": type_of_jacobian,
             "robot_params": robot_params,
             "strain_selector": strain_selector,
             "q0": q0,
@@ -398,6 +408,7 @@ def simulate_planar_pcs(
         print("Parameter for integration:", param_integration)
     print()
     
+    # ====================================================
     # Import the planar PCS model depending on the type of derivation
     print("Importing the planar PCS model...")
     
@@ -413,7 +424,7 @@ def simulate_planar_pcs(
                 strain_selector, 
                 integration_type=type_of_integration, 
                 param_integration=param_integration, 
-                bool_explicit=bool_explicit
+                jacobian_type=type_of_jacobian
                 )
         )
     timer_end = time.time()
@@ -421,7 +432,8 @@ def simulate_planar_pcs(
     simulation_dict["execution_time"]["import_model"] = timer_end - timer_start
     
     print(f"Importing the planar PCS model took {timer_end - timer_start:.2e} seconds. \n")
-        
+    
+    # ====================================================  
     # JIT the functions
     print("JIT-compiling the dynamical matrices function...")
     dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn))
@@ -431,7 +443,15 @@ def simulate_planar_pcs(
     
     timer_start = time.time()
     B, C, G, K, D, A = dynamical_matrices_fn(robot_params, q0, jnp.zeros_like(q0))
+    B.block_until_ready()  # ensure the matrices are computed
+    C.block_until_ready()  # ensure the matrices are computed
+    G.block_until_ready()  # ensure the matrices are computed
+    K.block_until_ready()  # ensure the matrices are computed
+    D.block_until_ready()  # ensure the matrices are computed
+    A.block_until_ready()  # ensure the matrices are computed
     timer_end = time.time()
+    
+    simulation_dict["execution_time"]["compile_dynamical_matrices"] = timer_end - timer_start
     
     if bool_print:
         print("B =\n", B) 
@@ -441,14 +461,6 @@ def simulate_planar_pcs(
         print("D =\n", D)
         print("A =\n", A)
     
-    simulation_dict["execution_time"]["compile_dynamical_matrices"] = timer_end - timer_start
-    simulation_dict["results"]["B_q0"] = B
-    simulation_dict["results"]["C_q0"] = C
-    simulation_dict["results"]["G_q0"] = G
-    simulation_dict["results"]["K_q0"] = K
-    simulation_dict["results"]["D_q0"] = D
-    simulation_dict["results"]["A_q0"] = A
-    
     print(f"Evaluating the dynamical matrices for the first time took {timer_end - timer_start:.2e} seconds. \n")
 
     # Second evaluation of the dynamical matrices to capture the time of the evaluation
@@ -456,12 +468,26 @@ def simulate_planar_pcs(
     
     timer_start = time.time()
     B, C, G, K, D, A = dynamical_matrices_fn(robot_params, q0, jnp.zeros_like(q0))
-    timer_end = time.time()    
+    B.block_until_ready()  # ensure the matrices are computed
+    C.block_until_ready()  # ensure the matrices are computed
+    G.block_until_ready()  # ensure the matrices are computed
+    K.block_until_ready()  # ensure the matrices are computed
+    D.block_until_ready()  # ensure the matrices are computed
+    A.block_until_ready()  # ensure the matrices are computed
+    timer_end = time.time()
     
     simulation_dict["execution_time"]["evaluate_dynamical_matrices"] = timer_end - timer_start
     
+    simulation_dict["results"]["B_q0"] = B
+    simulation_dict["results"]["C_q0"] = C
+    simulation_dict["results"]["G_q0"] = G
+    simulation_dict["results"]["K_q0"] = K
+    simulation_dict["results"]["D_q0"] = D
+    simulation_dict["results"]["A_q0"] = A
+    
     print(f"Evaluating the dynamical matrices for the second time took {timer_end - timer_start:.2e} seconds. \n")
     
+    # ====================================================
     # Parameter for the simulation
     x0 = jnp.concatenate([q0, q_d0])  # initial condition
     tau = jnp.zeros_like(q0)  # torques
@@ -484,55 +510,75 @@ def simulate_planar_pcs(
                 saveat=SaveAt(ts=video_ts))
         )
     
+    # ====================================================
     # First evaluation of the ODE to trigger JIT compilation
     print("Solving the ODE for the first time (JIT-compilation)...")
     
     timer_start = time.time()
     sol = diffeqsolve_fn()
+    sol.ys.block_until_ready()  # ensure the solution is computed
     timer_end = time.time()
-    
-    # the evolution of the generalized coordinates
-    q_ts = sol.ys[:, :n_dof]
-    # the evolution of the generalized velocities
-    q_d_ts = sol.ys[:, n_dof:]
-    
-    if bool_print:
-        print("q_ts =\n", q_ts)
-        print("q_d_ts =\n", q_d_ts)
         
     simulation_dict["execution_time"]["compile_ode"] = timer_end - timer_start
-    simulation_dict["results"]["q_ts"] = q_ts
-    simulation_dict["results"]["q_d_ts"] = q_d_ts
     
-    print(f"Solving the ODE took {timer_end - timer_start:.2e} seconds. \n")
+    print(f"Solving the ODE for the first time took {timer_end - timer_start:.2e} seconds. \n")
     
     # Second evaluation of the ODE to capture the time of the evaluation
     print("Solving the ODE for the second time (JIT-evaluation)...")
     
     timer_start = time.time()
     sol = diffeqsolve_fn()
+    sol.ys.block_until_ready()  # ensure the solution is computed
     timer_end = time.time()
     
     simulation_dict["execution_time"]["evaluate_ode"] = timer_end - timer_start
     
+    # the evolution of the generalized coordinates
+    q_ts = sol.ys[:, :n_dof].block_until_ready()
+    
+    # the evolution of the generalized velocities
+    q_d_ts = sol.ys[:, n_dof:].block_until_ready()
+    
+    if bool_print:
+        print("q_ts =\n", q_ts)
+        print("q_d_ts =\n", q_d_ts)
+        
+    simulation_dict["results"]["q_ts"] = q_ts
+    simulation_dict["results"]["q_d_ts"] = q_d_ts
+    
     print(f"Solving the ODE for a second time took {timer_end - timer_start:.2e} seconds. \n")
 
-    # Evaluate the forward kinematics of the end-effector along the trajectory
-    print("Evaluating the forward kinematics of the end-effector along the trajectory...")
+    # ====================================================
+    # First evaluation of the forward kinematics to trigger JIT compilation
+    print("Evaluating the forward kinematics of the end-effector along the trajectory for the first time (JIT-compilation)...")
     
     timer_start = time.time()
     chi_ee_ts = vmap(forward_kinematics_fn, in_axes=(None, 0, None))(
         robot_params, q_ts, jnp.array([jnp.sum(robot_params["l"])])
-    )
+    ).block_until_ready()
     timer_end = time.time()
+    
+    simulation_dict["execution_time"]["compile_forward_kinematics"] = timer_end - timer_start
     
     if bool_print:
         print("chi_ee_ts =\n", chi_ee_ts)
     
+    print(f"Evaluating the forward kinematics for the first time took {timer_end - timer_start:.2e} seconds. \n")
+    
+    # Second evaluation of the forward kinematics to capture the time of the evaluation
+    print("Evaluating the forward kinematics of the end-effector along the trajectory for a second time (JIT-evaluation)...")
+    
+    timer_start = time.time()
+    chi_ee_ts = vmap(forward_kinematics_fn, in_axes=(None, 0, None))(
+        robot_params, q_ts, jnp.array([jnp.sum(robot_params["l"])])
+    ).block_until_ready()
+    timer_end = time.time()
+    
     simulation_dict["execution_time"]["evaluate_forward_kinematics"] = timer_end - timer_start
+    
     simulation_dict["results"]["chi_ee_ts"] = chi_ee_ts
     
-    print(f"Evaluating the forward kinematics took {timer_end - timer_start:.2e} seconds. \n ")
+    print(f"Evaluating the forward kinematics for a second time took {timer_end - timer_start:.2e} seconds. \n")
     
     #====================================================
     # Plotting
@@ -610,32 +656,59 @@ def simulate_planar_pcs(
             plt.show()
         plt.close()
     
-    # Evaluate the energy along the trajectory
-    print("Evaluating the energy...")
+    # ====================================================
+    # First evaluation of the potential energy to trigger JIT compilation
+    print("Evaluating the potential energy for the first time (JIT-compilation)...")
     
     timer_start = time.time()
-    potential_energy_fn_vmapped = vmap(
-        partial(auxiliary_fns["potential_energy_fn"], robot_params)
-    )
-    U_ts = potential_energy_fn_vmapped(q_ts)
+    U_ts = vmap(partial(auxiliary_fns["potential_energy_fn"], robot_params))(q_ts).block_until_ready()
+    U_ts = U_ts.block_until_ready()  # ensure the potential energy is computed
+    timer_end = time.time()
+    
+    simulation_dict["execution_time"]["compile_potential_energy"] = timer_end - timer_start
+    
+    print(f"Evaluating the potential energy took {timer_end - timer_start:.2e} seconds. \n")
+    
+    # Second evaluation of the potential energy to capture the time of the evaluation
+    print("Evaluating the potential energy for a second time (JIT-evaluation)...")
+    
+    timer_start = time.time()
+    U_ts = vmap(partial(auxiliary_fns["potential_energy_fn"], robot_params))(q_ts).block_until_ready()
+    U_ts = U_ts.block_until_ready()  # ensure the potential energy is computed
     timer_end = time.time()
     
     simulation_dict["execution_time"]["evaluate_potential_energy"] = timer_end - timer_start
+    
     simulation_dict["results"]["U_ts"] = U_ts
     
-    print("Evaluating the potential energy took", timer_end - timer_start, "seconds.")
+    print(f"Evaluating the potential energy for a second time took {timer_end - timer_start:.2e} seconds. \n")
+    
+    # ====================================================
+    # First evaluation of the kinetic energy to trigger JIT compilation
+    print("Evaluating the kinetic energy for the first time (JIT-compilation)...")
     
     timer_start = time.time()
-    kinetic_energy_fn_vmapped = vmap(
-        partial(auxiliary_fns["kinetic_energy_fn"], robot_params)
-    )
-    T_ts = kinetic_energy_fn_vmapped(q_ts, q_d_ts)
+    T_ts = vmap(partial(auxiliary_fns["kinetic_energy_fn"], robot_params))(q_ts, q_d_ts).block_until_ready()
+    T_ts = T_ts.block_until_ready()  # ensure the kinetic energy is computed
+    timer_end = time.time()
+    
+    simulation_dict["execution_time"]["compile_kinetic_energy"] = timer_end - timer_start
+    
+    print(f"Evaluating the kinetic energy took {timer_end - timer_start:.2e} seconds. \n")
+    
+    # Second evaluation of the kinetic energy to capture the time of the evaluation
+    print("Evaluating the kinetic energy for a second time (JIT-evaluation)...")
+      
+    timer_start = time.time()
+    T_ts = vmap(partial(auxiliary_fns["kinetic_energy_fn"], robot_params))(q_ts, q_d_ts).block_until_ready()
+    T_ts = T_ts.block_until_ready()  # ensure the kinetic energy is computed
     timer_end = time.time()
     
     simulation_dict["execution_time"]["evaluate_kinetic_energy"] = timer_end - timer_start
+    
     simulation_dict["results"]["T_ts"] = T_ts
     
-    print("Evaluating the kinetic energy took", timer_end - timer_start, "seconds. \n")
+    print(f"Evaluating the kinetic energy for a second time took {timer_end - timer_start:.2e} seconds. \n")
     
     if bool_print:
         print("U_ts =\n", U_ts)
@@ -669,8 +742,6 @@ def simulate_planar_pcs(
     if bool_save_video:
         print("Drawing the robot...")
         
-        timer_start = time.time()
-        
         # Vectorize the forward kinematics function according to the s coordinates
         print("Vectorizing the forward kinematics function according to the number of segments...")
         batched_forward_kinematics = vmap(
@@ -701,11 +772,6 @@ def simulate_planar_pcs(
         # Release the video
         video.release()
         
-        timer_end = time.time()
-        
-        simulation_dict["execution_time"]["draw_robot"] = timer_end - timer_start
-        
-        print(f"Drawing the robot took {timer_end - timer_start:.2e} seconds. \n")
         print(f"Video saved at {video_path}. \n")
     
     # ===========================================================================
@@ -729,7 +795,7 @@ if __name__ == "__main__":
     simulate_res = simulate_planar_pcs(
         num_segments        = 1,
         type_of_derivation  = "numeric", #"symbolic"
-        type_of_integration = "quadgk", #"gauss", # "quadgk", "trapezoid", "quadcc", "quadts", 
+        type_of_integration = "gauss", # "trapezoid"
         # param_integration   = 30,
         strain_selector     = [True, False, True],
         bool_print          = True,

@@ -22,8 +22,6 @@ def tilde_SE3(
             A 3x3 matrix representing the tilde operator of the input vector.
     """
     vec3 = vec3.reshape(-1)  # Ensure vec3 is a 1D array
-    if vec3.shape != (3,):
-        raise ValueError("Input vector must be of shape (3,)")
     
     # Extract components of the vector
     x, y, z = vec3.flatten()
@@ -69,8 +67,6 @@ def adjoint_SE3(
             A 6x6 matrix representing the adjoint transformation of the input screw vector.
     """
     vec6 = vec6.reshape(-1) # Ensure vec6 is a 1D array
-    if vec6.shape != (6,):
-        raise ValueError("Input vector must be of shape (6,)")
     
     ang = vec6[:3].reshape((3, 1))  # Angular as a (3,1) vector
     lin = vec6[3:].reshape((3, 1))  # Linear as a (3,1) vector
@@ -78,10 +74,11 @@ def adjoint_SE3(
     angtilde = tilde_SE3(ang)  # Tilde operator for angular part
     lintilde = tilde_SE3(lin)  # Tilde operator for linear part
     
-    adj = jnp.zeros((6, 6))
-    adj = adj.at[:3, :3].set(angtilde)  # Fill the top-left 3x3 block with the tilde operator of the angular part
-    adj = adj.at[3:, 3:].set(angtilde)  # Fill the bottom-right 3x3 block with the tilde operator of the angular part
-    adj = adj.at[3:, :3].set(lintilde)  # Fill the bottom-left 3x3 block with the tilde operator of the linear part
+    adj = jnp.block([
+        [angtilde,        jnp.zeros((3, 3))],
+        [lintilde,        angtilde]
+    ])
+    
     return adj
 
 @jit
@@ -102,17 +99,17 @@ def hat_SE3(
             A 4x4 matrix representing the hat operator of the input screw vector.
     """
     vec6 = vec6.reshape(-1)  # Ensure vec6 is a 1D array
-    if vec6.shape != (6,):
-        raise ValueError("Input vector must be of shape (6,)")
     
     ang = vec6[:3].reshape((3, 1))  # Angular as a (3,1) vector
     lin = vec6[3:].reshape((3, 1))  # Linear as a (3,1) vector
     
     angtilde = tilde_SE3(ang)  # Tilde operator for angular part
     
-    hat = jnp.zeros((4, 4))
-    hat = hat.at[:3, :3].set(angtilde)  # Fill the top-left 3x3 block with the tilde operator of the angular part
-    hat = hat.at[:3, 3].set(lin.reshape((3,)))  # Fill the top-right column with the linear part
+    hat = jnp.block([
+        [angtilde, lin],
+        [jnp.zeros((1, 3)), jnp.zeros((1, 1))] 
+    ])
+    
     return hat
 
 @jit
@@ -135,10 +132,11 @@ def Adjoint_g_SE3(
     
     ltilde = tilde_SE3(lin)  # Tilde operator for linear part
     
-    Adjoint = jnp.zeros((6, 6))
-    Adjoint = Adjoint.at[:3, :3].set(ang)  # Fill the top-left 3x3 block with the tilde operator of the angular part
-    Adjoint = Adjoint.at[3:, 3:].set(ang)  # Fill the bottom-right 3x3 block with the tilde operator of the angular part
-    Adjoint = Adjoint.at[3:, :3].set(ltilde @ ang)  # Fill the bottom-left 3x3 block with the tilde operator of the linear part
+    Adjoint = jnp.block([
+        [ang, jnp.zeros((3, 3))],
+        [ltilde @ ang, ang]
+    ])
+    
     return Adjoint
 
 @jit
@@ -147,6 +145,24 @@ def Adjoint_gn_SE3(
     l_nprev: float,
     s :float,
     )-> Array:
+    """
+    Computes the adjoint representation of a position of a points at s (general curvilinear coordinate)
+    along a rod in SE(3) deformed ine the current segment according to a strain vector xi_n.
+    
+    If s is a point of the n-th segment, this function use the lenght from the origin of the rod to the begining of the n-th segment.
+
+    Args:
+        xi_n (Array): array-like, shape (6,1)
+            A 6-dimensional vector representing the screw in SE(3).
+        l_nprev (float): 
+            The length from the origin of the rod to the beginning of the n-th segment.
+        s (float):
+            The curvilinear coordinate along the rod, representing the position of a point in the n-th segment.
+
+    Returns:
+        Array: shape (6, 6)
+            A 6x6 matrix representing the adjoint transformation of the input screw vector at the specified position.
+    """
     # We suppose here that theta is not zero thanks to a previous use of apply_eps
     ang = xi_n[:3].reshape((3, 1))  # Angular as a (3,1) vector
     theta = jnp.linalg.norm(ang)  # Compute the norm of the angular part
@@ -175,6 +191,24 @@ def Tangent_gn_SE3(
     l_nprev: float,
     s :float,
     )-> Array:
+    """
+    Computes the tangent representation of a position of a points at s (general curvilinear coordinate)
+    along a rod in SE(3) deformed in the current segment according to a strain vector xi_n.
+    
+    If s is a point of the n-th segment, this function use the length from the origin of the rod to the beginning of the n-th segment.
+
+    Args:
+        xi_n (Array): array-like, shape (6,1)
+            A 6-dimensional vector representing the screw in SE(3).
+        l_nprev (float): 
+            The length from the origin of the rod to the beginning of the n-th segment.
+        s (float): 
+            The curvilinear coordinate along the rod, representing the position of a point in the n-th segment.
+
+    Returns:
+        Array: shape (6, 6)
+            A 6x6 matrix representing the tangent transformation of the input screw vector at the specified position.
+    """
     # We suppose here that theta is not zero thanks to a previous use of apply_eps
     ang = xi_n[:3].reshape((3, 1))  # Angular as a (3,1) vector
     theta = jnp.linalg.norm(ang)  # Compute the norm of the angular part
@@ -246,24 +280,16 @@ def compute_weighted_sums(
            The result of the weighted sums. For each i, the result is the sum of the products of M[i, j] and vec6[j] for j from 0 to idx.
     """
     N = M.shape[0]
-    print("M = ", M)
-    print("vec6 = ", vec6)
-    print("idx = ", idx)
-    print("shape of M = ", M.shape)
-    print("shape of vec6 = ", vec6.shape)
     # Matrix product for each j: (N, 6, 6) @ (N, 6, 1) -> (N, 6)
     prod = jnp.einsum('nij,nj->ni', M, vec6)
-    print("prod", prod)
 
     # Triangular mask for partial sum: (N, N)
     # mask[i, j] = 1 if j >= i and j <= idx
     mask = (jnp.arange(N)[:, None] <= jnp.arange(N)[None, :]) & (jnp.arange(N)[None, :] <= idx)
     mask = mask.astype(M.dtype)  # (N, N)
-    print("mask", mask)
 
     # Extend 6-dimensional mask (N, N, 1) to apply to (N, 6)
     masked_prod = mask[:, :, None] * prod[None, :, :]  # (N, N, 6)
-    print("masked_prod", masked_prod)
 
     # Sum over j for each i : (N, 6)
     result = masked_prod.sum(axis=1) # (N, 6)
