@@ -948,6 +948,9 @@ def G_fn_xi_explicit(
             
             J_all = vmap(lambda s: J_explicit(params, xi, s))(Xs)
             Jp_all, _ = extract_Jp_Jo(J_all) # shape: (nGauss, n_segments, 3, 3)
+            print("J_all:", J_all[0].shape)
+            print("Jp_all:", Jp_all[0].shape)
+            print("einsum", jnp.einsum("nij,nik->njk", Jp_all, Jp_all)[0].shape)
             
             # Compute the integrand
             integrand = -rho[i] * A[i] * jnp.einsum("ijk,j->ik", Jp_all, g)
@@ -963,6 +966,9 @@ def G_fn_xi_explicit(
                 J = J_explicit(params, xi, s)
                 Jp = J[:2, :]
                 Jo = J[2:, :]
+                print("J:", J)
+                print("Jp:", Jp)
+                print("Jo:", Jo)
                 return -rho[i] * A[i] * jnp.dot(g, Jp)  # shape: (k,)
 
             # Compute the integral
@@ -1053,20 +1059,20 @@ if __name__ == "__main__":
     J_autodiff_val = J_autodiff(params, xi, s)
     print("Jacobian (autodiff):\n", J_autodiff_val)
     
-    integration_type = "quadax"  # or "trapezoid"
-    param_integration = 21  # Number of integration points for the trapezoid rule or Gauss quadrature
+    # integration_type = "quadax"  # or "trapezoid"
+    # param_integration = 21  # Number of integration points for the trapezoid rule or Gauss quadrature
     
-    print("\nComputing gravity ...")
-    U_g = U_g_fn_xi(params, xi)
-    print("U_g:\n", U_g)
+    # print("\nComputing gravity ...")
+    # U_g = U_g_fn_xi(params, xi)
+    # print("U_g:\n", U_g)
     
-    print("\nComputing gravity vector with autodiff...")
-    G_fn_xi_autodiff_val = G_fn_xi_autodiff(params, xi)
-    print("Gravity vector (autodiff):\n", G_fn_xi_autodiff_val)
+    # print("\nComputing gravity vector with autodiff...")
+    # G_fn_xi_autodiff_val = G_fn_xi_autodiff(params, xi)
+    # print("Gravity vector (autodiff):\n", G_fn_xi_autodiff_val)
     
-    print("\nComputing gravity vector with explicit expressions...")
-    G_fn_xi_explicit_val = G_fn_xi_explicit(params, xi)
-    print("Gravity vector (explicit):\n", G_fn_xi_explicit_val)
+    # print("\nComputing gravity vector with explicit expressions...")
+    # G_fn_xi_explicit_val = G_fn_xi_explicit(params, xi)
+    # print("Gravity vector (explicit):\n", G_fn_xi_explicit_val)
     
     integration_type = "gauss"  # or "trapezoid"
     param_integration = 5  # Number of integration points for the trapezoid rule or Gauss quadrature

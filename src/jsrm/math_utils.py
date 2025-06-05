@@ -1,7 +1,6 @@
 from jax import numpy as jnp
 from jax import Array, lax, jit
 
-@jit
 def blk_diag(
     a: Array
 ) -> Array:
@@ -43,18 +42,17 @@ def blk_diag(
 
     return b
 
-@jit
 def blk_concat(
     a: Array
 ) -> Array:
     """
-    Concatenate horizontally (along the columns) a list of N matrices of size (a, b) to create a single matrix of size (a, b * N).
+    Concatenate horizontally (along the columns) a list of N matrices of size (m, n) to create a single matrix of size (m, n * N).
 
     Args:
-        a (Array): matrices to be concatenated of shape (N, a, b)
+        a (Array): matrices to be concatenated of shape (N, m, n)
 
     Returns:
-        Array: concatenated matrix of shape (a, N * b)
+        b (Array): concatenated matrix of shape (m, N * n)
     """
     b = a.transpose(1, 0, 2).reshape(a.shape[1], -1)
     return b

@@ -281,7 +281,7 @@ def factory(
         return segment_idx, s_segment.squeeze(), l_cum
     
     @jit
-    def chi_fn_xi(
+    def chi_fn(
         params: Dict[str, Array], 
         xi: Array, 
         s: Array
@@ -297,13 +297,13 @@ def factory(
         Returns:
             Array: pose of the robot at the point s in the interval [0, L].
         """
-        th0 = jnp.array(params["th0"])  # initial angle of the robot
+        th0 = params["th0"]  # initial angle of the robot
         l = params["l"] # length of each segment [m]
         
         # Classify the point along the robot to the corresponding segment
         segment_idx, s_local, _ = classify_segment(params, s)
             
-        chi_O = jnp.array([0.0, 0.0, th0])  # Initial pose of the robot
+        chi_0 = jnp.array([0, 0, th0])  # Initial pose of the robot #TODO
 
         # Iteration function
         def chi_i(
@@ -340,7 +340,7 @@ def factory(
 
         chi, chi_list = lax.scan(
             f = lambda carry, i: (chi_i(i, carry), chi_i(i, carry)),
-            init = chi_O, 
+            init = chi_0, 
             xs = jnp.arange(num_segments + 1))
 
         return chi_list[segment_idx]
@@ -372,7 +372,7 @@ def factory(
         # Add a small number to the bending strain to avoid singularities
         xi = apply_eps_to_bend_strains(xi, eps)
         
-        chi = chi_fn_xi(params, xi, s)
+        chi = chi_fn(params, xi, s)
         
         return chi
     
@@ -399,7 +399,7 @@ def factory(
         xi = apply_eps_to_bend_strains(xi, eps)
         
         # Compute the Jacobian of chi_fn with respect to xi
-        J = jacobian(lambda xi: chi_fn_xi(params, xi, s))(xi)
+        J = jacobian(lambda _xi: chi_fn(params, _xi, s))(xi)
 
         # apply the strain basis to the Jacobian
         J = J @ B_xi
@@ -507,7 +507,7 @@ def factory(
         # From local to global frame : applying the rotation of the pose at point s
         
         # Get the pose at point s
-        px, py, theta = chi_fn_xi(params, xi, s)  
+        px, py, theta = chi_fn(params, xi, s)  
         # Convert the pose to SE(3) representation
         R = jnp.array([             # Rotation matrix around the z-axis
             [jnp.cos(theta), -jnp.sin(theta)],
@@ -560,7 +560,7 @@ def factory(
         xi = apply_eps_to_bend_strains(xi, eps)
         
         # Compute the Jacobian of chi_fn with respect to xi
-        J = jacobian(lambda xi: chi_fn_xi(params, xi, s))(xi)
+        J = jacobian(lambda _xi: chi_fn(params, _xi, s))(xi)
         
         dJ_dxi = jacobian(J)(xi)  
         J_d = jnp.tensordot(dJ_dxi, xi_d, axes=([2], [0]))
@@ -683,7 +683,7 @@ def factory(
         # From local to global frame : applying the rotation of the pose at point s
         
         # Get the pose at point s
-        px, py, theta = chi_fn_xi(params, xi, s)  
+        px, py, theta = chi_fn(params, xi, s)  
         # Convert the pose to SE(3) representation
         g_s = jnp.eye(4)  # Initialize as identity matrix
         R = jnp.array([             # Rotation matrix around the z-axis
@@ -704,13 +704,13 @@ def factory(
             lambda i: lax.dynamic_slice(xi_d, (3 * i,), (3,))
         )(idx_range) # shape: (num_segments, 3)
         xi_d_SE3_i = vmap(
-            lambda xi_d_i : vec_SE2_to_xi_SE3(xi_d_i, SE2_to_SE3_indices)
+            lambda _xi_d_i: vec_SE2_to_xi_SE3(_xi_d_i, SE2_to_SE3_indices)
         )(xi_d_i) # shape: (num_segments, 6)
         S_i = vmap(
-            lambda i:lax.dynamic_index_in_dim(J_segment_SE3_global, i, axis=0, keepdims=False)
+            lambda i: lax.dynamic_index_in_dim(J_segment_SE3_global, i, axis=0, keepdims=False)
         )(idx_range) # shape: (num_segments, 6, 6)
         sum_Sj_xi_d_j = vmap(
-            lambda i, xi_d_SE3_i: compute_weighted_sums(J_segment_SE3_global, xi_d_SE3_i, i)
+            lambda i, _xi_d_SE3_i: compute_weighted_sums(J_segment_SE3_global, _xi_d_SE3_i, i)
         )(idx_range, xi_d_SE3_i) # shape: (num_segments, 6)
         adjoint_sum = vmap(adjoint_SE3)(sum_Sj_xi_d_j) # shape: (num_segments, 6, 6)
         
@@ -728,7 +728,7 @@ def factory(
         # From local to global frame : applying the rotation of the pose at point s
         
         # Get the pose at point s
-        px, py, theta = chi_fn_xi(params, xi, s)  
+        px, py, theta = chi_fn(params, xi, s)  
         # Convert the pose to SE(3) representation
         g_s = jnp.eye(4)  # Initialize as identity matrix
         R = jnp.array([             # Rotation matrix around the z-axis
@@ -874,7 +874,7 @@ def factory(
         return B
         
     @jit
-    def B_C_fn_xi(
+    def B_C_fn(
         params: Dict[str, Array], 
         xi: Array, 
         xi_d: Array
@@ -888,30 +888,124 @@ def factory(
             xi_d (Array): velocity vector of the robot.
 
         Returns:
-            Tuple[Array, Array]: 
-                - B (Array): mass / inertia matrix of the robot.
-                - C (Array): Coriolis / centrifugal matrix of the robot.
+            B (Array): mass / inertia matrix of the robot.
+            C (Array): Coriolis / centrifugal matrix of the robot.
         """
 
         # Compute the mass / inertia matrix
         B = B_fn_xi(params, xi)
 
-        # Compute the Christoffel symbols
-        def christoffel_symbol(i, j, k):
+        # # Compute the Christoffel symbols
+        # def christoffel_symbol(i, j, k):
+        #     return 0.5 * (
+        #         grad(lambda x: B[i, j])(xi)[k]
+        #         + grad(lambda x: B[i, k])(xi)[j]
+        #         - grad(lambda x: B[j, k])(xi)[i]
+        #     )
+
+        # # Compute the Coriolis / centrifugal matrix
+        # C = jnp.zeros_like(B)
+        # for i in range(B.shape[0]):
+        #     for j in range(B.shape[1]):
+        #         for k in range(B.shape[0]):
+        #             C = C.at[i, j].add(christoffel_symbol(i, j, k) * xi_d[k])
+        
+        n = B.shape[0]  # number of segments
+        
+        # Compute Christoffel symbols for all (i,j,k)
+        def christoffel_fn(i, j, k):
             return 0.5 * (
-                grad(lambda x: B[i, j])(xi)[k]
-                + grad(lambda x: B[i, k])(xi)[j]
-                - grad(lambda x: B[j, k])(xi)[i]
+                grad(lambda x: B_fn_xi(params, x)[i, j])(xi)[k]
+                + grad(lambda x: B_fn_xi(params, x)[i, k])(xi)[j]
+                - grad(lambda x: B_fn_xi(params, x)[j, k])(xi)[i]
             )
+        
+        # Vectorize over k
+        def C_ij(i, j):
+            cs_k = vmap(lambda k: christoffel_fn(i, j, k))(jnp.arange(n))  # shape (n,)
+            return jnp.dot(cs_k, xi_d)
 
-        # Compute the Coriolis / centrifugal matrix
-        C = jnp.zeros_like(B)
-        for i in range(B.shape[0]):
-            for j in range(B.shape[1]):
-                for k in range(B.shape[0]):
-                    C = C.at[i, j].add(christoffel_symbol(i, j, k) * xi_d[k])
-
+        # Vectorize over i and j
+        C = vmap(lambda i: vmap(lambda j: C_ij(i, j))(jnp.arange(n)))(jnp.arange(n))  # shape (n, n)
+        
         return B, C
+    
+    # @jit
+    # def B_C_fn_explicit(
+    #     params: Dict[str, Array], 
+    #     xi: Array
+    # ) -> Array:
+    #     """
+    #     Compute the mass / inertia matrix of the robot.
+
+    #     Args:
+    #         params (Dict[str, Array]): dictionary of robot parameters.
+    #         xi (Array): strain vector of the robot.
+
+    #     Returns:
+    #         Array: mass / inertia matrix of the robot.
+    #     """
+    #     # Extract the parameters
+    #     rho = params["rho"] # density of each segment [kg/m^3]
+    #     l = params["l"] # length of each segment [m]
+    #     r = params["r"] # radius of each segment [m]
+        
+    #     # Usefull derived quantities
+    #     A = jnp.pi * r**2  # cross-sectional area of each segment [m^2]
+    #     Ib = A**2 / (4 * jnp.pi) # second moment of area of each segment [m^4]
+
+    #     l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
+    #     # Compute each integral
+    #     def compute_integral(i):
+    #         if integration_type == "gauss-legendre":
+    #             Xs, Ws, nGauss = gauss_quadrature(N_GQ=param_integration, a=l_cum[i], b=l_cum[i + 1])
+                
+    #             J_all = vmap(lambda s: jacobian_fn_xi(params, xi, s))(Xs)
+    #             Jp_all = J_all[:, :2, :]
+    #             Jo_all = J_all[:, 2:, :]
+
+    #             integrand_JpT_Jp = jnp.einsum("nij,nik->njk", Jp_all, Jp_all)
+    #             integrand_JoT_Jo = jnp.einsum("nij,nik->njk", Jo_all, Jo_all)
+                
+    #             integral_Jp = jnp.sum(Ws[:, None, None] * integrand_JpT_Jp, axis=0)
+    #             integral_Jo = jnp.sum(Ws[:, None, None] * integrand_JoT_Jo, axis=0)
+                
+    #             integral_B = rho[i] * A[i] * integral_Jp + rho[i] * Ib[i] * integral_Jo
+                
+    #         elif integration_type == "gauss-kronrad":
+    #             rule = GaussKronrodRule(order=param_integration)
+    #             def integrand(s):
+    #                 J = jacobian_fn_xi(params, xi, s)
+    #                 Jp = J[:2, :]
+    #                 Jo = J[2:, :]
+    #                 return rho[i] * A[i] * Jp.T @ Jp + rho[i] * Ib[i] * Jo.T @ Jo
+
+    #             integral_B, _, _, _ = rule.integrate(integrand, l_cum[i], l_cum[i+1], args=())
+
+    #         elif integration_type == "trapezoid":
+    #             xs = jnp.linspace(l_cum[i], l_cum[i + 1], param_integration)
+                
+    #             J_all = vmap(lambda s: jacobian_fn_xi(params, xi, s))(xs)
+    #             Jp_all = J_all[:, :2, :]
+    #             Jo_all = J_all[:, 2:, :]
+
+    #             integrand_JpT_Jp = jnp.einsum("nij,nik->njk", Jp_all, Jp_all)
+    #             integrand_JoT_Jo = jnp.einsum("nij,nik->njk", Jo_all, Jo_all)
+                
+    #             integral_Jp = jscipy.integrate.trapezoid(integrand_JpT_Jp, x=xs, axis=0)
+    #             integral_Jo = jscipy.integrate.trapezoid(integrand_JoT_Jo, x=xs, axis=0) 
+                
+    #             integral_B = rho[i] * A[i] * integral_Jp + rho[i] * Ib[i] * integral_Jo
+                
+    #         return integral_B
+        
+    #     # Compute the cumulative integral
+    #     indices = jnp.arange(num_segments) 
+    #     integrals = vmap(compute_integral)(indices)
+        
+    #     B = jnp.sum(integrals, axis=0)
+        
+    #     return B
     
     @jit 
     def U_g_fn_xi(
@@ -928,7 +1022,7 @@ def factory(
             eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
-            Array: gravity vector of the robot.
+            U_g (Array): gravity vector of the robot.
         """
         # Add a small number to the bending strain to avoid singularities
         xi = apply_eps_to_bend_strains(xi, eps)
@@ -947,7 +1041,7 @@ def factory(
         def compute_integral(i):
             if integration_type == "gauss-legendre":
                 Xs, Ws, nGauss = gauss_quadrature(N_GQ=param_integration, a=l_cum[i], b=l_cum[i + 1])
-                chi_s = vmap(lambda s: chi_fn_xi(params, xi, s))(Xs)
+                chi_s = vmap(lambda s: chi_fn(params, xi, s))(Xs)
                 p_s = chi_s[:, :2]
                 integrand = -rho[i] * A[i] * jnp.einsum("ij,j->i", p_s, g)
                 
@@ -957,7 +1051,7 @@ def factory(
             elif integration_type == "gauss-kronrad":
                 rule = GaussKronrodRule(order=param_integration)
                 def integrand(s):
-                    chi_s = chi_fn_xi(params, xi, s)
+                    chi_s = chi_fn(params, xi, s)
                     p_s = chi_s[:2]
                     return -rho[i] * A[i] * jnp.dot(p_s, g)
                 
@@ -966,7 +1060,7 @@ def factory(
                 
             elif integration_type == "trapezoid":
                 xs = jnp.linspace(l_cum[i], l_cum[i + 1], param_integration)
-                chi_s = vmap(lambda s: chi_fn_xi(params, xi, s))(xs)
+                chi_s = vmap(lambda s: chi_fn(params, xi, s))(xs)
                 p_s = chi_s[:, :2]
                 integrand = -rho[i] * A[i] * jnp.einsum("ij,j->i", p_s, g)
                 
@@ -984,7 +1078,7 @@ def factory(
         return U_g
     
     @jit 
-    def G_fn_xi_autodiff(
+    def G_autodiff_fn(
         params: Dict[str, Array], 
         xi: Array
     ) -> Array:
@@ -996,14 +1090,14 @@ def factory(
             xi (Array): strain vector of the robot.
 
         Returns:
-            Array: gravity vector of the robot.
+            G (Array) : gravity vector of the robot.
         """
         
-        G = jacobian(lambda xi: U_g_fn_xi(params, xi))(xi)
+        G = jacobian(lambda _xi: U_g_fn_xi(params, _xi))(xi)
         return G
     
     @jit 
-    def G_fn_xi_explicit(
+    def G_explicit_fn(
         params: Dict[str, Array], 
         xi: Array,
         eps: float = global_eps
@@ -1085,9 +1179,9 @@ def factory(
         return G
     
     if jacobian_type == "explicit":
-        G_fn_xi = G_fn_xi_explicit
+        G_fn_xi = G_explicit_fn
     elif jacobian_type == "autodiff":
-        G_fn_xi = G_fn_xi_autodiff
+        G_fn_xi = G_autodiff_fn
     
     @jit
     def dynamical_matrices_fn(
@@ -1106,13 +1200,12 @@ def factory(
             eps (float, optional): small number to avoid singularities. Defaults to 1e4 * global_eps.
             
         Returns:
-            Tuple: 
-            - B (Array): mass / inertia matrix of the robot. (shape: (n_q, n_q))
-            - C (Array): Coriolis / centrifugal matrix of the robot. (shape: (n_q, n_q))
-            - G (Array): gravity vector of the robot. (shape: (n_q,))
-            - K (Array): elastic vector of the robot. (shape: (n_q,))
-            - D (Array): dissipative matrix of the robot. (shape: (n_q, n_q))
-            - alpha (Array): actuation matrix of the robot. (shape: (n_q, n_tau))
+            B (Array): mass / inertia matrix of the robot. (shape: (n_q, n_q))
+            C (Array): Coriolis / centrifugal matrix of the robot. (shape: (n_q, n_q))
+            G (Array): gravity vector of the robot. (shape: (n_q,))
+            K (Array): elastic vector of the robot. (shape: (n_q,))
+            D (Array): dissipative matrix of the robot. (shape: (n_q, n_q))
+            alpha (Array): actuation matrix of the robot. (shape: (n_q, n_tau))
         """
         # Map the configuration to the strains
         xi = xi_eq + B_xi @ q
@@ -1138,7 +1231,7 @@ def factory(
         # Apply the strain basis to the dissipative matrix
         D = B_xi.T @ D @ B_xi
         
-        B, C = B_C_fn_xi(params, xi, xi_d)
+        B, C = B_C_fn(params, xi, xi_d)
 
         G = B_xi.T @ G_fn_xi(params, xi).squeeze()
         
