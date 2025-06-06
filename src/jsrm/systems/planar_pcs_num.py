@@ -28,7 +28,7 @@ def factory(
     xi_eq: Optional[Array] = None,
     stiffness_fn: Optional[Callable] = None,
     actuation_mapping_fn: Optional[Callable] = None,
-    global_eps: float = 1e-6, 
+    global_eps: float = 1e-2, 
     integration_type: str = "gauss-legendre",
     param_integration: int = None,
     jacobian_type: str = "explicit",
@@ -220,36 +220,42 @@ def factory(
     B_xi = compute_strain_basis(strain_selector)
     
     @jit
-    def apply_eps_to_bend_strains(xi: Array, _eps: float) -> Array:
+    def apply_eps_to_bend_strains(
+        xi: Array, 
+        _eps: float
+    ) -> Array:
         """
         Add a small number to the bending strain to avoid singularities
         """
-        xi_reshaped = xi.reshape((-1, 3))
+        if _eps == None:
+            return xi
+        else:
+            xi_reshaped = xi.reshape((-1, 3))
 
-        xi_bend_sign = jnp.sign(xi_reshaped[:, 0])
-        
-        # set zero sign to 1 (i.e. positive)
-        xi_bend_sign = jnp.where(xi_bend_sign == 0, 1, xi_bend_sign)
-        
-        # add eps to the bending strain (i.e. the first column)
-        sigma_b_epsed = lax.select(
-            jnp.abs(xi_reshaped[:, 0]) < _eps,
-            xi_bend_sign * _eps,
-            xi_reshaped[:, 0],
-        )
-        xi_epsed = jnp.stack(
-            [
-                sigma_b_epsed,
-                xi_reshaped[:, 1],
-                xi_reshaped[:, 2],
-            ],
-            axis=1,
-        )
+            xi_bend_sign = jnp.sign(xi_reshaped[:, 0])
+            
+            # set zero sign to 1 (i.e. positive)
+            xi_bend_sign = jnp.where(xi_bend_sign == 0, 1, xi_bend_sign)
+            
+            # add eps to the bending strain (i.e. the first column)
+            sigma_b_epsed = lax.select(
+                jnp.abs(xi_reshaped[:, 0]) < _eps,
+                xi_bend_sign * _eps,
+                xi_reshaped[:, 0],
+            )
+            xi_epsed = jnp.stack(
+                [
+                    sigma_b_epsed,
+                    xi_reshaped[:, 1],
+                    xi_reshaped[:, 2],
+                ],
+                axis=1,
+            )
 
-        # Flatten the array
-        xi_epsed = xi_epsed.flatten()
+            # Flatten the array
+            xi_epsed = xi_epsed.flatten()
 
-        return xi_epsed
+            return xi_epsed
     
     def classify_segment(
         params: Dict[str, Array], 
@@ -270,7 +276,7 @@ def factory(
         l = params["l"]
         
         # Compute the cumulative length of the segments starting with 0
-        l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
+        l_cum = jnp.cumsum(jnp.concatenate([jnp.zeros(1), l]))
         
         # Classify the point along the robot to the corresponding segment
         segment_idx = jnp.clip(jnp.sum(s > l_cum) - 1, 0, len(l) - 1)
@@ -302,8 +308,8 @@ def factory(
         
         # Classify the point along the robot to the corresponding segment
         segment_idx, s_local, _ = classify_segment(params, s)
-            
-        chi_0 = jnp.array([0, 0, th0])  # Initial pose of the robot #TODO
+        
+        chi_0 = jnp.concatenate([jnp.zeros(2), th0[None]])  # Initial pose of the robot #TODO
 
         # Iteration function
         def chi_i(
@@ -330,13 +336,15 @@ def factory(
             int_sin_th = ((jnp.cos(th_prev) - jnp.cos(th)) / kappa).reshape(())
             
             # Transformation matrix
-            R = jnp.array([[int_cos_th, -int_sin_th],
-                   [int_sin_th, int_cos_th]])
+            R = jnp.stack([
+                jnp.stack([int_cos_th, -int_sin_th]),
+                jnp.stack([int_sin_th,  int_cos_th])
+            ])
 
             # Compute the position
-            p = p_prev + (R @ jnp.array([sigma_x, sigma_y]).T).T
+            p = p_prev + R @ jnp.stack([sigma_x, sigma_y], axis=-1)            
             
-            return jnp.concatenate([p, jnp.array([th])])
+            return jnp.concatenate([p, th[None]])
 
         chi, chi_list = lax.scan(
             f = lambda carry, i: (chi_i(i, carry), chi_i(i, carry)),
@@ -380,8 +388,7 @@ def factory(
     def J_autodiff(
         params: Dict[str, Array], 
         xi: Array, 
-        s: Array,
-        eps: float = global_eps
+        s: Array
     ) -> Array:
         """
         Compute the Jacobian of the forward kinematics function with respect to the strain vector.
@@ -390,14 +397,10 @@ def factory(
             params (Dict[str, Array]): dictionary of robot parameters.
             xi (Array): strain vector of the robot.
             s (Array): point coordinate along the robot in the interval [0, L].
-            eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
             Array: Jacobian of the forward kinematics function with respect to the strain vector.
         """
-        # Add a small number to the bending strain to avoid singularities
-        xi = apply_eps_to_bend_strains(xi, eps)
-        
         # Compute the Jacobian of chi_fn with respect to xi
         J = jacobian(lambda _xi: chi_fn(params, _xi, s))(xi)
 
@@ -410,8 +413,7 @@ def factory(
     def J_explicit(
         params: Dict[str, Array],
         xi: Array,
-        s: Array,
-        eps: float = global_eps
+        s: Array
     ) -> Array:
         """
         Compute the Jacobian of the forward kinematics function with respect to the strain vector at a given point s.
@@ -420,13 +422,10 @@ def factory(
             params (Dict[str, Array]): dictionary of robot parameters.
             xi (Array): strain vector of the robot.
             s (Array): point coordinate along the robot in the interval [0, L_tot].
-            eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
             Array: Jacobian of the forward kinematics function with respect to the strain vector using explicit expression in SE(3).
         """
-        # Add a small number to the bending strain to avoid singularities
-        xi = apply_eps_to_bend_strains(xi, eps)
         
         # Classify the point along the robot to the corresponding segment
         segment_idx, _, l_cum = classify_segment(params, s)
@@ -507,13 +506,13 @@ def factory(
         # From local to global frame : applying the rotation of the pose at point s
         
         # Get the pose at point s
-        px, py, theta = chi_fn(params, xi, s)  
+        _, _, theta = chi_fn(params, xi, s)  
         # Convert the pose to SE(3) representation
-        R = jnp.array([             # Rotation matrix around the z-axis
-            [jnp.cos(theta), -jnp.sin(theta)],
-            [jnp.sin(theta), jnp.cos(theta) ]
+        c, s = jnp.cos(theta), jnp.sin(theta)
+        R = jnp.stack([
+            jnp.stack([c, -s]),
+            jnp.stack([s,  c])
         ])
-        
         g_s = jnp.block([
             [R, jnp.zeros((2, 2))],
             [jnp.zeros((2, 2)), jnp.eye(2)]
@@ -538,8 +537,7 @@ def factory(
         params: Dict[str, Array], 
         xi: Array, 
         xi_d: Array,
-        s: Array, 
-        eps: float = global_eps
+        s: Array
     ) -> Tuple[Array, Array]:
         """
         Compute the Jacobian of the forward kinematics function and its time-derivative.
@@ -549,16 +547,12 @@ def factory(
             xi (Array): strain vector of the robot.
             xi_d (Array): velocity vector of the robot.
             s (Array): point coordinate along the robot in the interval [0, L].
-            eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
             Tuple[Array, Array]: 
                 - J (Array): Jacobian of the forward kinematics function.
                 - J_d (Array): time-derivative of the Jacobian of the forward kinematics function.
         """
-        # Add a small number to the bending strain to avoid singularities
-        xi = apply_eps_to_bend_strains(xi, eps)
-        
         # Compute the Jacobian of chi_fn with respect to xi
         J = jacobian(lambda _xi: chi_fn(params, _xi, s))(xi)
         
@@ -578,8 +572,7 @@ def factory(
         params: Dict[str, Array],
         xi: Array,
         xi_d: Array,
-        s: Array,
-        eps: float = global_eps
+        s: Array
     ) -> Array:
         """
         Compute the Jacobian and its derivative with respect to the strain vector at a given point s.
@@ -589,16 +582,12 @@ def factory(
             xi (Array): strain vector of the robot.
             xi_d (Array): velocity vector of the robot.
             s (Array): point coordinate along the robot in the interval [0, L].
-            eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
             Tuple[Array, Array]: 
                 - J (Array): Jacobian of the forward kinematics function.
                 - J_d (Array): time-derivative of the Jacobian of the forward kinematics function.
         """
-        # Add a small number to the bending strain to avoid singularities
-        xi = apply_eps_to_bend_strains(xi, eps)
-        
         # Classify the point along the robot to the corresponding segment
         segment_idx, _, l_cum = classify_segment(params, s)
         
@@ -683,14 +672,17 @@ def factory(
         # From local to global frame : applying the rotation of the pose at point s
         
         # Get the pose at point s
-        px, py, theta = chi_fn(params, xi, s)  
+        _, _, theta = chi_fn(params, xi, s)  
         # Convert the pose to SE(3) representation
-        g_s = jnp.eye(4)  # Initialize as identity matrix
-        R = jnp.array([             # Rotation matrix around the z-axis
-            [jnp.cos(theta), -jnp.sin(theta)],
-            [jnp.sin(theta), jnp.cos(theta) ]
+        c, s = jnp.cos(theta), jnp.sin(theta)
+        R = jnp.stack([
+            jnp.stack([c, -s]),
+            jnp.stack([s,  c])
         ])
-        g_s = g_s.at[:2, :2].set(R)  # Set rotation part as a 2D rotation matrix around the z-axis
+        g_s = jnp.block([
+            [R, jnp.zeros((2, 2))],
+            [jnp.zeros((2, 2)), jnp.eye(2)]
+        ])
         Adjoint_g_s = Adjoint_g_SE3(g_s)
         # For each segment, compute the Jacobian in SE(3) coordinates in global frame J_i_global = Adjoint_g_s @ J_i_local
         J_segment_SE3_global = jnp.einsum('ij,njk->nik', Adjoint_g_s, J_segment_SE3_local)  # shape: (n_segments, 6, 6)
@@ -728,14 +720,17 @@ def factory(
         # From local to global frame : applying the rotation of the pose at point s
         
         # Get the pose at point s
-        px, py, theta = chi_fn(params, xi, s)  
+        _, _, theta = chi_fn(params, xi, s)  
         # Convert the pose to SE(3) representation
-        g_s = jnp.eye(4)  # Initialize as identity matrix
-        R = jnp.array([             # Rotation matrix around the z-axis
-            [jnp.cos(theta), -jnp.sin(theta)],
-            [jnp.sin(theta), jnp.cos(theta) ]
+        c, s = jnp.cos(theta), jnp.sin(theta)
+        R = jnp.stack([
+            jnp.stack([c, -s]),
+            jnp.stack([s,  c])
         ])
-        g_s = g_s.at[:2, :2].set(R)  # Set rotation part as a 2D rotation matrix around the z-axis
+        g_s = jnp.block([
+            [R, jnp.zeros((2, 2))],
+            [jnp.zeros((2, 2)), jnp.eye(2)]
+        ])
         Adjoint_g_s = Adjoint_g_SE3(g_s)
         # For each segment, compute the Jacobian in SE(3) coordinates in global frame J_i_global = Adjoint_g_s @ J_i_local
         J_d_segment_SE3_global = jnp.einsum('ij,njk->nik', Adjoint_g_s, J_d_segment_SE3_local)  # shape: (n_segments, 6, 6)
@@ -820,7 +815,7 @@ def factory(
         A = jnp.pi * r**2  # cross-sectional area of each segment [m^2]
         Ib = A**2 / (4 * jnp.pi) # second moment of area of each segment [m^4]
 
-        l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
+        l_cum = jnp.cumsum(jnp.concatenate([jnp.zeros(1), l]))
         # Compute each integral
         def compute_integral(i):
             if integration_type == "gauss-legendre":
@@ -874,7 +869,7 @@ def factory(
         return B
         
     @jit
-    def B_C_fn(
+    def B_C_autodiff_fn(
         params: Dict[str, Array], 
         xi: Array, 
         xi_d: Array
@@ -894,124 +889,51 @@ def factory(
 
         # Compute the mass / inertia matrix
         B = B_fn_xi(params, xi)
-
-        # # Compute the Christoffel symbols
-        # def christoffel_symbol(i, j, k):
-        #     return 0.5 * (
-        #         grad(lambda x: B[i, j])(xi)[k]
-        #         + grad(lambda x: B[i, k])(xi)[j]
-        #         - grad(lambda x: B[j, k])(xi)[i]
-        #     )
-
-        # # Compute the Coriolis / centrifugal matrix
-        # C = jnp.zeros_like(B)
-        # for i in range(B.shape[0]):
-        #     for j in range(B.shape[1]):
-        #         for k in range(B.shape[0]):
-        #             C = C.at[i, j].add(christoffel_symbol(i, j, k) * xi_d[k])
-        
-        n = B.shape[0]  # number of segments
-        
-        # Compute Christoffel symbols for all (i,j,k)
+        n = B.shape[0]  # Number of segments
+    
+        # Vmap version
         def christoffel_fn(i, j, k):
-            return 0.5 * (
-                grad(lambda x: B_fn_xi(params, x)[i, j])(xi)[k]
-                + grad(lambda x: B_fn_xi(params, x)[i, k])(xi)[j]
-                - grad(lambda x: B_fn_xi(params, x)[j, k])(xi)[i]
-            )
-        
-        # Vectorize over k
+            dB_ij = grad(lambda x: B_fn_xi(params, x)[i, j])(xi)[k]
+            dB_ik = grad(lambda x: B_fn_xi(params, x)[i, k])(xi)[j]
+            dB_jk = grad(lambda x: B_fn_xi(params, x)[j, k])(xi)[i]
+            return 0.5 * (dB_ij + dB_ik - dB_jk)
         def C_ij(i, j):
-            cs_k = vmap(lambda k: christoffel_fn(i, j, k))(jnp.arange(n))  # shape (n,)
+            cs_k = vmap(lambda k: christoffel_fn(i, j, k))(jnp.arange(n))
             return jnp.dot(cs_k, xi_d)
-
-        # Vectorize over i and j
-        C = vmap(lambda i: vmap(lambda j: C_ij(i, j))(jnp.arange(n)))(jnp.arange(n))  # shape (n, n)
+        C = vmap(lambda i: vmap(lambda j: C_ij(i, j))(jnp.arange(n)))(jnp.arange(n))
         
         return B, C
     
-    # @jit
-    # def B_C_fn_explicit(
-    #     params: Dict[str, Array], 
-    #     xi: Array
-    # ) -> Array:
-    #     """
-    #     Compute the mass / inertia matrix of the robot.
+    @jit
+    def B_C_explicit_fn(
+        params: Dict[str, Array], 
+        xi: Array, 
+        xi_d: Array
+    ) -> Tuple[Array, Array]:
+        """
+        Compute the mass / inertia matrix of the robot and the Coriolis / centrifugal matrix of the robot.
 
-    #     Args:
-    #         params (Dict[str, Array]): dictionary of robot parameters.
-    #         xi (Array): strain vector of the robot.
+        Args:
+            params (Dict[str, Array]): dictionary of robot parameters.
+            xi (Array): strain vector of the robot.
+            xi_d (Array): velocity vector of the robot.
 
-    #     Returns:
-    #         Array: mass / inertia matrix of the robot.
-    #     """
-    #     # Extract the parameters
-    #     rho = params["rho"] # density of each segment [kg/m^3]
-    #     l = params["l"] # length of each segment [m]
-    #     r = params["r"] # radius of each segment [m]
-        
-    #     # Usefull derived quantities
-    #     A = jnp.pi * r**2  # cross-sectional area of each segment [m^2]
-    #     Ib = A**2 / (4 * jnp.pi) # second moment of area of each segment [m^4]
+        Returns:
+            B (Array): mass / inertia matrix of the robot.
+            C (Array): Coriolis / centrifugal matrix of the robot.
+        """
+        #TODO
+        return B_C_autodiff_fn
 
-    #     l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
-    #     # Compute each integral
-    #     def compute_integral(i):
-    #         if integration_type == "gauss-legendre":
-    #             Xs, Ws, nGauss = gauss_quadrature(N_GQ=param_integration, a=l_cum[i], b=l_cum[i + 1])
-                
-    #             J_all = vmap(lambda s: jacobian_fn_xi(params, xi, s))(Xs)
-    #             Jp_all = J_all[:, :2, :]
-    #             Jo_all = J_all[:, 2:, :]
+    if jacobian_type == "explicit":
+        B_C_fn_xi = B_C_explicit_fn
+    elif jacobian_type == "autodiff":
+        B_C_fn_xi = B_C_autodiff_fn
 
-    #             integrand_JpT_Jp = jnp.einsum("nij,nik->njk", Jp_all, Jp_all)
-    #             integrand_JoT_Jo = jnp.einsum("nij,nik->njk", Jo_all, Jo_all)
-                
-    #             integral_Jp = jnp.sum(Ws[:, None, None] * integrand_JpT_Jp, axis=0)
-    #             integral_Jo = jnp.sum(Ws[:, None, None] * integrand_JoT_Jo, axis=0)
-                
-    #             integral_B = rho[i] * A[i] * integral_Jp + rho[i] * Ib[i] * integral_Jo
-                
-    #         elif integration_type == "gauss-kronrad":
-    #             rule = GaussKronrodRule(order=param_integration)
-    #             def integrand(s):
-    #                 J = jacobian_fn_xi(params, xi, s)
-    #                 Jp = J[:2, :]
-    #                 Jo = J[2:, :]
-    #                 return rho[i] * A[i] * Jp.T @ Jp + rho[i] * Ib[i] * Jo.T @ Jo
-
-    #             integral_B, _, _, _ = rule.integrate(integrand, l_cum[i], l_cum[i+1], args=())
-
-    #         elif integration_type == "trapezoid":
-    #             xs = jnp.linspace(l_cum[i], l_cum[i + 1], param_integration)
-                
-    #             J_all = vmap(lambda s: jacobian_fn_xi(params, xi, s))(xs)
-    #             Jp_all = J_all[:, :2, :]
-    #             Jo_all = J_all[:, 2:, :]
-
-    #             integrand_JpT_Jp = jnp.einsum("nij,nik->njk", Jp_all, Jp_all)
-    #             integrand_JoT_Jo = jnp.einsum("nij,nik->njk", Jo_all, Jo_all)
-                
-    #             integral_Jp = jscipy.integrate.trapezoid(integrand_JpT_Jp, x=xs, axis=0)
-    #             integral_Jo = jscipy.integrate.trapezoid(integrand_JoT_Jo, x=xs, axis=0) 
-                
-    #             integral_B = rho[i] * A[i] * integral_Jp + rho[i] * Ib[i] * integral_Jo
-                
-    #         return integral_B
-        
-    #     # Compute the cumulative integral
-    #     indices = jnp.arange(num_segments) 
-    #     integrals = vmap(compute_integral)(indices)
-        
-    #     B = jnp.sum(integrals, axis=0)
-        
-    #     return B
-    
     @jit 
     def U_g_fn_xi(
         params: Dict[str, Array], 
-        xi: Array, 
-        eps: float = global_eps
+        xi: Array
     ) -> Array:
         """
         Compute the gravity vector of the robot.
@@ -1019,13 +941,10 @@ def factory(
         Args:
             params (Dict[str, Array]): dictionary of robot parameters.
             xi (Array): strain vector of the robot.
-            eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
             U_g (Array): gravity vector of the robot.
         """
-        # Add a small number to the bending strain to avoid singularities
-        xi = apply_eps_to_bend_strains(xi, eps)
         
         # Extract the parameters
         g = params["g"] # gravity vector [m/s^2]
@@ -1036,7 +955,7 @@ def factory(
         # Usefull derived quantitie
         A = jnp.pi * r**2  # cross-sectional area of each segment [m^2]
         
-        l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
+        l_cum = jnp.cumsum(jnp.concatenate([jnp.zeros(1), l]))
         # Compute each integral
         def compute_integral(i):
             if integration_type == "gauss-legendre":
@@ -1099,8 +1018,7 @@ def factory(
     @jit 
     def G_explicit_fn(
         params: Dict[str, Array], 
-        xi: Array,
-        eps: float = global_eps
+        xi: Array
     ) -> Array:
         """
         Compute the gravity vector of the robot.
@@ -1108,15 +1026,10 @@ def factory(
         Args:
             params (Dict[str, Array]): dictionary of robot parameters.
             xi (Array): strain vector of the robot.
-            eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
             Array: gravity vector of the robot.
         """
-        
-        # Add a small number to the bending strain to avoid singularities
-        xi = apply_eps_to_bend_strains(xi, eps)
-        
         # Extract the parameters
         g = params["g"] # gravity vector [m/s^2]
         rho = params["rho"] # density of each segment [kg/m^3]
@@ -1126,7 +1039,7 @@ def factory(
         # Usefull derived quantitie
         A = jnp.pi * r**2  # cross-sectional area of each segment [m^2]
         
-        l_cum = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), l]))
+        l_cum = jnp.cumsum(jnp.concatenate([jnp.zeros(1), l]))
         # Compute each integral
         def compute_integral(i):
             if integration_type == "gauss-legendre":
@@ -1188,7 +1101,7 @@ def factory(
         params: Dict[str, Array], 
         q: Array, 
         q_d: Array, 
-        eps: float = 1e4 * global_eps
+        eps: float = global_eps
         ) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
         Compute the dynamical matrices of the robot.
@@ -1197,7 +1110,7 @@ def factory(
             params (Dict[str, Array]): dictionary of robot parameters.
             q (Array): configuration vector of the robot.
             q_d (Array): velocity vector of the robot.
-            eps (float, optional): small number to avoid singularities. Defaults to 1e4 * global_eps.
+            eps (float, optional): small number to avoid singularities. Defaults to global_eps.
             
         Returns:
             B (Array): mass / inertia matrix of the robot. (shape: (n_q, n_q))
@@ -1231,7 +1144,7 @@ def factory(
         # Apply the strain basis to the dissipative matrix
         D = B_xi.T @ D @ B_xi
         
-        B, C = B_C_fn(params, xi, xi_d)
+        B, C = B_C_fn_xi(params, xi, xi_d)
 
         G = B_xi.T @ G_fn_xi(params, xi).squeeze()
         
@@ -1263,7 +1176,7 @@ def factory(
     def potential_energy_fn(
         params: Dict[str, Array], 
         q: Array, 
-        eps: float = 1e4 * global_eps
+        eps: float = global_eps
     ) -> Array:
         """
         Compute the potential energy of the system.
@@ -1321,7 +1234,7 @@ def factory(
         B: Array,
         C: Array,
         operational_space_selector: Tuple = (True, True, True),
-        eps: float = 1e4 * global_eps,
+        eps: float = global_eps,
     ) -> Tuple[Array, Array, Array, Array, Array]:
         """
         Compute the dynamics in operational space.

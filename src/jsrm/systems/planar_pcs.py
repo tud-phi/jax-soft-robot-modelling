@@ -152,32 +152,35 @@ def factory(
         """
         Add a small number to the bending strain to avoid singularities
         """
-        xi_reshaped = xi.reshape((-1, 3))
+        if _eps == None:
+            return xi
+        else:
+            xi_reshaped = xi.reshape((-1, 3))
 
-        xi_bend_sign = jnp.sign(xi_reshaped[:, 0])
-        # set zero sign to 1 (i.e. positive)
-        xi_bend_sign = jnp.where(xi_bend_sign == 0, 1, xi_bend_sign)
-        # add eps to the bending strain (i.e. the first column)
-        sigma_b_epsed = lax.select(
-            jnp.abs(xi_reshaped[:, 0]) < _eps,
-            xi_bend_sign * _eps,
-            xi_reshaped[:, 0],
-        )
-        xi_epsed = jnp.stack(
-            [
-                sigma_b_epsed,
-                xi_reshaped[:, 1],
-                xi_reshaped[:, 2],
-            ],
-            axis=1,
-        )
+            xi_bend_sign = jnp.sign(xi_reshaped[:, 0])
+            # set zero sign to 1 (i.e. positive)
+            xi_bend_sign = jnp.where(xi_bend_sign == 0, 1, xi_bend_sign)
+            # add eps to the bending strain (i.e. the first column)
+            sigma_b_epsed = lax.select(
+                jnp.abs(xi_reshaped[:, 0]) < _eps,
+                xi_bend_sign * _eps,
+                xi_reshaped[:, 0],
+            )
+            xi_epsed = jnp.stack(
+                [
+                    sigma_b_epsed,
+                    xi_reshaped[:, 1],
+                    xi_reshaped[:, 2],
+                ],
+                axis=1,
+            )
 
-        # old implementation:
-        # xi_epsed = xi_reshaped
-        # xi_epsed = xi_epsed.at[:, 0].add(xi_bend_sign * _eps)
+            # old implementation:
+            # xi_epsed = xi_reshaped
+            # xi_epsed = xi_epsed.at[:, 0].add(xi_bend_sign * _eps)
 
-        # flatten the array
-        xi_epsed = xi_epsed.flatten()
+            # flatten the array
+            xi_epsed = xi_epsed.flatten()
 
         return xi_epsed
 
