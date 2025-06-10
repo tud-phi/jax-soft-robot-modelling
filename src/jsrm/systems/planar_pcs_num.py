@@ -923,7 +923,7 @@ def factory(
             C (Array): Coriolis / centrifugal matrix of the robot.
         """
         #TODO
-        return B_C_autodiff_fn
+        return B_C_autodiff_fn(params, xi, xi_d)
 
     if jacobian_type == "explicit":
         B_C_fn_xi = B_C_explicit_fn
