@@ -409,6 +409,7 @@ def simulate_planar_pcs(
     if type_of_derivation == "numeric":
         print("Type of integration:", type_of_integration)
         print("Parameter for integration:", param_integration)
+        print("Type of jacobian:", type_of_jacobian)
     print()
     
     # ====================================================
@@ -1111,6 +1112,7 @@ def simulate_planar_pcs_time_eval(
     if type_of_derivation == "numeric":
         print("Type of integration:", type_of_integration)
         print("Parameter for integration:", param_integration)
+        print("Type of jacobian:", type_of_jacobian)
     print()
     
     # ====================================================
@@ -1138,17 +1140,22 @@ def simulate_planar_pcs_time_eval(
     
     print(f"Importing the planar PCS model took {timer_end - timer_start:.2e} seconds. \n")
     
+    # ====================================================  
+    # JIT the functions
+    print("JIT-compiling the dynamical matrices function...")
+    dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn))
+    
     if type_time == "once":
-        # ====================================================  
-        # JIT the functions
-        print("JIT-compiling the dynamical matrices function...")
-        dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn))
+        print("Only compilation and evaluation for one element")
         
+        q = jnp.array(onp.random.randn(*q0.shape)).block_until_ready()
+        qd = jnp.array(onp.random.randn(*q0.shape)).block_until_ready()
+        
+        # =====================================================
         # First evaluation of the dynamical matrices to trigger JIT compilation
-        print(f"Evaluating the dynamical matrices for the first time (JIT-compilation) for q0 = {q0} and q_d0 = {jnp.zeros_like(q0)}...")
-        
+        print(f"Evaluating the dynamical matrices for the first time (JIT-compilation) ...")
         timer_start = time.time()
-        B, C, G, K, D, A = dynamical_matrices_fn(robot_params, q0, jnp.zeros_like(q0))
+        B, C, G, K, D, A = dynamical_matrices_fn(robot_params, q, qd)
         B.block_until_ready()  # ensure the matrices are computed
         C.block_until_ready()  # ensure the matrices are computed
         G.block_until_ready()  # ensure the matrices are computed
@@ -1162,10 +1169,12 @@ def simulate_planar_pcs_time_eval(
         print(f"Evaluating the dynamical matrices for the first time took {timer_end - timer_start:.2e} seconds. \n")
 
         # Second evaluation of the dynamical matrices to capture the time of the evaluation
-        print("Evaluating the dynamical matrices for the second time (JIT-evaluation)...")
+        print("Evaluating the dynamical matrices for the second time (JIT-evaluation) ...")
         
         def time_dynamical_matrices_once():
-            B, C, G, K, D, A = dynamical_matrices_fn(robot_params, q0, jnp.zeros_like(q0))
+            q = jnp.array(onp.random.randn(*q0.shape)).block_until_ready()
+            qd = jnp.array(onp.random.randn(*q0.shape)).block_until_ready()
+            B, C, G, K, D, A = dynamical_matrices_fn(robot_params, q, jnp.zeros_like(qd))
             B.block_until_ready()  # ensure the matrices are computed
             C.block_until_ready()  # ensure the matrices are computed
             G.block_until_ready()  # ensure the matrices are computed
@@ -1184,9 +1193,9 @@ def simulate_planar_pcs_time_eval(
         
         # ====================================================
         # First evaluation of the forward kinematics to trigger JIT compilation
-        print("Evaluating the forward kinematics associated with the initial configuration (JIT-compilation)...")
+        print("Evaluating the forward kinematics associated with the q configuration (JIT-compilation)...")
         timer_start = time.time()
-        chi_0 = forward_kinematics_fn(robot_params, q0, jnp.array([jnp.sum(robot_params["l"])])).block_until_ready()  # ensure the forward kinematics is computed
+        chi = forward_kinematics_fn(robot_params, q, jnp.array([jnp.sum(robot_params["l"])])).block_until_ready()  # ensure the forward kinematics is computed
         timer_end = time.time()
         
         simulation_dict["execution_time"]["compile_forward_kinematics_once"] = timer_end - timer_start
@@ -1194,10 +1203,12 @@ def simulate_planar_pcs_time_eval(
         print(f"Evaluating the forward kinematics for the first time took {timer_end - timer_start:.2e} seconds. \n")
         
         # Second evaluation of the forward kinematics to capture the time of the evaluation
-        print("Evaluating the forward kinematics associated with the initial configuration for a second time (JIT-evaluation)...")
+        print("Evaluating the forward kinematics associated with the q configuration for a second time (JIT-evaluation)...")
         
         def time_forward_kinematics_once():
-            chi_ee = forward_kinematics_fn(robot_params, q0, jnp.array([jnp.sum(robot_params["l"])])).block_until_ready()
+            q = jnp.array(onp.random.randn(*q0.shape)).block_until_ready()
+            qd = jnp.array(onp.random.randn(*q0.shape)).block_until_ready()
+            chi_ee = forward_kinematics_fn(robot_params, q, jnp.array([jnp.sum(robot_params["l"])])).block_until_ready()
             return None
         results_time_forward_kinematics_once = [timeit.timeit(time_forward_kinematics_once, number=nb_eval)/nb_eval for _ in range(nb_samples)]
         mean_time_forward_kinematics_once = statistics.mean(results_time_forward_kinematics_once)
@@ -1209,21 +1220,23 @@ def simulate_planar_pcs_time_eval(
         
         # ====================================================
         # First evaluation of the potential energy to trigger JIT compilation
-        print("Evaluating the potential energy for the first time (JIT-compilation)...")
+        print("Evaluating the potential energy associated with the q configuration for the first time (JIT-compilation)...")
         
         timer_start = time.time()
-        U_0 = auxiliary_fns["potential_energy_fn"](robot_params, q0).block_until_ready()
+        U = auxiliary_fns["potential_energy_fn"](robot_params, q).block_until_ready()
         timer_end = time.time()
         
         simulation_dict["execution_time"]["compile_potential_energy_once"] = timer_end - timer_start
         
-        print(f"Evaluating the potential energy for the first time took {timer_end - timer_start:.2e} seconds. \n")
+        print(f"Evaluating the potential energy associated with the q configuration for the first time took {timer_end - timer_start:.2e} seconds. \n")
         
         # Second evaluation of the potential energy to capture the time of the evaluation
-        print("Evaluating the potential energy for a second time (JIT-evaluation)...")
+        print("Evaluating the potential energy associated with the q configuration for a second time (JIT-evaluation)...")
         
         def time_potential_energy_once():
-            U_0 = auxiliary_fns["potential_energy_fn"](robot_params, q0).block_until_ready()
+            q = jnp.array(onp.random.randn(*q0.shape)).block_until_ready()
+            qd = jnp.array(onp.random.randn(*q0.shape)).block_until_ready()
+            U = auxiliary_fns["potential_energy_fn"](robot_params, q).block_until_ready()
             return None
         results_time_potential_energy_once = [timeit.timeit(time_potential_energy_once, number=nb_eval)/nb_eval for _ in range(nb_samples)]
         mean_time_potential_energy_once = statistics.mean(results_time_potential_energy_once)
@@ -1231,25 +1244,27 @@ def simulate_planar_pcs_time_eval(
         
         simulation_dict["execution_time"]["evaluate_potential_energy_once"] = (mean_time_potential_energy_once, std_time_potential_energy_once)
         
-        print(f"Evaluating the potential energy for a second time took {mean_time_potential_energy_once:.2e} seconds +/- {std_time_potential_energy_once:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
+        print(f"Evaluating the potential energy associated with the q configuration for a second time took {mean_time_potential_energy_once:.2e} seconds +/- {std_time_potential_energy_once:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
     
         # ====================================================
         # First evaluation of the kinetic energy to trigger JIT compilation
-        print("Evaluating the kinetic energy for the first time (JIT-compilation)...")
+        print("Evaluating the kinetic energy associated with the q configuration for the first time (JIT-compilation)...")
         
         timer_start = time.time()
-        T_0 = auxiliary_fns["kinetic_energy_fn"](robot_params, q0, jnp.zeros_like(q0)).block_until_ready()
+        T = auxiliary_fns["kinetic_energy_fn"](robot_params, q, qd).block_until_ready()
         timer_end = time.time()
         
         simulation_dict["execution_time"]["compile_kinetic_energy_once"] = timer_end - timer_start
         
-        print(f"Evaluating the kinetic energy took {timer_end - timer_start:.2e} seconds. \n")
+        print(f"Evaluating the kinetic energy associated with the q configuration took {timer_end - timer_start:.2e} seconds. \n")
         
         # Second evaluation of the kinetic energy to capture the time of the evaluation
-        print("Evaluating the kinetic energy for a second time (JIT-evaluation)...")
+        print("Evaluating the kinetic energy associated with the q configuration for a second time (JIT-evaluation)...")
         
         def time_kinetic_energy_once():
-            T_0 = auxiliary_fns["kinetic_energy_fn"](robot_params, q0, jnp.zeros_like(q0)).block_until_ready()
+            q = jnp.array(onp.random.randn(*q0.shape)).block_until_ready()
+            qd = jnp.array(onp.random.randn(*q0.shape)).block_until_ready()
+            T = auxiliary_fns["kinetic_energy_fn"](robot_params, q, qd).block_until_ready()
             return None
         results_time_kinetic_energy_once = [timeit.timeit(time_kinetic_energy_once, number=nb_eval)/nb_eval for _ in range(nb_samples)]
         mean_time_kinetic_energy_once = statistics.mean(results_time_kinetic_energy_once)
@@ -1257,9 +1272,10 @@ def simulate_planar_pcs_time_eval(
         
         simulation_dict["execution_time"]["evaluate_kinetic_energy_once"] = (mean_time_kinetic_energy_once, std_time_kinetic_energy_once)
         
-        print(f"Evaluating the kinetic energy for a second time took {mean_time_kinetic_energy_once:.2e} seconds +/- {std_time_kinetic_energy_once:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
+        print(f"Evaluating the kinetic energy associated with the q configuration for a second time took {mean_time_kinetic_energy_once:.2e} seconds +/- {std_time_kinetic_energy_once:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
     
     else:
+        print("Only in time compilation and evaluation\n")
         # ====================================================
         # Parameter for the simulation
         x0 = jnp.concatenate([q0, q_d0])  # initial condition
@@ -1299,17 +1315,27 @@ def simulate_planar_pcs_time_eval(
         # Second evaluation of the ODE to capture the time of the evaluation
         print("Solving the ODE for the second time (JIT-evaluation)...")
         
-        def time_diffeqsolve_over_time():
+        if nb_eval is None or nb_samples is None or nb_samples == 1:
+            timer_start = time.time()
             sol = diffeqsolve_fn()
-            sol.ys.block_until_ready()
-            return None
-        results_time_diffeqsolve_over_time = [timeit.timeit(time_diffeqsolve_over_time, number=nb_eval)/nb_eval for _ in range(nb_samples)]
-        mean_time_diffeqsolve_over_time = statistics.mean(results_time_diffeqsolve_over_time)
-        std_time_diffeqsolve_over_time = statistics.stdev(results_time_diffeqsolve_over_time)
-        
-        simulation_dict["execution_time"]["evaluate_ode_over_time"] = (mean_time_diffeqsolve_over_time, std_time_diffeqsolve_over_time)
-        
-        print(f"Solving the ODE for a second time took {mean_time_diffeqsolve_over_time:.2e} seconds +/- {std_time_diffeqsolve_over_time:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
+            sol.ys.block_until_ready()  # ensure the solution is computed
+            timer_end = time.time()
+            
+            simulation_dict["execution_time"]["evaluate_ode_over_time"] = timer_end - timer_start
+            
+            print(f"Solving the ODE for a second time took {timer_end - timer_start:.2e} seconds. \n")
+        else:
+            def time_diffeqsolve_over_time():
+                sol = diffeqsolve_fn()
+                sol.ys.block_until_ready()
+                return None
+            results_time_diffeqsolve_over_time = [timeit.timeit(time_diffeqsolve_over_time, number=nb_eval)/nb_eval for _ in range(nb_samples)]
+            mean_time_diffeqsolve_over_time = statistics.mean(results_time_diffeqsolve_over_time)
+            std_time_diffeqsolve_over_time = statistics.stdev(results_time_diffeqsolve_over_time)
+            
+            simulation_dict["execution_time"]["evaluate_ode_over_time"] = (mean_time_diffeqsolve_over_time, std_time_diffeqsolve_over_time)
+            
+            print(f"Solving the ODE for a second time took {mean_time_diffeqsolve_over_time:.2e} seconds +/- {std_time_diffeqsolve_over_time:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
         
         # ====================================================
         # the evolution of the generalized coordinates
@@ -1335,18 +1361,29 @@ def simulate_planar_pcs_time_eval(
         # Second evaluation of the forward kinematics to capture the time of the evaluation
         print("Evaluating the forward kinematics of the end-effector along the trajectory for a second time (JIT-evaluation)...")
         
-        def time_forward_kinematics_over_time():
+        if nb_eval is None or nb_samples is None or nb_samples == 1:
+            timer_start = time.time()
             chi_ee_ts = vmap(forward_kinematics_fn, in_axes=(None, 0, None))(
                 robot_params, q_ts, jnp.array([jnp.sum(robot_params["l"])])
             ).block_until_ready()
-            return None
-        results_time_forward_kinematics_over_time = [timeit.timeit(time_forward_kinematics_over_time, number=nb_eval)/nb_eval for _ in range(nb_samples)]
-        mean_time_forward_kinematics_over_time = statistics.mean(results_time_forward_kinematics_over_time)
-        std_time_forward_kinematics_over_time = statistics.stdev(results_time_forward_kinematics_over_time)
-        
-        simulation_dict["execution_time"]["evaluate_forward_kinematics_over_time"] = (mean_time_forward_kinematics_over_time, std_time_forward_kinematics_over_time)
-        
-        print(f"Evaluating the forward kinematics for a second time took {mean_time_forward_kinematics_over_time:.2e} seconds +/- {std_time_forward_kinematics_over_time:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
+            timer_end = time.time()
+            
+            simulation_dict["execution_time"]["evaluate_forward_kinematics_over_time"] = timer_end - timer_start
+            
+            print(f"Evaluating the forward kinematics for a second time took {timer_end - timer_start:.2e} seconds. \n")
+        else:
+            def time_forward_kinematics_over_time():
+                chi_ee_ts = vmap(forward_kinematics_fn, in_axes=(None, 0, None))(
+                    robot_params, q_ts, jnp.array([jnp.sum(robot_params["l"])])
+                ).block_until_ready()
+                return None
+            results_time_forward_kinematics_over_time = [timeit.timeit(time_forward_kinematics_over_time, number=nb_eval)/nb_eval for _ in range(nb_samples)]
+            mean_time_forward_kinematics_over_time = statistics.mean(results_time_forward_kinematics_over_time)
+            std_time_forward_kinematics_over_time = statistics.stdev(results_time_forward_kinematics_over_time)
+            
+            simulation_dict["execution_time"]["evaluate_forward_kinematics_over_time"] = (mean_time_forward_kinematics_over_time, std_time_forward_kinematics_over_time)
+            
+            print(f"Evaluating the forward kinematics for a second time took {mean_time_forward_kinematics_over_time:.2e} seconds +/- {std_time_forward_kinematics_over_time:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
     
         # =====================================================
         # First evaluation of the potential energy to trigger JIT compilation
@@ -1363,14 +1400,25 @@ def simulate_planar_pcs_time_eval(
         # Second evaluation of the potential energy to capture the time of the evaluation
         print("Evaluating the potential energy for a second time (JIT-evaluation)...")
         
-        def time_potential_energy_over_time():
+        if nb_eval is None or nb_samples is None or nb_samples == 1:
+            timer_start = time.time()
             U_ts = vmap(partial(auxiliary_fns["potential_energy_fn"], robot_params))(q_ts).block_until_ready()
-            return None
-        results_time_potential_energy_over_time = [timeit.timeit(time_potential_energy_over_time, number=nb_eval)/nb_eval for _ in range(nb_samples)]
-        mean_time_potential_energy_over_time = statistics.mean(results_time_potential_energy_over_time)
-        std_time_potential_energy_over_time = statistics.stdev(results_time_potential_energy_over_time)
-        
-        simulation_dict["execution_time"]["evaluate_potential_energy_over_time"] = (mean_time_potential_energy_over_time, std_time_potential_energy_over_time)
+            timer_end = time.time()
+            
+            simulation_dict["execution_time"]["evaluate_potential_energy_over_time"] = timer_end - timer_start
+            
+            print(f"Evaluating the potential energy for a second time took {timer_end - timer_start:.2e} seconds. \n")
+        else:
+            def time_potential_energy_over_time():
+                U_ts = vmap(partial(auxiliary_fns["potential_energy_fn"], robot_params))(q_ts).block_until_ready()
+                return None
+            results_time_potential_energy_over_time = [timeit.timeit(time_potential_energy_over_time, number=nb_eval)/nb_eval for _ in range(nb_samples)]
+            mean_time_potential_energy_over_time = statistics.mean(results_time_potential_energy_over_time)
+            std_time_potential_energy_over_time = statistics.stdev(results_time_potential_energy_over_time)
+            
+            simulation_dict["execution_time"]["evaluate_potential_energy_over_time"] = (mean_time_potential_energy_over_time, std_time_potential_energy_over_time)
+            
+            print(f"Evaluating the potential energy for a second time took {mean_time_potential_energy_over_time:.2e} seconds +/- {std_time_potential_energy_over_time:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
         
         # ====================================================
         # First evaluation of the kinetic energy to trigger JIT compilation
@@ -1387,16 +1435,25 @@ def simulate_planar_pcs_time_eval(
         # Second evaluation of the kinetic energy to capture the time of the evaluation
         print("Evaluating the kinetic energy for a second time (JIT-evaluation)...")
         
-        def time_kinetic_energy_over_time():
+        if nb_eval is None or nb_samples is None or nb_samples == 1:
+            timer_start = time.time()
             T_ts = vmap(partial(auxiliary_fns["kinetic_energy_fn"], robot_params))(q_ts, q_d_ts).block_until_ready()
-            return None
-        results_time_kinetic_energy_over_time = [timeit.timeit(time_kinetic_energy_over_time, number=nb_eval)/nb_eval for _ in range(nb_samples)]
-        mean_time_kinetic_energy_over_time = statistics.mean(results_time_kinetic_energy_over_time)
-        std_time_kinetic_energy_over_time = statistics.stdev(results_time_kinetic_energy_over_time)
-        
-        simulation_dict["execution_time"]["evaluate_kinetic_energy_over_time"] = (mean_time_kinetic_energy_over_time, std_time_kinetic_energy_over_time)
-        
-        print(f"Evaluating the kinetic energy for a second time took {mean_time_kinetic_energy_over_time:.2e} seconds +/- {std_time_kinetic_energy_over_time:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
+            timer_end = time.time()
+            
+            simulation_dict["execution_time"]["evaluate_kinetic_energy_over_time"] = timer_end - timer_start
+            
+            print(f"Evaluating the kinetic energy for a second time took {timer_end - timer_start:.2e} seconds. \n")
+        else:
+            def time_kinetic_energy_over_time():
+                T_ts = vmap(partial(auxiliary_fns["kinetic_energy_fn"], robot_params))(q_ts, q_d_ts).block_until_ready()
+                return None
+            results_time_kinetic_energy_over_time = [timeit.timeit(time_kinetic_energy_over_time, number=nb_eval)/nb_eval for _ in range(nb_samples)]
+            mean_time_kinetic_energy_over_time = statistics.mean(results_time_kinetic_energy_over_time)
+            std_time_kinetic_energy_over_time = statistics.stdev(results_time_kinetic_energy_over_time)
+            
+            simulation_dict["execution_time"]["evaluate_kinetic_energy_over_time"] = (mean_time_kinetic_energy_over_time, std_time_kinetic_energy_over_time)
+            
+            print(f"Evaluating the kinetic energy for a second time took {mean_time_kinetic_energy_over_time:.2e} seconds +/- {std_time_kinetic_energy_over_time:.2e} seconds (mean +/- std) over {nb_samples} samples. \n")
     
     # ===========================================================================
     # Save the simulation results
@@ -1802,6 +1859,7 @@ def simulate_planar_pcs_ode(
     if type_of_derivation == "numeric":
         print("Type of integration:", type_of_integration)
         print("Parameter for integration:", param_integration)
+        print("Type of jacobian:", type_of_jacobian)
     print()
     
     # ====================================================

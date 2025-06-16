@@ -7,7 +7,7 @@ from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
 
 
 def substitute_params_into_all_symbolic_expressions(
-    sym_exps: Dict, params: Dict[str, jnp.array]
+    sym_exps: Dict, params: Dict[str, Array]
 ) -> Dict:
     """
     Substitute robot parameters into symbolic expressions.
@@ -43,11 +43,10 @@ def substitute_params_into_all_symbolic_expressions(
 
     return exps
 
-
 def substitute_params_into_single_symbolic_expression(
     sym_exp: sp.Expr,
     params_syms: Dict[str, List[sp.Symbol]],
-    params: Dict[str, jnp.array],
+    params: Dict[str, Array],
 ) -> sp.Expr:
     """
     Substitute robot parameters into a single symbolic expression.
@@ -72,7 +71,6 @@ def substitute_params_into_single_symbolic_expression(
 
     return sym_exp
 
-
 def concatenate_params_syms(
     params_syms: Dict[str, Union[sp.Symbol, List[sp.Symbol]]],
 ) -> List[sp.Symbol]:
@@ -85,16 +83,17 @@ def concatenate_params_syms(
             params_syms_cat.append(params_sym)
     return params_syms_cat
 
-
 def compute_strain_basis(
     strain_selector: Array,
-) -> jnp.ndarray:
+) -> Array:
     """
     Compute strain basis based on boolean strain selector.
     Args:
-        strain_selector: boolean array of shape (n_xi, ) specifying which strain components are active
+        strain_selector (Array):
+            boolean array of shape (n_xi, ) specifying which strain components are active
     Returns:
-        strain_basis: strain basis matrix of shape (n_xi, n_q) where n_q is the number of configuration variables
+        strain_basis (Array): 
+            strain basis matrix of shape (n_xi, n_q) where n_q is the number of configuration variables
             and n_xi is the number of strains
     """
     n_q = strain_selector.sum().item()
@@ -105,7 +104,6 @@ def compute_strain_basis(
         if strain_selector[i].item() is True:
             strain_basis = strain_basis.at[i, j].set(1.0)
     return strain_basis
-
 
 @jit
 def compute_planar_stiffness_matrix(l: Array, A: Array, Ib: Array, E: Array, G: Array) -> Array:

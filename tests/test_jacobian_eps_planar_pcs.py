@@ -70,7 +70,9 @@ sigma_y_values = jnp.linspace(0, borne_sigma_y, nb_sigma_y)
 s_values = jnp.linspace(0, float(params["l"][0]), nb_s)
 
 # === Tracé principal ===
-fig, axs = plt.subplots(2, 3, figsize=(15, 8))
+nb_colomns = 3
+nb_rows = 3
+fig, axs = plt.subplots(nb_colomns, nb_rows, figsize=(15, 8))
 
 def J_plot(eps_list, s, sigma_x, sigma_y, fig, axs):
     for ax_row in axs:
@@ -89,8 +91,8 @@ def J_plot(eps_list, s, sigma_x, sigma_y, fig, axs):
             J_symb.append(J_symbolic_fn(params, q, s, eps=eps))
         J_auto, J_exp, J_symb = jnp.stack(J_auto), jnp.stack(J_exp), jnp.stack(J_symb)
 
-        for i in range(2):
-            for j in range(3):
+        for i in range(nb_colomns):
+            for j in range(nb_rows):
                 if eps is not None:
                     axs[i, j].axvline(eps, color='red', linestyle=':', linewidth=2, alpha=(i_eps + 1)/len(eps_list), label =f'+/-eps={eps:.2e}')
                     axs[i, j].axvline(-eps, color='red', linestyle=':', linewidth=2, alpha=(i_eps + 1)/len(eps_list))
