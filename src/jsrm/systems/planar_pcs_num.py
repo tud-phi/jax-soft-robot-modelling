@@ -114,7 +114,7 @@ def factory(
         raise ValueError(f"num_segments must be greater than 0, but got {num_segments}")
     
     # Max number of degrees of freedom = size of the strain vector
-    n_xi = 3 * num_segments
+    n_xi = 3 * num_segments 
     
     # Strain basis matrix
     if strain_selector is None:
@@ -256,12 +256,19 @@ def factory(
     @jit
     def apply_eps_to_bend_strains(
         xi: Array, 
-        _eps: float
+        eps: float
     ) -> Array:
         """
-        Add a small number to the bending strain to avoid singularities
+        Add a small number to the bending strain to avoid singularities.
+        
+        Args:
+            xi (Array): strain vector of the robot.
+            eps (float): small number to add to the bending strain.
+            
+        Returns:
+            Array: strain vector with the bending strain modified.
         """
-        if _eps == None:
+        if eps == None:
             return xi
         else:
             xi_reshaped = xi.reshape((-1, 3))
@@ -273,8 +280,8 @@ def factory(
             
             # add eps to the bending strain (i.e. the first column)
             sigma_b_epsed = lax.select(
-                jnp.abs(xi_reshaped[:, 0]) < _eps,
-                xi_bend_sign * _eps,
+                jnp.abs(xi_reshaped[:, 0]) < eps,
+                xi_bend_sign * eps,
                 xi_reshaped[:, 0],
             )
             xi_epsed = jnp.stack(
@@ -302,10 +309,9 @@ def factory(
             params (Dict[str, Array]): dictionary of robot parameters
             s (Array): point coordinate along the robot in the interval [0, L].
 
-        Returns:
-            Tuple[Array, Array]: 
-                - segment_idx (Array): index of the segment where the point is located
-                - s_segment (Array): point coordinate along the segment in the interval [0, l_segment]
+        Returns: 
+            segment_idx (Array): index of the segment where the point is located
+            s_segment (Array): point coordinate along the segment in the interval [0, l_segment]
         """
         l = params["l"]
         
@@ -335,8 +341,8 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            Array: pose of the robot at the point s in the interval [0, L]
-                The pose is represented as a 3D vector [x, y, theta] where (x, y) is the position
+            chi (Array): pose of the robot at the point s in the interval [0, L]
+                The pose is represented as a vector [x, y, theta] where (x, y) is the position
                 and theta is the orientation angle.
         """
         th0 = params["th0"]  # initial angle of the robot
@@ -387,7 +393,9 @@ def factory(
             init = chi_0, 
             xs = jnp.arange(num_segments + 1))
 
-        return chi_list[segment_idx]
+        chi = chi_list[segment_idx]
+        
+        return chi
 
     @jit
     def forward_kinematics_fn(
@@ -406,8 +414,8 @@ def factory(
             eps (float, optional): small number to avoid singularities. Defaults to global_eps.
 
         Returns:
-            Array: pose of the robot at the point s in the interval [0, L].
-                The pose is represented as a 3D vector [x, y, theta] where (x, y) is the position
+            chi (Array): pose of the robot at the point s in the interval [0, L].
+                The pose is represented as a vector [x, y, theta] where (x, y) is the position
                 and theta is the orientation angle.
         """        
         # Map the configuration to the strains
@@ -427,7 +435,7 @@ def factory(
         s: Array
     ) -> Array:
         """
-        Compute the Jacobian of the forward kinematics function with respect to the strain vector 
+        Compute the inertial-frame jacobian of the forward kinematics function with respect to the strain vector 
         using autodiff.
 
         Args:
@@ -436,7 +444,7 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            Array: Jacobian of the forward kinematics function with respect to the strain vector.
+            J (Array): inertial-frame jacobian of the forward kinematics function with respect to the strain vector.
         """
         # Compute the Jacobian of chi_fn with respect to xi
         J = jacobian(lambda _xi: chi_fn(params, _xi, s))(xi)
@@ -453,7 +461,7 @@ def factory(
         s: Array
     ) -> Array:
         """
-        Compute the body-frame Jacobian of the forward kinematics function with respect to the strain vector 
+        Compute the body-frame jacobian of the forward kinematics function with respect to the strain vector 
         at a given point s using explicit expression in SE(2).
 
         Args:
@@ -462,7 +470,7 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L_tot].
 
         Returns:
-            Array: body-frame Jacobian of the forward kinematics function with respect to the strain vector 
+            J_local (Array) : body-frame jacobian of the forward kinematics function with respect to the strain vector 
             using explicit expression in SE(2).
         """
         
@@ -546,7 +554,7 @@ def factory(
         s: Array
     ) -> Array:
         """
-        Compute the inertial-frame Jacobian of the forward kinematics function with respect to the strain vector 
+        Compute the inertial-frame jacobian of the forward kinematics function with respect to the strain vector 
         at a given point s using explicit expression in SE(2).
 
         Args:
@@ -555,7 +563,7 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L_tot].
 
         Returns:
-            Array: inertial-frame Jacobian of the forward kinematics function with respect to the strain vector 
+            J_global (Array): inertial-frame jacobian of the forward kinematics function with respect to the strain vector 
             using explicit expression in SE(2).
         """
         
@@ -658,7 +666,7 @@ def factory(
         s: Array
     ) -> Array:
         """
-        Compute the body-frame Jacobian of the forward kinematics function with respect to the strain vector 
+        Compute the body-frame jacobian of the forward kinematics function with respect to the strain vector 
         at a given point s using explicit expression in SE(3).
 
         Args:
@@ -667,7 +675,7 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L_tot].
 
         Returns:
-            Array: body-frame Jacobian of the forward kinematics function with respect to the strain vector 
+            J_local (Array): body-frame jacobian of the forward kinematics function with respect to the strain vector 
             using explicit expression in SE(3).
         """
         
@@ -756,7 +764,7 @@ def factory(
         s: Array
     ) -> Array:
         """
-        Compute the inertial-frame Jacobian of the forward kinematics function with respect to the strain vector 
+        Compute the inertial-frame jacobian of the forward kinematics function with respect to the strain vector 
         at a given point s using explicit expression in SE(3).
 
         Args:
@@ -765,7 +773,7 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L_tot].
 
         Returns:
-            Array: inertial-frame Jacobian of the forward kinematics function with respect to the strain vector 
+            J_global (Array): inertial-frame Jacobian of the forward kinematics function with respect to the strain vector 
             using explicit expression in SE(3).
         """
         
@@ -874,7 +882,7 @@ def factory(
         s: Array
     ) -> Tuple[Array, Array]:
         """
-        Compute the inertial-frame Jacobian of the forward kinematics function and its time-derivative using autodiff.
+        Compute the inertial-frame jacobian of the forward kinematics function and its time-derivative using autodiff.
 
         Args:
             params (Dict[str, Array]): dictionary of robot parameters.
@@ -883,8 +891,8 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J (Array): Jacobian of the forward kinematics function.
-            J_d (Array): time-derivative of the Jacobian of the forward kinematics function.
+            J (Array): inertial-frame jacobian of the forward kinematics function.
+            J_d (Array): inertial-frame time-derivative of the Jacobian of the forward kinematics function.
         """
         # Compute the Jacobian of chi_fn with respect to xi
         J = jacobian(lambda _xi: chi_fn(params, _xi, s))(xi)
@@ -908,7 +916,7 @@ def factory(
         s: Array
     ) -> Array:
         """
-        Compute the body-frame Jacobian and its derivative with respect to the strain vector 
+        Compute the body-frame jacobian and its derivative with respect to the strain vector 
         at a given point s using explicit expression in SE(2).
 
         Args:
@@ -918,8 +926,8 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J (Array): Jacobian of the forward kinematics function.
-            J_d (Array): time-derivative of the Jacobian of the forward kinematics function.
+            J_local (Array): body-frame jacobian of the forward kinematics function.
+            J_d_local (Array): body-frame time-derivative of the jacobian of the forward kinematics function.
         """
         # Classify the point along the robot to the corresponding segment
         segment_idx, _, l_cum = classify_segment(params, s)
@@ -1034,7 +1042,7 @@ def factory(
         s: Array
     ) -> Array:
         """
-        Compute the inertial-frame Jacobian and its derivative with respect to the strain vector 
+        Compute the inertial-frame jacobian and its derivative with respect to the strain vector 
         at a given point s using explicit expression in SE(2).
 
         Args:
@@ -1044,8 +1052,8 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J (Array): Jacobian of the forward kinematics function.
-            J_d (Array): time-derivative of the Jacobian of the forward kinematics function.
+            J_global (Array): inertial-frame jacobian of the forward kinematics function.
+            J_d_global (Array): inertial-frame time-derivative of the jacobian of the forward kinematics function.
         """
         # Classify the point along the robot to the corresponding segment
         segment_idx, _, l_cum = classify_segment(params, s)
@@ -1180,7 +1188,7 @@ def factory(
         s: Array
     ) -> Array:
         """
-        Compute the body-frame Jacobian and its derivative with respect to the strain vector 
+        Compute the body-frame jacobian and its derivative with respect to the strain vector 
         at a given point s using explicit expression in SE(3).
 
         Args:
@@ -1190,8 +1198,8 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J (Array): Jacobian of the forward kinematics function.
-            J_d (Array): time-derivative of the Jacobian of the forward kinematics function.
+            J_local (Array): body-frame jacobian of the forward kinematics function.
+            J_d (Array): body-frame time-derivative of the jacobian of the forward kinematics function.
         """
         # Classify the point along the robot to the corresponding segment
         segment_idx, _, l_cum = classify_segment(params, s)
@@ -1317,7 +1325,7 @@ def factory(
         s: Array
     ) -> Array:
         """
-        Compute the inertial-frame Jacobian and its derivative with respect to the strain vector 
+        Compute the inertial-frame jacobian and its derivative with respect to the strain vector 
         at a given point s using explicit expression in SE(3).
 
         Args:
@@ -1327,8 +1335,8 @@ def factory(
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J (Array): Jacobian of the forward kinematics function.
-            J_d (Array): time-derivative of the Jacobian of the forward kinematics function.
+            J_global (Array): inertial-frame jacobian of the forward kinematics function.
+            J_d_global (Array): inertial-frame time-derivative of the jacobian of the forward kinematics function.
         """
         # Classify the point along the robot to the corresponding segment
         segment_idx, _, l_cum = classify_segment(params, s)
@@ -1466,7 +1474,7 @@ def factory(
         
         return J_global, J_d_global
 
-    use_SE2 = False
+    use_SE2 = True
     if use_SE2:
         J_explicit_local = J_explicit_local_SE2
         J_Jd_explicit_local = J_Jd_explicit_local_SE2
@@ -1493,7 +1501,7 @@ def factory(
         eps: float = global_eps
     ) -> Array:
         """
-        Compute the Jacobian of the forward kinematics function with respect to the configuration vector q.
+        Compute the inertial-frame jacobian of the forward kinematics function with respect to the configuration vector q.
 
         Args:
             params (Dict[str, Array]): dictionary of robot parameters.
@@ -1502,7 +1510,7 @@ def factory(
             eps (float, optional): small number to avoid singularities in the bending strain. Defaults to global_eps.
 
         Returns:
-            Array: Jacobian of the forward kinematics function with respect to the strain vector.
+            J (Array): inertial-frame jacobian of the forward kinematics function with respect to the strain vector.
         """
         # Map the configuration to the strains
         xi = xi_eq + B_xi @ q
@@ -1527,7 +1535,7 @@ def factory(
             xi (Array): strain vector of the robot.
 
         Returns:
-            Array: mass / inertia matrix of the robot.
+            B (Array): mass / inertia matrix of the robot.
         """
         # Extract the parameters
         rho = params["rho"] # density of each segment [kg/m^3]
@@ -1592,13 +1600,13 @@ def factory(
         return B
         
     @jit
-    def B_C_autodiff_fn(
+    def C_autodiff_fn(
         params: Dict[str, Array], 
         xi: Array, 
         xi_d: Array
     ) -> Tuple[Array, Array]:
         """
-        Compute the mass / inertia matrix of the robot and the Coriolis / centrifugal matrix of the robot
+        Compute the Coriolis / centrifugal matrix of the robot
         using autodiff.
 
         Args:
@@ -1607,13 +1615,10 @@ def factory(
             xi_d (Array): velocity vector of the robot.
 
         Returns:
-            B (Array): mass / inertia matrix of the robot.
             C (Array): Coriolis / centrifugal matrix of the robot.
         """
-
-        # Compute the mass / inertia matrix
-        B = B_autodiff_fn(params, xi)
-        n = B.shape[0]
+        
+        n_xi = 3*num_segments
         
         def christoffel_fn(i, j, k):
             dB_ij = grad(lambda x: B_autodiff_fn(params, x)[i, j])(xi)[k]
@@ -1623,52 +1628,52 @@ def factory(
         
         # # ===========================================
         # # For loop without LAX version
-        # C = jnp.zeros((n, n))  # Initialize the Coriolis matrix
-        # for i in range(n):
-        #     for j in range(n):
-        #         for k in range(n):
+        # C = jnp.zeros((n_xi, n_xi))  # Initialize the Coriolis matrix
+        # for i in range(n_xi):
+        #     for j in range(n_xi):
+        #         for k in range(n_xi):
         #             christoffel_symbol = christoffel_fn(i, j, k)
         #             C = C.at[i,j].add(christoffel_symbol * xi_d[k])
         
         # # ===========================================
         # # For loop with LAX version
-        # C = jnp.zeros((n, n))  # Initialize the Coriolis matrix
+        # C = jnp.zeros((n_xi, n_xi))  # Initialize the Coriolis matrix
         # def body_i(i, C):
         #     def body_j(j, C):
         #         def body_k(k, acc):
         #             christoffel_symbol = christoffel_fn(i, j, k)
         #             coeff = christoffel_symbol * xi_d[k]
         #             return acc + coeff
-        #         C_ij = lax.fori_loop(0, n, body_k, 0.0)
+        #         C_ij = lax.fori_loop(0, n_xi, body_k, 0.0)
         #         return C.at[i, j].set(C_ij)
-        #     return lax.fori_loop(0, n, body_j, C)
-        # C = lax.fori_loop(0, n, body_i, C)
+        #     return lax.fori_loop(0, n_xi, body_j, C)
+        # C = lax.fori_loop(0, n_xi, body_i, C)
         
         # ===========================================
         # Vmap version
         def C_ij(i, j):
-            cs_k = vmap(lambda k: christoffel_fn(i, j, k))(jnp.arange(n))
+            cs_k = vmap(lambda k: christoffel_fn(i, j, k))(jnp.arange(n_xi))
             return jnp.dot(cs_k, xi_d)
-        C = vmap(lambda i: vmap(lambda j: C_ij(i, j))(jnp.arange(n)))(jnp.arange(n))
+        C = vmap(lambda i: vmap(lambda j: C_ij(i, j))(jnp.arange(n_xi)))(jnp.arange(n_xi))
         
         # # ===========================================
         # # LAX map version
-        # def C_ij(i, j, xi_d, n):
-        #     cs_k = lax.map(lambda k: christoffel_fn(i, j, k), jnp.arange(n))
+        # def C_ij(i, j, xi_d, n_xi):
+        #     cs_k = lax.map(lambda k: christoffel_fn(i, j, k), jnp.arange(n_xi))
         #     return jnp.dot(cs_k, xi_d)
         # C = jnp.stack(
         #         jnp.stack(
         #             lax.map(
         #                 lambda i: lax.map(
-        #                     lambda j: C_ij(i, j, xi_d, n),
-        #                     jnp.arange(n)
+        #                     lambda j: C_ij(i, j, xi_d, n_xi),
+        #                     jnp.arange(n_xi)
         #                 ),
-        #                 jnp.arange(n))
+        #                 jnp.arange(n_xi))
         #             )
         #         )
         
-        return B, C
-    
+        return C
+
     @jit
     def B_explicit_fn(
         params: Dict[str, Array], 
@@ -1682,7 +1687,7 @@ def factory(
             xi (Array): strain vector of the robot.
 
         Returns:
-            Array: mass / inertia matrix of the robot.
+            B (Array): mass / inertia matrix of the robot.
         """
         # Extract the parameters
         rho = params["rho"] # density of each segment [kg/m^3]
@@ -1830,37 +1835,7 @@ def factory(
     
         return C
 
-    @jit
-    def B_C_explicit_fn(
-        params: Dict[str, Array], 
-        xi: Array, 
-        xi_d: Array
-    ) -> Tuple[Array, Array]:
-        """
-        Compute the mass / inertia matrix of the robot and the Coriolis / centrifugal matrix of the robot
-        using explicit expressions.
-
-        Args:
-            params (Dict[str, Array]): dictionary of robot parameters.
-            xi (Array): strain vector of the robot.
-            xi_d (Array): velocity vector of the robot.
-
-        Returns:
-            B (Array): mass / inertia matrix of the robot.
-            C (Array): Coriolis / centrifugal matrix of the robot.
-        """
-
-        # Compute the mass / inertia matrix
-        B = B_explicit_fn(params, xi)
-        # Compute the Coriolis matrix
-        C = C_explicit_fn(params, xi, xi_d)
-        
         return B, C
-    
-    if jacobian_type == "explicit":
-        B_C_fn_xi = B_C_explicit_fn
-    elif jacobian_type == "autodiff":
-        B_C_fn_xi = B_C_autodiff_fn
 
     @jit 
     def U_g_fn_xi(
@@ -1944,7 +1919,9 @@ def factory(
         Returns:
             G (Array) : gravity vector of the robot.
         """
+        
         G = jacobian(lambda _xi: U_g_fn_xi(params, _xi))(xi)
+        
         return G
     
     @jit 
@@ -1961,7 +1938,7 @@ def factory(
             xi (Array): strain vector of the robot.
 
         Returns:
-            Array: gravity vector of the robot.
+            G (Array): gravity vector of the robot.
         """
         # Extract the parameters
         g = params["g"] # gravity vector [m/s^2]
@@ -2022,11 +1999,16 @@ def factory(
         integrals = vmap(compute_integral)(indices)
 
         G = jnp.sum(integrals, axis=0)  # sum over the segments
+        
         return G
     
     if jacobian_type == "explicit":
+        B_fn_xi = B_explicit_fn
+        C_fn_xi = C_explicit_fn
         G_fn_xi = G_explicit_fn
     elif jacobian_type == "autodiff":
+        B_fn_xi = B_autodiff_fn
+        C_fn_xi = C_autodiff_fn
         G_fn_xi = G_autodiff_fn
     
     @jit
@@ -2077,8 +2059,13 @@ def factory(
         # Apply the strain basis to the dissipative matrix
         D = B_xi.T @ D @ B_xi
         
-        B, C = B_C_fn_xi(params, xi, xi_d)
+        # Mass/inertia matrix
+        B =  B_xi.T @ B_fn_xi(params, xi) @ B_xi
+        
+        # Coriolis matrix
+        C =  B_xi.T @ C_fn_xi(params, xi, xi_d) @ B_xi
 
+        # Gravitational matrix
         G = B_xi.T @ G_fn_xi(params, xi).squeeze()
         
         return B, C, G, K, D, alpha    
@@ -2087,18 +2074,27 @@ def factory(
     def kinetic_energy_fn(
         params: Dict[str, Array], 
         q: Array, 
-        q_d: Array
+        q_d: Array,
+        eps: float = global_eps
         ) -> Array:
         """
         Compute the kinetic energy of the system.
         Args:
-            params: Dictionary of robot parameters
-            q: generalized coordinates of shape (n_q, )
-            q_d: generalized velocities of shape (n_q, )
+            params (Dict[str, Array]): dictionary of robot parameters.
+            q (Array): generalized coordinates of shape (n_q, )
+            q_d (Array): generalized velocities of shape (n_q, )
+            eps (float, optional): small number to avoid singularities (e.g., division by zero). Defaults to global_eps.
         Returns:
-            T: kinetic energy of shape ()
+            T (Array): kinetic energy of shape ()
         """
-        B, _, _, _, _, _ = dynamical_matrices_fn(params, q=q, q_d=q_d)
+        
+        # Map the configuration to the strains
+        xi = xi_eq + B_xi @ q
+        # Add a small number to the bending strain to avoid singularities
+        xi_epsed = apply_eps_to_bend_strains(xi, eps)
+        
+        # Compute the inertia matrix
+        B = B_fn_xi(params, xi_epsed)
 
         # Kinetic energy
         T = (0.5 * q_d.T @ B @ q_d).squeeze()
@@ -2114,15 +2110,15 @@ def factory(
         """
         Compute the potential energy of the system.
         Args:
-            params: Dictionary of robot parameters
-            q: generalized coordinates of shape (n_q, )
-            eps: small number to avoid singularities (e.g., division by zero)
+            params (Dict[str, Array]): dictionary of robot parameters.
+            q (Array): generalized coordinates of shape (n_q, )
+            eps (float, optional): small number to avoid singularities (e.g., division by zero). Defaults to global_eps.
         Returns:
-            U: potential energy of shape ()
+            U (Array): potential energy of shape ()
         """
-        # map the configuration to the strains
+        # Map the configuration to the strains
         xi = xi_eq + B_xi @ q
-        # add a small number to the bending strain to avoid singularities
+        # Add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains(xi, eps)
 
         # compute the stiffness matrix
@@ -2142,15 +2138,16 @@ def factory(
     def energy_fn(
         params: Dict[str, Array], 
         q: Array, 
-        q_d: Array) -> Array:
+        q_d: Array
+    ) -> Array:
         """
         Compute the total energy of the system.
         Args:
-            params: Dictionary of robot parameters
-            q: generalized coordinates of shape (n_q, )
-            q_d: generalized velocities of shape (n_q, )
+            params (Dict[str, Array]): dictionary of robot parameters.
+            q (Array): generalized coordinates of shape (n_q, )
+            q_d (Array): generalized velocities of shape (n_q, )
         Returns:
-            E: total energy of shape ()
+            E (Array): total energy of shape ()
         """
         T = kinetic_energy_fn(params, q, q_d)
         U = potential_energy_fn(params, q)
@@ -2174,29 +2171,29 @@ def factory(
         The implementation is based on Chapter 7.8 of "Modelling, Planning and Control of Robotics" by
         Siciliano, Sciavicco, Villani, Oriolo.
         Args:
-            params: dictionary of parameters
-            q: generalized coordinates of shape (n_q,)
-            q_d: generalized velocities of shape (n_q,)
-            s: point coordinate along the robot in the interval [0, L].
-            B: inertia matrix in the generalized coordinates of shape (n_q, n_q)
-            C: coriolis matrix derived with Christoffer symbols in the generalized coordinates of shape (n_q, n_q)
-            operational_space_selector: tuple of shape (3,) to select the operational space variables.
-                For examples, (True, True, False) selects only the positional components of the operational space.
-            eps: small number to avoid singularities (e.g., division by zero)
+            params (Dict[str, Array]): dictionary of robot parameters.
+            q (Array): generalized coordinates of shape (n_q, )
+            q_d (Array): generalized velocities of shape (n_q, )
+            s (Array): point coordinate along the robot in the interval [0, L].
+            B (Array): mass / inertia matrix of the robot in the generalized coordinates of shape (n_q, n_q)
+            C (Array): Coriolis / centrifugal matrix of the robot in the generalized coordinates of shape (n_q, n_q)
+            operational_space_selector (Tuple, optional): tuple of shape (3,) to select the operational space variables.
+                For example, (True, True, False) selects only the positional components of the operational space.
+            eps (float, optional): small number to avoid singularities (e.g., division by zero). Defaults to global_eps.
         Returns:
-            Lambda: inertia matrix in the operational space of shape (3, 3)
-            mu: matrix with corioli and centrifugal terms in the operational space of shape (3, 3)
-            J: Jacobian of the Cartesian pose with respect to the generalized coordinates of shape (3, n_q)
-            J_d: time-derivative of the Jacobian of the end-effector pose with respect to the generalized coordinates
+            Lambda (Array): inertia matrix in the operational space of shape (3, 3)
+            mu (Array): coriolis and centrifugal matrix in the operational space of shape (3, )
+            J (Array): inertial-frame jacobian of the end-effector pose with respect to the generalized coordinates
+            J_d (Array): inertial-frame time-derivative of the jacobian of the end-effector pose with respect to the generalized coordinates
                 of shape (3, n_q)
-            JB_pinv: Dynamically-consistent pseudo-inverse of the Jacobian. Allows the mapping of torques
+            JB_pinv (Array): Dynamically-consistent pseudo-inverse of the inertial-frame jacobian. Allows the mapping of torques
                 from the generalized coordinates to the operational space: f = JB_pinv.T @ tau_q
                 Shape (n_q, 3)
         """
-        ## map the configuration to the strains
+        # Map the configuration to the strains
         xi = xi_eq + B_xi @ q
         xi_d = B_xi @ q_d
-        # add a small number to the bending strain to avoid singularities
+        # Add a small number to the bending strain to avoid singularities
         xi_epsed = apply_eps_to_bend_strains(xi, eps)
 
         # classify the point along the robot to the corresponding segment
