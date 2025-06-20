@@ -1,5 +1,5 @@
 from jax import numpy as jnp
-from jax import Array, lax, jit
+from jax import Array, lax
 
 def blk_diag(
     a: Array

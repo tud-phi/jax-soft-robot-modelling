@@ -105,7 +105,6 @@ def compute_strain_basis(
             strain_basis = strain_basis.at[i, j].set(1.0)
     return strain_basis
 
-@jit
 def compute_planar_stiffness_matrix(l: Array, A: Array, Ib: Array, E: Array, G: Array) -> Array:
     """
     Compute the stiffness matrix of the system.

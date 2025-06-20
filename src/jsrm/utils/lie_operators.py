@@ -1,12 +1,10 @@
 import jax
 import jax.numpy as jnp
-from jax import jit
 
 # for documentation
 from jax import Array
 from typing import Sequence
 
-@jit
 def tilde_SE3( 
     vec3:Array
 )-> Array:
@@ -34,7 +32,6 @@ def tilde_SE3(
     ])
     return Mtilde
 
-@jit
 def adjoint_SE3(
     vec6:Array
 )-> Array:
@@ -66,7 +63,6 @@ def adjoint_SE3(
     
     return adj
 
-@jit
 def adjoint_star_SE3(
     vec6:Array
 )-> Array:
@@ -98,7 +94,6 @@ def adjoint_star_SE3(
     
     return adj_star
 
-@jit
 def hat_SE3(
     vec6:Array
 )-> Array:
@@ -129,7 +124,6 @@ def hat_SE3(
     
     return hat
 
-@jit
 def Adjoint_g_SE3(
     mat4:Array
 )-> Array:
@@ -156,7 +150,6 @@ def Adjoint_g_SE3(
     
     return Adjoint
 
-@jit
 def Adjoint_gn_SE3(
     xi_n: Array,
     l_nprev: float,
@@ -202,7 +195,6 @@ def Adjoint_gn_SE3(
 
     return Adjoint
 
-@jit
 def Adjoint_gn_SE3_inv(
     xi_n: Array,
     l_nprev: float,
@@ -262,8 +254,7 @@ def Adjoint_gn_SE3_inv(
     ])
 
     return inverse_Adjoint
-    
-@jit
+
 def Tangent_gn_SE3(
     xi_n: Array,
     l_nprev: float,
@@ -309,7 +300,6 @@ def Tangent_gn_SE3(
 
     return Tangent
 
-@jit
 def vec_SE2_to_xi_SE3(
     vec3: Array, 
     indices: Sequence[int] = (2, 3, 4)
@@ -342,7 +332,6 @@ def vec_SE2_to_xi_SE3(
 # ===================================
 J = jnp.array([[0, -1], [1, 0]])
 
-@jit
 def adjoint_SE2(
     vec3:Array
 )-> Array:
@@ -371,7 +360,6 @@ def adjoint_SE2(
     
     return adj
 
-@jit
 def adjoint_star_SE2(
     vec3:Array
 )-> Array:
@@ -400,7 +388,6 @@ def adjoint_star_SE2(
     
     return adj_star
 
-@jit
 def Adjoint_g_SE2(
     mat3:Array
 )-> Array:
@@ -425,7 +412,6 @@ def Adjoint_g_SE2(
     
     return Adjoint
 
-@jit
 def Adjoint_gn_SE2(
     xi_n: Array,
     l_nprev: float,
@@ -470,7 +456,6 @@ def Adjoint_gn_SE2(
 
     return Adjoint
 
-@jit
 def Adjoint_gn_SE2_inv(
     xi_n: Array,
     l_nprev: float,
@@ -527,7 +512,6 @@ def Adjoint_gn_SE2_inv(
 
     return inverse_Adjoint
 
-@jit
 def Tangent_gn_SE2(
     xi_n: Array,
     l_nprev: float,
@@ -575,7 +559,6 @@ def Tangent_gn_SE2(
 # ================================================================================================
 # Shared operators
 # ============================
-@jit
 def compute_weighted_sums(
     M: Array,
     vecm: Array,

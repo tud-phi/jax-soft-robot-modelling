@@ -13,7 +13,6 @@ from .utils import (
 )
 from jsrm.math_utils import blk_diag
 
-
 def factory(
     filepath: Union[str, Path],
     strain_selector: Array = None,
@@ -54,7 +53,6 @@ def factory(
     # symbols for robot parameters
     params_syms = sym_exps["params_syms"]
 
-    @jit
     def select_params_for_lambdify_fn(params: Dict[str, Array]) -> List[Array]:
         """
         Select the parameters for lambdify
@@ -147,7 +145,6 @@ def factory(
         compute_planar_stiffness_matrix
     )
 
-    @jit
     def apply_eps_to_bend_strains(xi: Array, _eps: float) -> Array:
         """
         Add a small number to the bending strain to avoid singularities
@@ -263,7 +260,6 @@ def factory(
 
             return A
 
-    @jit
     def forward_kinematics_fn(
         params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
     ) -> Array:
@@ -297,7 +293,6 @@ def factory(
 
         return chi
 
-    @jit
     def jacobian_fn(
         params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
     ) -> Array:
@@ -333,7 +328,6 @@ def factory(
 
         return J
 
-    @jit
     def dynamical_matrices_fn(
         params: Dict[str, Array], q: Array, q_d: Array, eps: float = 1e4 * global_eps
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:

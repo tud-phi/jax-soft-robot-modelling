@@ -61,8 +61,6 @@ def get_eps_from_slider():
 # === Variables physiques ===
 borne_kappa = 1e-1
 nb_kappa = 51
-kappa_values = jnp.linspace(-borne_kappa, borne_kappa, nb_kappa)
-
 borne_sigma_x, borne_sigma_y = 1e-1, 1e-1
 nb_sigma_x, nb_sigma_y, nb_s = 50, 50, 50
 sigma_x_values = jnp.linspace(0, borne_sigma_x, nb_sigma_x)
@@ -74,7 +72,8 @@ nb_colomns = 3
 nb_rows = 3
 fig, axs = plt.subplots(nb_colomns, nb_rows, figsize=(15, 8))
 
-def J_plot(eps_list, s, sigma_x, sigma_y, fig, axs):
+def J_plot(eps_list, s, sigma_x, sigma_y, kappa_max, fig, axs):
+    kappa_values = jnp.linspace(-kappa_max, kappa_max, nb_kappa)
     for ax_row in axs:
         for ax in ax_row:
             ax.clear()
@@ -130,31 +129,35 @@ def J_plot(eps_list, s, sigma_x, sigma_y, fig, axs):
 initial_s = float(params["l"][0] / 2)
 initial_sigma_x = float(borne_sigma_x / 2)
 initial_sigma_y = float(borne_sigma_y / 2)
+initial_borne_kappa = float(borne_kappa)
 
 # === Première visualisation ===
-J_plot([eps_options[0]], initial_s, initial_sigma_x, initial_sigma_y, fig, axs)
+J_plot([eps_options[0]], initial_s, initial_sigma_x, initial_sigma_y, initial_borne_kappa, fig, axs)
 
 # === Sliders ===
 s_slider = Slider(plt.axes([0.2, 0.01, 0.65, 0.03]), 's', float(s_values[0]), float(s_values[-1]), valinit=initial_s)
 sigma_x_slider = Slider(plt.axes([0.2, 0.05, 0.65, 0.03]), 'sigma_x', float(sigma_x_values[0]), float(sigma_x_values[-1]), valinit=initial_sigma_x)
 sigma_y_slider = Slider(plt.axes([0.2, 0.09, 0.65, 0.03]), 'sigma_y', float(sigma_y_values[0]), float(sigma_y_values[-1]), valinit=initial_sigma_y)
 eps_slider = Slider(plt.axes([0.2, 0.13, 0.65, 0.03]), 'eps (log scale)', 0, len(eps_options)-1, valinit=0, valstep=1)
+kappa_slider = Slider(plt.axes([0.2, 0.17, 0.65, 0.03]), 'kappa max', 0.01, 0.5, valinit=borne_kappa)
 
-def on_slider_change(s_val, sigma_x_val, sigma_y_val):
+def on_slider_change(s_val, sigma_x_val, sigma_y_val, kappa_val):
     s = float(s_val)
     sigma_x = float(sigma_x_val)
     sigma_y = float(sigma_y_val)
+    kappa_val = float(kappa_val)
     eps_val = get_eps_from_slider()
-    J_plot([eps_val], s, sigma_x, sigma_y, fig, axs)
+    J_plot([eps_val], s, sigma_x, sigma_y, kappa_val, fig, axs)
     fig.canvas.draw_idle()
 
 def update_sliders(_):
-    on_slider_change(s_slider.val, sigma_x_slider.val, sigma_y_slider.val)
+    on_slider_change(s_slider.val, sigma_x_slider.val, sigma_y_slider.val, kappa_slider.val)
 
 s_slider.on_changed(update_sliders)
 sigma_x_slider.on_changed(update_sliders)
 sigma_y_slider.on_changed(update_sliders)
 eps_slider.on_changed(update_sliders)
+kappa_slider.on_changed(update_sliders)
 
 # === Boutons et CheckBoxes ===
 reset_ax = plt.axes([0.87, 0.6, 0.1, 0.05])

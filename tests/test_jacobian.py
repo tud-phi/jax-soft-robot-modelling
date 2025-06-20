@@ -27,7 +27,6 @@ from jsrm.systems import planar_pcs
 
 global_eps = 1e-6  # Small number to avoid singularities in the bending strain
 
-# @jit
 def apply_eps_to_bend_strains(xi: Array, _eps: float) -> Array:
     """
     Add a small number to the bending strain to avoid singularities
@@ -88,7 +87,6 @@ def classify_segment(
 
     return segment_idx, s_segment.squeeze(), l_cum
 
-# @jit
 def chi_fn_xi(
     params: Dict[str, Array], 
     xi: Array, 
@@ -153,7 +151,6 @@ def chi_fn_xi(
 
     return chi_list[segment_idx]
 
-# @jit
 def forward_kinematics_fn(
     params: Dict[str, Array], 
     q: Array, 
@@ -184,7 +181,6 @@ def forward_kinematics_fn(
     
     return chi
 
-# @jit
 def J_autodiff(
     params: Dict[str, Array], 
     xi: Array, 
@@ -214,7 +210,6 @@ def J_autodiff(
 
     return J
 
-# @jit
 def tilde_SE3( 
     vec3:Array
 )-> Array:
@@ -241,8 +236,7 @@ def tilde_SE3(
         [-y, x, 0]
     ])
     return Mtilde
-# 
-# @jit
+
 def Adjoint_gn_SE3_inv(
     params: Dict[str, Array],
     xi_n: Array,
@@ -284,7 +278,7 @@ def Adjoint_gn_SE3_inv(
     
     return Adjoint_inv
 
-# @jit
+
 # def J_explicit(
 #     params: Dict[str, Array],
 #     xi: Array,
@@ -614,7 +608,6 @@ def J_Jd_autodiff(
 
     return J, J_d
 
-# @jit
 def J_Jd_explicit(
     params: Dict[str, Array],
     xi: Array,
@@ -800,8 +793,7 @@ def J_Jd_explicit(
     J_d = J_d @ B_xi
     
     return J, J_d
-
-# @jit 
+ 
 def U_g_fn_xi(
     params: Dict[str, Array], 
     xi: Array, 
@@ -869,8 +861,7 @@ def U_g_fn_xi(
     U_g = jnp.sum(integrals)
     
     return U_g
-
-# @jit 
+ 
 def G_fn_xi_autodiff(
     params: Dict[str, Array], 
     xi: Array
@@ -889,7 +880,6 @@ def G_fn_xi_autodiff(
     G = jax.jacobian(lambda xi: U_g_fn_xi(params, xi))(xi)
     return G
 
-# @jit
 def extract_Jp_Jo(
     J: Array
 ) -> Tuple[Array, Array]:
@@ -909,8 +899,7 @@ def extract_Jp_Jo(
     Jo = J[:, 2:, :]
     
     return Jp, Jo
-
-# @jit 
+ 
 def G_fn_xi_explicit(
     params: Dict[str, Array], 
     xi: Array,
