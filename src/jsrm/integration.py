@@ -1,4 +1,4 @@
-from jax import Array, jit
+from jax import Array
 from typing import Callable, Dict
 
 from jsrm.systems import euler_lagrangian
@@ -26,7 +26,6 @@ def ode_factory(
         ode_fn: ODE function of the form ode_fn(t, x) -> x_dot
     """
 
-    @jit
     def ode_fn(t: float, x: Array, *args) -> Array:
         """
         ODE of the dynamical Lagrangian system.
@@ -69,7 +68,6 @@ def ode_with_forcing_factory(
         ode_fn: ODE function of the form ode_fn(t, x, tau) -> x_dot
     """
 
-    @jit
     def ode_fn(
         t: float,
         x: Array,

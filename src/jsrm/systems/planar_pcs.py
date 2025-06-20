@@ -13,7 +13,6 @@ from .utils import (
 )
 from jsrm.math_utils import blk_diag
 
-
 def factory(
     filepath: Union[str, Path],
     strain_selector: Array = None,
@@ -54,7 +53,6 @@ def factory(
     # symbols for robot parameters
     params_syms = sym_exps["params_syms"]
 
-    @jit
     def select_params_for_lambdify_fn(params: Dict[str, Array]) -> List[Array]:
         """
         Select the parameters for lambdify
@@ -147,37 +145,39 @@ def factory(
         compute_planar_stiffness_matrix
     )
 
-    @jit
     def apply_eps_to_bend_strains(xi: Array, _eps: float) -> Array:
         """
         Add a small number to the bending strain to avoid singularities
         """
-        xi_reshaped = xi.reshape((-1, 3))
+        if _eps == None:
+            return xi
+        else:
+            xi_reshaped = xi.reshape((-1, 3))
 
-        xi_bend_sign = jnp.sign(xi_reshaped[:, 0])
-        # set zero sign to 1 (i.e. positive)
-        xi_bend_sign = jnp.where(xi_bend_sign == 0, 1, xi_bend_sign)
-        # add eps to the bending strain (i.e. the first column)
-        sigma_b_epsed = lax.select(
-            jnp.abs(xi_reshaped[:, 0]) < _eps,
-            xi_bend_sign * _eps,
-            xi_reshaped[:, 0],
-        )
-        xi_epsed = jnp.stack(
-            [
-                sigma_b_epsed,
-                xi_reshaped[:, 1],
-                xi_reshaped[:, 2],
-            ],
-            axis=1,
-        )
+            xi_bend_sign = jnp.sign(xi_reshaped[:, 0])
+            # set zero sign to 1 (i.e. positive)
+            xi_bend_sign = jnp.where(xi_bend_sign == 0, 1, xi_bend_sign)
+            # add eps to the bending strain (i.e. the first column)
+            sigma_b_epsed = lax.select(
+                jnp.abs(xi_reshaped[:, 0]) < _eps,
+                xi_bend_sign * _eps,
+                xi_reshaped[:, 0],
+            )
+            xi_epsed = jnp.stack(
+                [
+                    sigma_b_epsed,
+                    xi_reshaped[:, 1],
+                    xi_reshaped[:, 2],
+                ],
+                axis=1,
+            )
 
-        # old implementation:
-        # xi_epsed = xi_reshaped
-        # xi_epsed = xi_epsed.at[:, 0].add(xi_bend_sign * _eps)
+            # old implementation:
+            # xi_epsed = xi_reshaped
+            # xi_epsed = xi_epsed.at[:, 0].add(xi_bend_sign * _eps)
 
-        # flatten the array
-        xi_epsed = xi_epsed.flatten()
+            # flatten the array
+            xi_epsed = xi_epsed.flatten()
 
         return xi_epsed
 
@@ -262,7 +262,6 @@ def factory(
 
             return A
 
-    @jit
     def forward_kinematics_fn(
         params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
     ) -> Array:
@@ -296,7 +295,6 @@ def factory(
 
         return chi
 
-    @jit
     def jacobian_fn(
         params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
     ) -> Array:
@@ -332,7 +330,6 @@ def factory(
 
         return J
 
-    @jit
     def dynamical_matrices_fn(
         params: Dict[str, Array], q: Array, q_d: Array, eps: float = 1e4 * global_eps
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
@@ -474,7 +471,7 @@ def factory(
             Lambda: inertia matrix in the operational space of shape (3, 3)
             mu: matrix with corioli and centrifugal terms in the operational space of shape (3, 3)
             J: Jacobian of the Cartesian pose with respect to the generalized coordinates of shape (3, n_q)
-            J: time-derivative of the Jacobian of the end-effector pose with respect to the generalized coordinates
+            J_d: time-derivative of the Jacobian of the end-effector pose with respect to the generalized coordinates
                 of shape (3, n_q)
             JB_pinv: Dynamically-consistent pseudo-inverse of the Jacobian. Allows the mapping of torques
                 from the generalized coordinates to the operational space: f = JB_pinv.T @ tau_q

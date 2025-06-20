@@ -65,9 +65,9 @@ def symbolically_derive_planar_pcs_model(
     # tendon length jacobians for each segment as a function of the point coordinate s
     J_tend_sms = []
     # cross-sectional area of each segment
-    A = sp.zeros(num_segments)
+    A = sp.zeros(num_segments, 1)
     # second area moment of inertia of each segment
-    I = sp.zeros(num_segments)
+    I = sp.zeros(num_segments, 1)
     # inertia matrix
     B = sp.zeros(num_dof, num_dof)
     # potential energy
