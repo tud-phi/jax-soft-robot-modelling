@@ -87,11 +87,11 @@ def factory(
                     Returns:
                         A_d_segment: actuation matrix for the segment of shape (3, 3)
                     """
-                    sigma_norm = jnp.sqrt(xi_i[1] ** 2 + xi_i[2] ** 2)
+                    square_root_term = jnp.sqrt(xi[1]**2 + (xi[2] + d * xi[0])**2)
                     A_d_wrt_xi_i = - jnp.array([
-                        d * l_i * sigma_norm,
-                        l_i * xi_i[1] * (1 + d * xi_i[0]) / sigma_norm,
-                        l_i * xi_i[2] * (1 + d * xi_i[0]) / sigma_norm,
+                        l_i * d * (d * xi_i[0] + xi_i[2]) / square_root_term,
+                        l_i * xi_i[1] / square_root_term,
+                        l_i * (d * xi_i[0] + xi_i[2]) / square_root_term,
                     ])
                     return jnp.where(
                         i * jnp.ones((3, )) <= segment_idx * jnp.ones((3, )),
