@@ -153,7 +153,7 @@ def symbolically_derive_planar_pcs_model(
         U_g = U_g + U_gi
 
         # simplify derived tendon length
-        L_tend = L_tend + s * (1 + kappa_be * d) * sp.sqrt(sigma_sh**2 + sigma_ax**2)
+        L_tend = L_tend + s * sp.sqrt(sigma_sh**2 + (sigma_ax + kappa_be * d)**2)
         L_tend_sms.append(L_tend)
         print(f"L_tend of segment {i+1}:\n", L_tend)
         # take the derivative of the tendon length with respect to the configuration
