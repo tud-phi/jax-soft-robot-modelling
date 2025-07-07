@@ -8,8 +8,10 @@ from functools import partial
 from numpy.testing import assert_allclose
 from pathlib import Path
 
-from jsrm.systems import planar_pcs, euler_lagrangian
+from jsrm.systems import planar_pcs_num, euler_lagrangian
 from jsrm.utils.tolerance import Tolerance
+
+from typing import Optional, Literal
 
 
 def constant_strain_inverse_kinematics_fn(params, xi_eq, chi, s) -> Array:
@@ -25,10 +27,24 @@ def constant_strain_inverse_kinematics_fn(params, xi_eq, chi, s) -> Array:
     q = xi - xi_eq
     return q
 
-def test_planar_cs():
-    sym_exp_filepath = (
-        Path(jsrm.__file__).parent / "symbolic_expressions" / "planar_pcs_ns-1.dill"
-    )
+def test_planar_cs_num(
+    type_of_integration: Optional[Literal["gauss-legendre", "gauss-kronrad", "trapezoid"]] = "gauss-legendre",
+    type_of_jacobian: Optional[Literal["explicit", "autodiff"]] = "explicit",
+):
+    """
+Test the planar constant strain system with numerical integration and Jacobian for 1 segment.
+
+    Args:
+        type_of_integration (Literal["gauss-legendre", "gauss-kronrad", "trapezoid"], optional): 
+            Type of integration method to use. 
+            "gauss-kronrad" for Gauss-Kronrad rule, "gauss-legendre" for Gauss-Legendre rule,
+            "trapezoid" for trapezoid rule.
+            Defaults to "gauss-legendre".
+        type_of_jacobian (Literal["explicit", "autodiff"], optional): 
+            Type of Jacobian method to use. 
+            "explicit" for explicit Jacobian, "autodiff" for automatic differentiation.
+            Defaults to "explicit".
+    """
     params = {
         "th0": jnp.array(0.0),  # initial orientation angle [rad]
         "l": jnp.array([1e-1]),
@@ -42,8 +58,25 @@ def test_planar_cs():
     strain_selector = jnp.ones((3,), dtype=bool)
 
     xi_eq = jnp.array([0.0, 0.0, 1.0])
+    
+    num_segments = 1
+    if type_of_integration == "gauss-kronrad":
+        # use Gauss-Kronrad rule for integration
+        param_integration = 15
+    elif type_of_integration == "gauss-legendre":
+        # use Gauss-Legendre rule for integration
+        param_integration = 5
+    elif type_of_integration == "trapezoid":
+        # use trapezoid rule for integration
+        param_integration = 1000
     strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-        planar_pcs.factory(sym_exp_filepath, strain_selector, xi_eq)
+        planar_pcs_num.factory(
+            num_segments, 
+            strain_selector, 
+            integration_type=type_of_integration, 
+            param_integration=param_integration, 
+            jacobian_type=type_of_jacobian
+            )
     )
     forward_dynamics_fn = partial(
         euler_lagrangian.forward_dynamics, dynamical_matrices_fn
@@ -212,4 +245,14 @@ def test_planar_cs():
     print("[To check]")
 
 if __name__ == "__main__":
-    test_planar_cs()
+    list_of_integration_types = ["gauss-legendre", "gauss-kronrad", "trapezoid"]
+    list_of_jacobian_types = ["autodiff", "explicit"]
+    
+    for integration_type in list_of_integration_types:
+        for jacobian_type in list_of_jacobian_types:
+            print("\n================================================================================================")
+            print(f"Testing {integration_type} integration with {jacobian_type} Jacobian...")
+            test_planar_cs_num(
+                type_of_integration=integration_type,
+                type_of_jacobian=jacobian_type,
+            )

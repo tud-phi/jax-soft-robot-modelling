@@ -1,4 +1,3 @@
-import jax
 import jax.numpy as jnp
 
 # for documentation
@@ -179,18 +178,20 @@ def Adjoint_gn_SE3(
     x = s-l_nprev  # Compute the segment length
     adjoint_xi_n = adjoint_SE3(xi_n)  # Adjoint representation of the input vector
     
+    cos = jnp.cos(x * theta)
+    sin = jnp.sin(x * theta)
     Adjoint = (jnp.eye(6)
             + 1/(2*theta) * (
-                3*jnp.sin(x*theta) - x*theta*jnp.cos(x*theta)
+                3*sin - x*theta*cos
                 ) * adjoint_xi_n
             + 1/(2*jnp.power(theta, 2)) * (
-                4 - 4*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                4 - 4*cos - x*theta*sin
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 2)
             + 1/(2*jnp.power(theta, 3)) * (
-                jnp.sin(x*theta) - x*theta*jnp.cos(x*theta)
+                sin - x*theta*cos
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 3)
             + 1/(2*jnp.power(theta, 4)) * (
-                2 - 2*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                2 - 2*cos - x*theta*sin
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 4))
 
     return Adjoint
@@ -224,18 +225,21 @@ def Adjoint_gn_SE3_inv(
     x = s-l_nprev  # Compute the segment length
     adjoint_xi_n = adjoint_SE3(xi_n)  # Adjoint representation of the input vector
     
+    cos = jnp.cos(x * theta)
+    sin = jnp.sin(x * theta)
+    
     Adjoint = (jnp.eye(6)
             + 1/(2*theta) * (
-                3*jnp.sin(x*theta) - x*theta*jnp.cos(x*theta)
+                3*sin - x*theta*cos
                 ) * adjoint_xi_n
             + 1/(2*jnp.power(theta, 2)) * (
-                4 - 4*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                4 - 4*cos - x*theta*sin
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 2)
             + 1/(2*jnp.power(theta, 3)) * (
-                jnp.sin(x*theta) - x*theta*jnp.cos(x*theta)
+                sin - x*theta*cos
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 3)
             + 1/(2*jnp.power(theta, 4)) * (
-                2 - 2*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                2 - 2*cos - x*theta*sin
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 4))
     
     # Extract R and uR from the Adjoint matrix
@@ -284,18 +288,21 @@ def Tangent_gn_SE3(
     x = s-l_nprev  # Compute the segment length
     adjoint_xi_n = adjoint_SE3(xi_n)  # Adjoint representation of the input vector
     
+    cos = jnp.cos(x * theta)
+    sin = jnp.sin(x * theta)
+    
     Tangent = (x*jnp.eye(6)
             + 1/(2*jnp.power(theta, 2)) * (
-                4 - 4*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                4 - 4*cos - x*theta*sin
                 ) * adjoint_xi_n
             + 1/(2*jnp.power(theta, 3)) * (
-                4*x*theta - 5*jnp.sin(x*theta) + x*theta*jnp.cos(x*theta)
+                4*x*theta - 5*sin + x*theta*cos
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 2)
             + 1/(2*jnp.power(theta, 4)) * (
-                2 - 2*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                2 - 2*cos - x*theta*sin
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 3)
             + 1/(2*jnp.power(theta, 5)) * (
-                2*x*theta - 3*jnp.sin(x*theta) + x*theta*jnp.cos(x*theta)
+                2*x*theta - 3*sin + x*theta*cos
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 4))
 
     return Tangent
@@ -440,18 +447,21 @@ def Adjoint_gn_SE2(
     x = s-l_nprev  # Compute the segment length
     adjoint_xi_n = adjoint_SE2(xi_n)  # Adjoint representation of the input vector
     
+    cos = jnp.cos(x * theta)
+    sin = jnp.sin(x * theta)
+    
     Adjoint = (jnp.eye(3)
             + 1/(2*theta) * (
-                3*jnp.sin(x*theta) - x*theta*jnp.cos(x*theta)
+                3*sin - x*theta*cos
                 ) * adjoint_xi_n
             + 1/(2*jnp.power(theta, 2)) * (
-                4 - 4*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                4 - 4*cos - x*theta*sin
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 2)
             + 1/(2*jnp.power(theta, 3)) * (
-                jnp.sin(x*theta) - x*theta*jnp.cos(x*theta)
+                sin - x*theta*cos
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 3)
             + 1/(2*jnp.power(theta, 4)) * (
-                2 - 2*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                2 - 2*cos - x*theta*sin
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 4))
 
     return Adjoint
@@ -484,18 +494,21 @@ def Adjoint_gn_SE2_inv(
     x = s-l_nprev  # Compute the segment length
     adjoint_xi_n = adjoint_SE2(xi_n)  # Adjoint representation of the input vector
     
+    cos = jnp.cos(x * theta)
+    sin = jnp.sin(x * theta)
+    
     Adjoint = (jnp.eye(3)
             + 1/(2*theta) * (
-                3*jnp.sin(x*theta) - x*theta*jnp.cos(x*theta)
+                3*sin - x*theta*cos
                 ) * adjoint_xi_n
             + 1/(2*jnp.power(theta, 2)) * (
-                4 - 4*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                4 - 4*cos - x*theta*sin
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 2)
             + 1/(2*jnp.power(theta, 3)) * (
-                jnp.sin(x*theta) - x*theta*jnp.cos(x*theta)
+                sin - x*theta*cos
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 3)
             + 1/(2*jnp.power(theta, 4)) * (
-                2 - 2*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                2 - 2*cos - x*theta*sin
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 4))
     
     # Extract R and -Jt from the Adjoint matrix
@@ -540,18 +553,21 @@ def Tangent_gn_SE2(
     x = s-l_nprev  # Compute the segment length
     adjoint_xi_n = adjoint_SE2(xi_n)  # Adjoint representation of the input vector
     
+    cos = jnp.cos(x * theta)
+    sin = jnp.sin(x * theta)
+    
     Tangent = (x*jnp.eye(3)
             + 1/(2*jnp.power(theta, 2)) * (
-                4 - 4*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                4 - 4*cos - x*theta*sin
                 ) * adjoint_xi_n
             + 1/(2*jnp.power(theta, 3)) * (
-                4*x*theta - 5*jnp.sin(x*theta) + x*theta*jnp.cos(x*theta)
+                4*x*theta - 5*sin + x*theta*cos
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 2)
             + 1/(2*jnp.power(theta, 4)) * (
-                2 - 2*jnp.cos(x*theta) - x*theta*jnp.sin(x*theta)
+                2 - 2*cos - x*theta*sin
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 3)
             + 1/(2*jnp.power(theta, 5)) * (
-                2*x*theta - 3*jnp.sin(x*theta) + x*theta*jnp.cos(x*theta)
+                2*x*theta - 3*sin + x*theta*cos
                 ) * jnp.linalg.matrix_power(adjoint_xi_n, 4))
 
     return Tangent

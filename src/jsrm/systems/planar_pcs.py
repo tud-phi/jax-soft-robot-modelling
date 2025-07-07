@@ -261,7 +261,10 @@ def factory(
             return A
 
     def forward_kinematics_fn(
-        params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
+        params: Dict[str, Array], 
+        q: Array, 
+        s: Array, 
+        eps: float = global_eps
     ) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
@@ -294,7 +297,10 @@ def factory(
         return chi
 
     def jacobian_fn(
-        params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
+        params: Dict[str, Array], 
+        q: Array, 
+        s: Array, 
+        eps: float = global_eps
     ) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
@@ -329,7 +335,10 @@ def factory(
         return J
 
     def dynamical_matrices_fn(
-        params: Dict[str, Array], q: Array, q_d: Array, eps: float = 1e4 * global_eps
+        params: Dict[str, Array], 
+        q: Array, 
+        q_d: Array, 
+        eps: float = 1e4 * global_eps
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
         Compute the dynamical matrices of the system.
@@ -377,7 +386,11 @@ def factory(
 
         return B, C, G, K, D, alpha
 
-    def kinetic_energy_fn(params: Dict[str, Array], q: Array, q_d: Array) -> Array:
+    def kinetic_energy_fn(
+        params: Dict[str, Array], 
+        q: Array, 
+        q_d: Array
+    ) -> Array:
         """
         Compute the kinetic energy of the system.
         Args:

@@ -9,7 +9,7 @@ from jax import numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as onp
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional, Literal
 
 import jsrm
 from jsrm import ode_factory
@@ -23,10 +23,10 @@ import statistics
 
 def simulate_planar_pcs_value_eval(
     num_segments: int,
-    type_of_derivation: str = "symbolic",
-    type_of_integration: str = "gauss-legendre",
+    type_of_derivation: Optional[Literal["symbolic", "numeric"]] = "symbolic",
+    type_of_integration: Optional[Literal["gauss-legendre", "gauss-kronrad", "trapezoid"]] = "gauss-legendre",
     param_integration: int = None,
-    type_of_jacobian: str = "explicit",
+    type_of_jacobian: Optional[Literal["explicit", "autodiff"]] = "explicit",
     robot_params: Dict[str, Array] = None,
     strain_selector: Array = None,
     q0: Array = None,

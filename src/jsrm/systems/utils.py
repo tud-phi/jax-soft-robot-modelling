@@ -1,9 +1,12 @@
 from copy import deepcopy
 import jax
-from jax import Array, jit, vmap
+
 from jax import numpy as jnp
 import sympy as sp
-from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
+
+# For documentation purposes
+from jax import Array
+from typing import Dict, List, Tuple, Union
 
 
 def substitute_params_into_all_symbolic_expressions(
@@ -168,7 +171,7 @@ def gauss_quadrature(
         L = jnp.stack(L, axis=1)
         Lp = N2 * (L[:, N1 - 1] - y * L[:, N1]) / (1 - y ** 2)
         y_new = y - L[:, N1] / Lp
-        return jnp.max(jnp.abs(y_new - y)) > jnp.finfo(float).eps
+        return jnp.max(jnp.abs(y_new - y)) > jnp.finfo(jnp.float32).eps
 
     y = jax.lax.while_loop( #TODO
         convergence_condition, 
