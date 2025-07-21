@@ -5,7 +5,7 @@ from jax import numpy as jnp
 from quadax import GaussKronrodRule
 
 import numpy as onp
-from typing import Callable, Dict, Tuple, Optional, Literal
+from typing import Callable, Dict, Tuple, Optional, Literal, Any
 
 from .utils import (
     compute_strain_basis,
@@ -33,25 +33,25 @@ REORDERED_LINES_STRAIN      = jnp.array([2, 0, 1]) # reorder the lines to match 
 
 def factory(
     num_segments: int, 
-    strain_selector: Array=None,
+    strain_selector: Optional[Array] = None,
     xi_eq: Optional[Array] = None,
     stiffness_fn: Optional[Callable] = None,
     actuation_mapping_fn: Optional[Callable] = None,
     global_eps: float = jnp.finfo(jnp.float32).eps, 
     integration_type: Optional[Literal["gauss-legendre", "gauss-kronrad", "trapezoid"]] = "gauss-legendre",
-    param_integration: int = None,
+    param_integration: Optional[int] = None,
     jacobian_type: Optional[Literal["explicit", "autodiff"]] = "explicit"
-    ) -> Tuple[
+) -> Tuple[
         Array,
         Callable[
-            [Dict[str, Array], Array, Array, Optional[float]], 
+            [Dict[str, Array], Array, Array, float], 
             Array
         ],
         Callable[
-            [Dict[str, Array], Array, Array, Optional[float]],
+            [Dict[str, Array], Array, Array, float],
             Tuple[Array, Array, Array, Array, Array, Array],
         ],
-        Dict[str, Callable],
+        Dict[str, Callable[..., Any]],
     ]:
     """
     Factory function to create the forward kinematics function for a planar robot.
@@ -190,7 +190,7 @@ def factory(
                 S = B_xi.T @ S @ B_xi
 
             return S
-    if not isinstance(stiffness_fn, Callable):
+    if not isinstance(stiffness_fn, callable):
         raise TypeError(f"stiffness_fn must be a callable, but got {type(stiffness_fn).__name__}")
 
     # Actuation mapping function
@@ -295,7 +295,7 @@ def factory(
     def classify_segment(
         params: Dict[str, Array], 
         s: Array
-        ) -> Tuple[Array, Array]:
+        ) -> Tuple[Array, Array, Array]:
         """
         Classify the point along the robot to the corresponding segment.
 
@@ -306,6 +306,7 @@ def factory(
         Returns: 
             segment_idx (Array): index of the segment where the point is located
             s_segment (Array): point coordinate along the segment in the interval [0, l_segment]
+            l_cum (Array): cumulative length of the segments starting with 0
         """
         l = params["l"]
         
@@ -501,7 +502,7 @@ def factory(
         def J_i(
             tuple_J_prev: Array,
             i: int
-        ) -> Array:
+        ) -> Tuple[Tuple[Array, Array], Array]:
             J_prev_Lprev, _ = tuple_J_prev
             
             start_index = 3 * i
@@ -534,7 +535,8 @@ def factory(
         _, J_array = lax.scan(
             f = J_i,
             init = tuple_J_0, 
-            xs = jnp.arange(1, num_segments))
+            xs = jnp.arange(1, num_segments)
+        )
         
         # Add the initial condition to the Jacobian array
         J_array = jnp.concatenate([J_0_s[jnp.newaxis, ...], J_array], axis=0)
@@ -597,7 +599,7 @@ def factory(
         def J_i(
             tuple_J_prev: Array,
             i: int
-        ) -> Array:
+        ) -> Tuple[Tuple[Array, Array], Array]:
             J_prev_Lprev, _ = tuple_J_prev
             
             start_index = 3 * i
@@ -708,7 +710,7 @@ def factory(
         xi_d: Array,
         s: Array, 
         eps: float = global_eps
-    ) -> Array:
+    ) -> Tuple[Array, Array]:
         """
         Compute the body-frame jacobian and its derivative with respect to the strain vector 
         at a given point s using explicit expression in SE(2).
@@ -753,7 +755,7 @@ def factory(
         def J_i(
             tuple_J_prev: Array,
             i: int
-        ) -> Array:
+        ) -> Tuple[Tuple[Array, Array], Array]:
             J_prev_Lprev, _ = tuple_J_prev
             
             start_index = 3 * i
@@ -837,7 +839,7 @@ def factory(
         xi_d: Array,
         s: Array,
         eps: float = global_eps
-    ) -> Array:
+    ) -> Tuple[Array, Array]:
         """
         Compute the inertial-frame jacobian and its derivative with respect to the strain vector 
         at a given point s using explicit expression in SE(2).
@@ -882,7 +884,7 @@ def factory(
         def J_i(
             tuple_J_prev: Array,
             i: int
-        ) -> Array:
+        ) -> Tuple[Tuple[Array, Array], Array]:
             J_prev_Lprev, _ = tuple_J_prev
             
             start_index = 3 * i
@@ -915,7 +917,8 @@ def factory(
         _, J_array = lax.scan(
             f = J_i,
             init = tuple_J_0, 
-            xs = jnp.arange(1, num_segments))
+            xs = jnp.arange(1, num_segments)
+        )
 
         # Add the initial condition to the Jacobian array
         J_array = jnp.concatenate([J_0_s[jnp.newaxis, ...], J_array], axis=0)
@@ -1705,7 +1708,7 @@ def factory(
 
         return Lambda, mu, J, J_d, JB_pinv
 
-    auxiliary_fns = {
+    auxiliary_fns: Dict[str, Callable[..., Any]] = {
         "apply_eps_to_bend_strains": apply_eps_to_bend_strains,
         "classify_segment": classify_segment,
         "stiffness_fn": stiffness_fn,

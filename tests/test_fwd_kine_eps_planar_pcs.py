@@ -5,7 +5,7 @@ from matplotlib.widgets import Slider, Button, CheckButtons
 from matplotlib import rc
 rc('animation', html='html5')
 
-from jsrm.systems import planar_pcs, planar_pcs_num
+from jsrm.systems import planar_pcs_num, planar_pcs_sym
 from pathlib import Path
 import jsrm
 from tqdm import tqdm
@@ -33,7 +33,7 @@ strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
 def get_fwd_kine_fn(jacobian_type):
     if jacobian_type == "symbolic":
         sym_exp_filepath = Path(jsrm.__file__).parent / "symbolic_expressions" / f"planar_pcs_ns-{num_segments}.dill"
-        _, fwd, _, _ = planar_pcs.factory(sym_exp_filepath, strain_selector)
+        _, fwd, _, _ = planar_pcs_sym.factory(sym_exp_filepath, strain_selector)
     else:
         _, fwd, _, _ = planar_pcs_num.factory(
             num_segments, strain_selector,

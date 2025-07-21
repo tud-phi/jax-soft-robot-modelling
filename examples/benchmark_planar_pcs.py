@@ -9,11 +9,11 @@ from jax import numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as onp
 from pathlib import Path
-from typing import Callable, Dict, Optional, Literal
+from typing import Callable, Dict, Optional, Literal, Union
 
 import jsrm
 from jsrm import ode_factory
-from jsrm.systems import planar_pcs, planar_pcs_num
+from jsrm.systems import planar_pcs_num, planar_pcs_sym
 
 import time
 import pickle
@@ -25,21 +25,21 @@ def simulate_planar_pcs_value_eval(
     num_segments: int,
     type_of_derivation: Optional[Literal["symbolic", "numeric"]] = "symbolic",
     type_of_integration: Optional[Literal["gauss-legendre", "gauss-kronrad", "trapezoid"]] = "gauss-legendre",
-    param_integration: int = None,
+    param_integration: Optional[int] = None,
     type_of_jacobian: Optional[Literal["explicit", "autodiff"]] = "explicit",
-    robot_params: Dict[str, Array] = None,
-    strain_selector: Array = None,
-    q0: Array = None,
-    q_d0: Array = None,
+    robot_params: Optional[Dict[str, Array]] = None,
+    strain_selector: Optional[Array] = None,
+    q0: Optional[Array] = None,
+    q_d0: Optional[Array] = None,
     t: float = 1.0,
-    dt: float = None,
+    dt: Optional[float] = None,
     bool_print: bool = True,
     bool_plot: bool = True,
     bool_save_plot: bool = False,
     bool_save_video: bool = True,
     bool_save_res: bool = False,
-    results_path: str = None, 
-    results_path_extension: str = None
+    results_path: Optional[Union[str, Path]] = None, 
+    results_path_extension: Optional[str] = None
 ) -> Dict:
     """
     Simulate a planar PCS model. Save the video and figures.
@@ -81,7 +81,7 @@ def simulate_planar_pcs_value_eval(
             Defaults to None, which will use the default path.
         
     Returns:
-        TODO
+        simulation_dict (Dict): dictionary with the simulation results.
     """
 
     # ===================================================
@@ -253,13 +253,12 @@ def simulate_planar_pcs_value_eval(
             results_path = (results_path_parent / file_name).with_suffix(".pkl")
         
         if isinstance(results_path, str) or isinstance(results_path, Path):
-            results_path = Path(results_path)
-            if results_path.suffix != ".pkl":
+            results_path_obj = Path(results_path)
+            if results_path_obj.suffix != ".pkl":
                 raise ValueError(
-                    f"results_path must have the suffix .pkl, but got {results_path.suffix}"
+                    f"results_path must have the suffix .pkl, but got {results_path_obj.suffix}"
                 )
-            else:
-                results_path = Path(results_path)
+            results_path = results_path_obj
         else:
             raise TypeError(
                 f"results_path must be a string, but got {type(results_path).__name__}"
@@ -390,7 +389,7 @@ def simulate_planar_pcs_value_eval(
     
     if type_of_derivation == "symbolic":
         strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-            planar_pcs.factory(sym_exp_filepath, strain_selector)
+            planar_pcs_sym.factory(sym_exp_filepath, strain_selector)
         )
     elif type_of_derivation == "numeric":
         strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
@@ -441,7 +440,7 @@ def simulate_planar_pcs_value_eval(
                 y0=x0, 
                 max_steps=None, 
                 saveat=SaveAt(ts=video_ts))
-    diffeqsolve_fn = jit(diffeqsolve_fn)
+    diffeqsolve_fn = jit(diffeqsolve_fn)  # type: ignore
     
     print("Solving the ODE ...")
     sol = diffeqsolve_fn()  
@@ -463,7 +462,7 @@ def simulate_planar_pcs_value_eval(
     forward_kinematics_fn_end_effector = partial(forward_kinematics_fn, robot_params, s=s_max)
         
     print("JIT-compiling the forward kinematics function...")
-    forward_kinematics_fn_end_effector = jit(forward_kinematics_fn_end_effector)
+    forward_kinematics_fn_end_effector = jit(forward_kinematics_fn_end_effector)  # type: ignore
     forward_kinematics_fn_end_effector = vmap(forward_kinematics_fn_end_effector)
     
     print("Computing the end-effector position along the trajectory...")
@@ -619,7 +618,7 @@ def simulate_planar_pcs_value_eval(
         )
         
         # Initialize the video
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore
         video = cv2.VideoWriter(
             str(video_path),
             fourcc,
@@ -649,6 +648,7 @@ def simulate_planar_pcs_value_eval(
     # ===========================
     if bool_save_res:
         print("Saving the simulation results...")
+        assert results_path is not None, "results_path should not be None when saving results"
         with open(results_path, "wb") as f:
             pickle.dump(simulation_dict, f)
         print(f"Simulation results saved at {results_path} \n")
@@ -665,20 +665,20 @@ def simulate_planar_pcs_time_eval(
     num_segments: int,
     type_of_derivation: str = "symbolic",
     type_of_integration: str = "gauss-legendre",
-    param_integration: int = None,
+    param_integration: Optional[int] = None,
     type_of_jacobian: str = "explicit",
-    robot_params: Dict[str, Array] = None,
-    strain_selector: Array = None,
-    q0: Array = None,
-    q_d0: Array = None,
+    robot_params: Optional[Dict[str, Array]] = None,
+    strain_selector: Optional[Array] = None,
+    q0: Optional[Array] = None,
+    q_d0: Optional[Array] = None,
     t: float = 1.0,
-    dt: float = None,
+    dt: Optional[float] = None,
     bool_save_res: bool = False,
-    results_path: str = None, 
-    results_path_extension: str = None,
-    type_time = "once",
-    nb_eval : int = None,
-    nb_samples: int = None
+    results_path: Optional[Union[str, Path]] = None, 
+    results_path_extension: Optional[str] = None,
+    type_time: str = "once",
+    nb_eval: Optional[int] = None,
+    nb_samples: Optional[int] = None
 ) -> Dict:
     """
     Simulate a planar PCS model. Save the video and figures.
@@ -922,13 +922,12 @@ def simulate_planar_pcs_time_eval(
             results_path = (results_path_parent / file_name).with_suffix(".pkl")
         
         if isinstance(results_path, str) or isinstance(results_path, Path):
-            results_path = Path(results_path)
-            if results_path.suffix != ".pkl":
+            results_path_obj = Path(results_path)
+            if results_path_obj.suffix != ".pkl":
                 raise ValueError(
-                    f"results_path must have the suffix .pkl, but got {results_path.suffix}"
+                    f"results_path must have the suffix .pkl, but got {results_path_obj.suffix}"
                 )
-            else:
-                results_path = Path(results_path)
+            results_path = results_path_obj
         else:
             raise TypeError(
                 f"results_path must be a string, but got {type(results_path).__name__}"
@@ -982,7 +981,7 @@ def simulate_planar_pcs_time_eval(
     timer_start = time.time()
     if type_of_derivation == "symbolic":
         strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-            planar_pcs.factory(sym_exp_filepath, strain_selector)
+            planar_pcs_sym.factory(sym_exp_filepath, strain_selector)
         )
     elif type_of_derivation == "numeric":
         strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
@@ -1330,7 +1329,7 @@ def simulate_planar_pcs_time_eval(
 
         # JIT the functions
         print("JIT-compiling the ODE function...")
-        diffeqsolve_fn = jit(diffeqsolve_fn)
+        diffeqsolve_fn = jit(diffeqsolve_fn)  # type: ignore
         
         # First evaluation of the ODE to trigger JIT compilation
         print("Solving the ODE for the first time (JIT-compilation)...")
@@ -1579,6 +1578,7 @@ def simulate_planar_pcs_time_eval(
     # ===========================
     if bool_save_res:
         print("Saving the simulation results...")
+        assert results_path is not None, "results_path should not be None when saving results"
         with open(results_path, "wb") as f:
             pickle.dump(simulation_dict, f)
         print(f"Simulation results saved at {results_path} \n")

@@ -8,7 +8,7 @@ from functools import partial
 from numpy.testing import assert_allclose
 from pathlib import Path
 
-from jsrm.systems import planar_pcs, euler_lagrangian
+from jsrm.systems import euler_lagrangian, planar_pcs_sym
 from jsrm.utils.tolerance import Tolerance
 
 
@@ -43,7 +43,7 @@ def test_planar_cs():
 
     xi_eq = jnp.array([0.0, 0.0, 1.0])
     strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-        planar_pcs.factory(sym_exp_filepath, strain_selector, xi_eq)
+        planar_pcs_sym.factory(sym_exp_filepath, strain_selector, xi_eq)
     )
     forward_dynamics_fn = partial(
         euler_lagrangian.forward_dynamics, dynamical_matrices_fn
