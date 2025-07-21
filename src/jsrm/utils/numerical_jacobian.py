@@ -137,7 +137,7 @@ def _eps_for_method(x0_dtype, f0_dtype, method):
         return EPS ** (1 / 3)
     else:
         raise RuntimeError(
-            "Unknown step method, should be one of " "{'2-point', '3-point'}"
+            "Unknown step method, should be one of {'2-point', '3-point'}"
         )
 
 

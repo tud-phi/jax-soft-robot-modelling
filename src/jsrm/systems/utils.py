@@ -1,13 +1,16 @@
 from copy import deepcopy
 import jax
-from jax import Array, jit, vmap
+
 from jax import numpy as jnp
 import sympy as sp
-from typing import Callable, Dict, Iterable, List, Sequence, Tuple, Union
+
+# For documentation purposes
+from jax import Array
+from typing import Dict, List, Tuple, Union
 
 
 def substitute_params_into_all_symbolic_expressions(
-    sym_exps: Dict, params: Dict[str, jnp.array]
+    sym_exps: Dict, params: Dict[str, Array]
 ) -> Dict:
     """
     Substitute robot parameters into symbolic expressions.
@@ -47,7 +50,7 @@ def substitute_params_into_all_symbolic_expressions(
 def substitute_params_into_single_symbolic_expression(
     sym_exp: sp.Expr,
     params_syms: Dict[str, List[sp.Symbol]],
-    params: Dict[str, jnp.array],
+    params: Dict[str, Array],
 ) -> sp.Expr:
     """
     Substitute robot parameters into a single symbolic expression.
@@ -88,13 +91,15 @@ def concatenate_params_syms(
 
 def compute_strain_basis(
     strain_selector: Array,
-) -> jnp.ndarray:
+) -> Array:
     """
     Compute strain basis based on boolean strain selector.
     Args:
-        strain_selector: boolean array of shape (n_xi, ) specifying which strain components are active
+        strain_selector (Array):
+            boolean array of shape (n_xi, ) specifying which strain components are active
     Returns:
-        strain_basis: strain basis matrix of shape (n_xi, n_q) where n_q is the number of configuration variables
+        strain_basis (Array):
+            strain basis matrix of shape (n_xi, n_q) where n_q is the number of configuration variables
             and n_xi is the number of strains
     """
     n_q = strain_selector.sum().item()
@@ -107,8 +112,9 @@ def compute_strain_basis(
     return strain_basis
 
 
-@jit
-def compute_planar_stiffness_matrix(l: Array, A: Array, Ib: Array, E: Array, G: Array) -> Array:
+def compute_planar_stiffness_matrix(
+    l: Array, A: Array, Ib: Array, E: Array, G: Array
+) -> Array:
     """
     Compute the stiffness matrix of the system.
     Args:
@@ -124,3 +130,75 @@ def compute_planar_stiffness_matrix(l: Array, A: Array, Ib: Array, E: Array, G: 
     S = l * jnp.diag(jnp.stack([Ib * E, 4 / 3 * A * G, A * E], axis=0))
 
     return S
+
+
+def gauss_quadrature(N_GQ: int, a=0.0, b=1.0) -> Tuple[Array, Array, int]:
+    """
+    Computes the Legendre-Gauss nodes and weights on the interval [0, 1]
+    using Legendre-Gauss Quadrature with truncation order N_GQ.
+
+    Args:
+        N_GQ (int): order of the truncature.
+        a (float, optional): The lower bound of the interval. Default is 0.0.
+        b (float, optional): The upper bound of the interval. Default is 1.0.
+
+    Returns:
+        Xs (Array): The Gauss nodes on [a, b].
+        Ws (Array): The Gauss weights on [a, b].
+        nGauss (int): The number of Gauss points including boundary points, i.e., N_GQ + 2.
+    """
+
+    N = N_GQ - 1
+    N1 = N + 1
+    N2 = N + 2
+
+    xu = jnp.linspace(-1, 1, N1)
+
+    # Initial guess
+    y = jnp.cos((2 * jnp.arange(N + 1) + 1) * jnp.pi / (2 * N + 2)) + (
+        0.27 / N1
+    ) * jnp.sin(jnp.pi * xu * N / N2)
+
+    def legendre_iteration(y):
+        L = [jnp.ones_like(y), y]
+        for k in range(2, N1 + 1):
+            Lk = ((2 * k - 1) * y * L[-1] - (k - 1) * L[-2]) / k
+            L.append(Lk)
+        L = jnp.stack(L, axis=1)
+        Lp = N2 * (L[:, N1 - 1] - y * L[:, N1]) / (1 - y**2)
+        return y - L[:, N1] / Lp
+
+    def convergence_condition(y):
+        L = [jnp.ones_like(y), y]
+        for k in range(2, N1 + 1):
+            Lk = ((2 * k - 1) * y * L[-1] - (k - 1) * L[-2]) / k
+            L.append(Lk)
+        L = jnp.stack(L, axis=1)
+        Lp = N2 * (L[:, N1 - 1] - y * L[:, N1]) / (1 - y**2)
+        y_new = y - L[:, N1] / Lp
+        return jnp.max(jnp.abs(y_new - y)) > jnp.finfo(jnp.float32).eps
+
+    y = jax.lax.while_loop(  # TODO
+        convergence_condition, legendre_iteration, y
+    )
+
+    # Linear map from [-1, 1] to [a, b]
+    Xs = (a * (1 - y) + b * (1 + y)) / 2
+    Xs = jnp.flip(Xs)
+
+    # Add the boundary points
+    Xs = jnp.concatenate([jnp.array([a]), Xs, jnp.array([b])])
+
+    # Compute the weights
+    L = [jnp.ones_like(y), y]
+    for k in range(2, N1 + 1):
+        Lk = ((2 * k - 1) * y * L[-1] - (k - 1) * L[-2]) / k
+        L.append(Lk)
+    L = jnp.stack(L, axis=1)
+    Lp = N2 * (L[:, N1 - 1] - y * L[:, N1]) / (1 - y**2)
+    Ws = (b - a) / ((1 - y**2) * Lp**2) * (N2 / N1) ** 2
+
+    # Add the boundary points
+    Ws = jnp.concatenate([jnp.array([0.0]), Ws, jnp.array([0.0])])
+
+    return Xs, Ws, N_GQ + 2
