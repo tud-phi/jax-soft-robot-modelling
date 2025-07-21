@@ -242,6 +242,7 @@ def factory(
             jacobian_fn: Callable,
             params: Dict[str, Array],
             B_xi: Array,
+            xi_eq: Array,
             q: Array,
         ) -> Array:
             """
@@ -252,6 +253,7 @@ def factory(
                 jacobian_fn: function to compute the Jacobian
                 params: dictionary with robot parameters
                 B_xi: strain basis matrix
+                xi_eq: equilibrium strains as array of shape (n_xi,)
                 q: configuration of the robot
             Returns:
                 A: actuation matrix of shape (n_xi, n_xi) where n_xi is the number of strains.
@@ -365,7 +367,7 @@ def factory(
         # compute the stiffness matrix
         K = stiffness_fn(params, B_xi, formulate_in_strain_space=True)
         # compute the actuation matrix
-        A = actuation_mapping_fn(forward_kinematics_fn, jacobian_fn, params, B_xi, q)
+        A = actuation_mapping_fn(forward_kinematics_fn, jacobian_fn, params, B_xi, xi_eq, q)
 
         # dissipative matrix from the parameters
         D = params.get("D", jnp.zeros((n_xi, n_xi)))

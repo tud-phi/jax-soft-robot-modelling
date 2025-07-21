@@ -15,7 +15,7 @@ def factory(
     **kwargs
 ):
     """
-    Factory function for the planar PCS.
+    Factory function for the pneumatically-actuated planar PCS.
     Args:
         num_segments: number of segments
         segment_actuation_selector: actuation selector for the segments as boolean array of shape (num_segments,)
@@ -43,6 +43,7 @@ def factory(
         jacobian_fn: Callable,
         params: Dict[str, Array],
         B_xi: Array,
+        xi_eq: Array,
         q: Array,
     ) -> Array:
         """
@@ -52,6 +53,7 @@ def factory(
             jacobian_fn: function to compute the Jacobian
             params: dictionary with robot parameters
             B_xi: strain basis matrix
+            xi_eq: equilibrium strains as array of shape (n_xi,)
             q: configuration of the robot
         Returns:
             A: actuation matrix of shape (n_xi, n_act) where n_xi is the number of strains and

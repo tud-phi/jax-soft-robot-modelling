@@ -12,7 +12,7 @@ from typing import Callable, Dict
 
 import jsrm
 from jsrm import ode_factory
-from jsrm.systems import pneumatic_planar_pcs
+from jsrm.systems import pneumatically_actuated_planar_pcs
 
 num_segments = 1
 
@@ -48,7 +48,7 @@ params["D"] = 5e-4 * jnp.diag(
 strain_selector = jnp.array([True, False, True])[None, :].repeat(num_segments, axis=0).flatten()
 
 B_xi, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-    pneumatic_planar_pcs.factory(
+    pneumatically_actuated_planar_pcs.factory(
         num_segments, sym_exp_filepath, strain_selector, # simplified_actuation_mapping=True
     )
 )
