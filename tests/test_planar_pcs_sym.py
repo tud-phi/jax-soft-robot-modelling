@@ -17,13 +17,26 @@ def constant_strain_inverse_kinematics_fn(params, xi_eq, chi, s) -> Array:
     px, py, th = chi
     th0 = params["th0"].item()
     print("th0 = ", th0)
-    xi = (th - th0) / (2 * s) * jnp.array([
-        2.0, 
-        (-jnp.sin(th0)*px+jnp.cos(th0)*py) - (jnp.cos(th0)*px+jnp.sin(th0)*py)*jnp.sin(th-th0)/(jnp.cos(th-th0)-1), 
-        -(jnp.cos(th0)*px+jnp.sin(th0)*py) - (-jnp.sin(th0)*px+jnp.cos(th0)*py)*jnp.sin(th-th0)/(jnp.cos(th-th0)-1)
-    ])
+    xi = (
+        (th - th0)
+        / (2 * s)
+        * jnp.array(
+            [
+                2.0,
+                (-jnp.sin(th0) * px + jnp.cos(th0) * py)
+                - (jnp.cos(th0) * px + jnp.sin(th0) * py)
+                * jnp.sin(th - th0)
+                / (jnp.cos(th - th0) - 1),
+                -(jnp.cos(th0) * px + jnp.sin(th0) * py)
+                - (-jnp.sin(th0) * px + jnp.cos(th0) * py)
+                * jnp.sin(th - th0)
+                / (jnp.cos(th - th0) - 1),
+            ]
+        )
+    )
     q = xi - xi_eq
     return q
+
 
 def test_planar_cs():
     sym_exp_filepath = (
@@ -51,7 +64,7 @@ def test_planar_cs():
     nonlinear_state_space_fn = partial(
         euler_lagrangian.nonlinear_state_space, dynamical_matrices_fn
     )
-    
+
     # ========================================
     # Test of the functions
     # ========================================
@@ -59,10 +72,22 @@ def test_planar_cs():
     # test forward kinematics
     print("\nTesting forward kinematics... ------------------------")
     test_cases = [
-        (jnp.zeros((3,)), params["l"][0] / 2, jnp.array([0.0, params["l"][0] / 2, 0.0])),
+        (
+            jnp.zeros((3,)),
+            params["l"][0] / 2,
+            jnp.array([0.0, params["l"][0] / 2, 0.0]),
+        ),
         (jnp.zeros((3,)), params["l"][0], jnp.array([0.0, params["l"][0], 0.0])),
-        (jnp.array([0.0, 0.0, 1.0]), params["l"][0], jnp.array([0.0, 2 * params["l"][0], 0.0])),
-        (jnp.array([0.0, 1.0, 0.0]), params["l"][0], params["l"][0] * jnp.array([1.0, 1.0, 0.0])),
+        (
+            jnp.array([0.0, 0.0, 1.0]),
+            params["l"][0],
+            jnp.array([0.0, 2 * params["l"][0], 0.0]),
+        ),
+        (
+            jnp.array([0.0, 1.0, 0.0]),
+            params["l"][0],
+            params["l"][0] * jnp.array([1.0, 1.0, 0.0]),
+        ),
     ]
 
     for q, s, expected in test_cases:
@@ -75,13 +100,7 @@ def test_planar_cs():
     # test inverse kinematics
     print("\nTesting inverse kinematics... ------------------------")
     params_ik = params.copy()
-    ik_th0_ls = [
-        -jnp.pi / 2, 
-        -jnp.pi / 4, 
-        0.0, 
-        jnp.pi / 4, 
-        jnp.pi / 2
-    ]
+    ik_th0_ls = [-jnp.pi / 2, -jnp.pi / 4, 0.0, jnp.pi / 4, jnp.pi / 2]
     ik_q_ls = [
         jnp.array([0.1, 0.0, 0.0]),
         jnp.array([0.1, 0.0, 0.2]),
@@ -114,10 +133,7 @@ def test_planar_cs():
     assert not jnp.isnan(D).any(), "D matrix contains NaN!"
     assert not jnp.isnan(A).any(), "A matrix contains NaN!"
     print("testing K")
-    assert_allclose(
-        K, 
-        jnp.zeros((3,))
-    )
+    assert_allclose(K, jnp.zeros((3,)))
     print("[Valid test]\n")
     print("testing A")
     assert_allclose(
@@ -144,27 +160,34 @@ def test_planar_cs():
     print("D =\n", D)
     print("A =\n", A)
     print("[To check]")
-    
+
     # test energies
     print("\nTesting energies... ------------------------")
     kinetic_energy_fn = auxiliary_fns["kinetic_energy_fn"]
     potential_energy_fn = auxiliary_fns["potential_energy_fn"]
-    
+
     q = jnp.zeros((3,))
     q_d = jnp.zeros((3,))
     print("q = ", q, "q_d = ", q_d)
-    
+
     print("Testing kinetic energy...")
     E_kin = kinetic_energy_fn(params, q, q_d)
     assert not jnp.isnan(E_kin).any(), "Kinetic energy contains NaN!"
     E_kin_th = 0.0
     assert_allclose(E_kin, E_kin_th, rtol=Tolerance.rtol(), atol=Tolerance.atol())
     print("[Valid test]\n")
-    
+
     print("Testing potential energy...")
     E_pot = potential_energy_fn(params, q)
     assert not jnp.isnan(E_pot).any(), "Potential energy contains NaN!"
-    E_pot_th = jnp.array(0.5 * params["rho"][0] * jnp.pi * params["r"][0]**2 * jnp.linalg.norm(params["g"]) * params["l"][0]**2)
+    E_pot_th = jnp.array(
+        0.5
+        * params["rho"][0]
+        * jnp.pi
+        * params["r"][0] ** 2
+        * jnp.linalg.norm(params["g"])
+        * params["l"][0] ** 2
+    )
     assert_allclose(E_pot, E_pot_th, rtol=Tolerance.rtol(), atol=Tolerance.atol())
     print("[Valid test]\n")
 
@@ -194,12 +217,7 @@ def test_planar_cs():
     print("q = ", q, "q_d = ", q_d, "tau = ", tau, "g = ", params_bis["g"])
     q_dd = forward_dynamics_fn(params_bis, q, q_d, tau)
     assert not jnp.isnan(q_dd).any(), "Forward dynamics output contains NaN!"
-    assert_allclose(
-        q_dd,
-        jnp.zeros((3,)),
-        rtol=Tolerance.rtol(),
-        atol=Tolerance.atol()
-    )
+    assert_allclose(q_dd, jnp.zeros((3,)), rtol=Tolerance.rtol(), atol=Tolerance.atol())
     print("[Valid test]\n")
 
     # test nonlinear state space
@@ -210,6 +228,7 @@ def test_planar_cs():
     assert not jnp.isnan(x_dot).any(), "Nonlinear state space output contains NaN!"
     print("x_dot = ", x_dot)
     print("[To check]")
+
 
 if __name__ == "__main__":
     test_planar_cs()
