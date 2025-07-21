@@ -190,7 +190,7 @@ def factory(
                 S = B_xi.T @ S @ B_xi
 
             return S
-    if not isinstance(stiffness_fn, callable):
+    if not callable(stiffness_fn):
         raise TypeError(f"stiffness_fn must be a callable, but got {type(stiffness_fn).__name__}")
 
     # Actuation mapping function
@@ -219,7 +219,7 @@ def factory(
             A = B_xi.T @ jnp.identity(n_xi) @ B_xi
 
             return A
-    if not isinstance(actuation_mapping_fn, Callable):
+    if not callable(actuation_mapping_fn):
         raise TypeError(f"actuation_mapping_fn must be a callable, but got {type(actuation_mapping_fn).__name__}")
     
     if integration_type == "gauss-legendre":
@@ -369,7 +369,7 @@ def factory(
             dth = kappa * l_i  # Angle increment for the current segment
             th = th_prev + dth
 
-            # Compute the integrals for the transformation matrix            
+            # Compute the integrals for the transformation matrix
             int_cos_th = jnp.where(
                 jnp.abs(kappa) < eps,
                 l_i * jnp.cos(th_prev),

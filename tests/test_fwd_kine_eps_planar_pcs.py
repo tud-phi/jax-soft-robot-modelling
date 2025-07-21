@@ -80,12 +80,13 @@ def FwdKine_plot(eps_list, s, sigma_x, sigma_y, fig, axs):
         ax.set_ylabel("Fwd Kinematics components")
 
     for i_eps, eps in enumerate(eps_list):
+        FwdKine_kwargs = {"eps": eps} if eps is not None else {}
         FwdKine_auto, FwdKine_exp, FwdKine_symb = [], [], []
         for kappa in kappa_values:
             q = jnp.array([kappa, sigma_x, sigma_y - 1.0] * num_segments)
-            FwdKine_auto.append(FwdKine_autodiff_fn(params, q, s, eps=eps))
-            FwdKine_exp.append(FwdKine_explicit_fn(params, q, s, eps=eps))
-            FwdKine_symb.append(FwdKine_symbolic_fn(params, q, s, eps=eps))
+            FwdKine_auto.append(FwdKine_autodiff_fn(params, q, s, **FwdKine_kwargs))
+            FwdKine_exp.append(FwdKine_explicit_fn(params, q, s, **FwdKine_kwargs))
+            FwdKine_symb.append(FwdKine_symbolic_fn(params, q, s, **FwdKine_kwargs))
         FwdKine_auto, FwdKine_exp, FwdKine_symb = jnp.stack(FwdKine_auto), jnp.stack(FwdKine_exp), jnp.stack(FwdKine_symb)
 
         for i in range(2):
