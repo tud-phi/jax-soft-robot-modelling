@@ -271,7 +271,7 @@ def simulate_planar_pcs_value_eval(
     # =============================================================================================
     # Figures and video generation
     # =============================================================================================
-    extension = f"planar_pcs_ns-{num_segments}-{('symb' if type_of_derivation == 'symbolic' else 'num')}"
+    extension = f"planar_pcs_ns-{num_segments}-{('sym' if type_of_derivation == 'symbolic' else 'num')}"
     if type_of_derivation == "numeric":
         extension += f"-{type_of_integration}-{param_integration}"
 
@@ -1589,3 +1589,6 @@ def simulate_planar_pcs_time_eval(
     print("**************************************************************** \n \n")
         
     return simulation_dict
+
+if __name__ == "__main__":
+    simulate_planar_pcs_value_eval(num_segments=1)

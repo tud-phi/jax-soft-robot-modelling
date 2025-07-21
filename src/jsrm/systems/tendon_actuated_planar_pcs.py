@@ -5,7 +5,7 @@ from jsrm.math_utils import blk_diag
 import numpy as onp
 from typing import Callable, Dict, Optional, Tuple, Union
 
-from .planar_pcs import factory as planar_pcs_factory
+from .planar_pcs_sym import factory as planar_pcs_factory
 
 def factory(
     num_segments: int,
