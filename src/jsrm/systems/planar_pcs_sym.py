@@ -13,6 +13,7 @@ from .utils import (
 )
 from jsrm.math_utils import blk_diag
 
+
 def factory(
     filepath: Union[str, Path],
     strain_selector: Array = None,
@@ -141,9 +142,7 @@ def factory(
         params_syms_cat + sym_exps["state_syms"]["xi"], sym_exps["exps"]["U_g"], "jax"
     )
 
-    compute_stiffness_matrix_for_all_segments_fn = vmap(
-        compute_planar_stiffness_matrix
-    )
+    compute_stiffness_matrix_for_all_segments_fn = vmap(compute_planar_stiffness_matrix)
 
     def apply_eps_to_bend_strains(xi: Array, _eps: float) -> Array:
         """
@@ -206,8 +205,11 @@ def factory(
         return segment_idx, s_segment
 
     if stiffness_fn is None:
+
         def stiffness_fn(
-            params: Dict[str, Array], B_xi: Array, formulate_in_strain_space: bool = False
+            params: Dict[str, Array],
+            B_xi: Array,
+            formulate_in_strain_space: bool = False,
         ) -> Array:
             """
             Compute the stiffness matrix of the system.
@@ -237,6 +239,7 @@ def factory(
             return S
 
     if actuation_mapping_fn is None:
+
         def actuation_mapping_fn(
             forward_kinematics_fn: Callable,
             jacobian_fn: Callable,
@@ -263,10 +266,7 @@ def factory(
             return A
 
     def forward_kinematics_fn(
-        params: Dict[str, Array], 
-        q: Array, 
-        s: Array, 
-        eps: float = global_eps
+        params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
     ) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
@@ -299,10 +299,7 @@ def factory(
         return chi
 
     def jacobian_fn(
-        params: Dict[str, Array], 
-        q: Array, 
-        s: Array, 
-        eps: float = global_eps
+        params: Dict[str, Array], q: Array, s: Array, eps: float = global_eps
     ) -> Array:
         """
         Evaluate the forward kinematics the tip of the links
@@ -337,10 +334,7 @@ def factory(
         return J
 
     def dynamical_matrices_fn(
-        params: Dict[str, Array], 
-        q: Array, 
-        q_d: Array, 
-        eps: float = 1e4 * global_eps
+        params: Dict[str, Array], q: Array, q_d: Array, eps: float = 1e4 * global_eps
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
         Compute the dynamical matrices of the system.
@@ -367,7 +361,9 @@ def factory(
         # compute the stiffness matrix
         K = stiffness_fn(params, B_xi, formulate_in_strain_space=True)
         # compute the actuation matrix
-        A = actuation_mapping_fn(forward_kinematics_fn, jacobian_fn, params, B_xi, xi_eq, q)
+        A = actuation_mapping_fn(
+            forward_kinematics_fn, jacobian_fn, params, B_xi, xi_eq, q
+        )
 
         # dissipative matrix from the parameters
         D = params.get("D", jnp.zeros((n_xi, n_xi)))
@@ -388,11 +384,7 @@ def factory(
 
         return B, C, G, K, D, alpha
 
-    def kinetic_energy_fn(
-        params: Dict[str, Array], 
-        q: Array, 
-        q_d: Array
-    ) -> Array:
+    def kinetic_energy_fn(params: Dict[str, Array], q: Array, q_d: Array) -> Array:
         """
         Compute the kinetic energy of the system.
         Args:

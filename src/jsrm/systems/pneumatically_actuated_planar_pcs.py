@@ -7,12 +7,13 @@ from typing import Callable, Dict, Optional, Tuple, Union
 
 from .planar_pcs_sym import factory as planar_pcs_factory
 
+
 def factory(
     num_segments: int,
     *args,
     segment_actuation_selector: Optional[Array] = None,
     simplified_actuation_mapping: bool = False,
-    **kwargs
+    **kwargs,
 ):
     """
     Factory function for the pneumatically-actuated planar PCS.
@@ -69,9 +70,13 @@ def factory(
         J_sms = vmap(jacobian_fn, in_axes=(None, None, 0))(params, q, sms)
 
         def compute_actuation_matrix_for_segment(
-            r_cham_in: Array, r_cham_out: Array, varphi_cham: Array,
-            chi_pe: Array, chi_de: Array,
-            J_pe: Array, J_de: Array,
+            r_cham_in: Array,
+            r_cham_out: Array,
+            varphi_cham: Array,
+            chi_pe: Array,
+            chi_de: Array,
+            J_pe: Array,
+            J_de: Array,
         ) -> Array:
             """
             Compute the actuation matrix for a single segment.
@@ -100,32 +105,42 @@ def factory(
             th_pe, th_de = chi_pe[2], chi_de[2]
 
             # compute the area of each pneumatic chamber (we assume identical chambers within a segment)
-            A_cham = 0.5 * varphi_cham * (r_cham_out ** 2 - r_cham_in ** 2)
+            A_cham = 0.5 * varphi_cham * (r_cham_out**2 - r_cham_in**2)
             # compute the center of pressure of the pneumatic chamber
             r_cop = (
-                2 / 3 * jnp.sinc(0.5 * varphi_cham) * (r_cham_out ** 3 - r_cham_in ** 3) / (r_cham_out ** 2 - r_cham_in ** 2)
+                2
+                / 3
+                * jnp.sinc(0.5 * varphi_cham)
+                * (r_cham_out**3 - r_cham_in**3)
+                / (r_cham_out**2 - r_cham_in**2)
             )
 
             if simplified_actuation_mapping:
-                A_sm = B_xi.T @ jnp.array([
-                    [A_cham * r_cop, -A_cham * r_cop],
-                    [0.0, 0.0],
-                    [2 * A_cham, 2 * A_cham],
-                ])
+                A_sm = B_xi.T @ jnp.array(
+                    [
+                        [A_cham * r_cop, -A_cham * r_cop],
+                        [0.0, 0.0],
+                        [2 * A_cham, 2 * A_cham],
+                    ]
+                )
             else:
                 # compute the actuation matrix that collects the contributions of the pneumatic chambers in the given segment
                 # first we consider the contribution of the distal end
-                A_sm_de = J_de.T @ jnp.array([
-                    [-2 * A_cham * jnp.sin(th_de), -2 * A_cham * jnp.sin(th_de)],
-                    [2 * A_cham * jnp.cos(th_de), 2 * A_cham * jnp.cos(th_de)],
-                    [A_cham * r_cop, -A_cham * r_cop]
-                ])
+                A_sm_de = J_de.T @ jnp.array(
+                    [
+                        [-2 * A_cham * jnp.sin(th_de), -2 * A_cham * jnp.sin(th_de)],
+                        [2 * A_cham * jnp.cos(th_de), 2 * A_cham * jnp.cos(th_de)],
+                        [A_cham * r_cop, -A_cham * r_cop],
+                    ]
+                )
                 # then, we consider the contribution of the proximal end
-                A_sm_pe = J_pe.T @ jnp.array([
-                    [2 * A_cham * jnp.sin(th_pe), 2 * A_cham * jnp.sin(th_pe)],
-                    [-2 * A_cham * jnp.cos(th_pe), -2 * A_cham * jnp.cos(th_pe)],
-                    [-A_cham * r_cop, A_cham * r_cop]
-                ])
+                A_sm_pe = J_pe.T @ jnp.array(
+                    [
+                        [2 * A_cham * jnp.sin(th_pe), 2 * A_cham * jnp.sin(th_pe)],
+                        [-2 * A_cham * jnp.cos(th_pe), -2 * A_cham * jnp.cos(th_pe)],
+                        [-A_cham * r_cop, A_cham * r_cop],
+                    ]
+                )
 
                 # sum the contributions of the distal and proximal ends
                 A_sm = A_sm_de + A_sm_pe
@@ -133,9 +148,13 @@ def factory(
             return A_sm
 
         A_sms = vmap(compute_actuation_matrix_for_segment)(
-            params["r_cham_in"], params["r_cham_out"], params["varphi_cham"],
-            chi_pe=chi_sms[:-1], chi_de=chi_sms[1:],
-            J_pe=J_sms[:-1], J_de=J_sms[1:],
+            params["r_cham_in"],
+            params["r_cham_out"],
+            params["varphi_cham"],
+            chi_pe=chi_sms[:-1],
+            chi_de=chi_sms[1:],
+            J_pe=J_sms[:-1],
+            J_de=J_sms[1:],
         )
         # we need to sum the contributions of the actuation of each segment
         A = jnp.sum(A_sms, axis=0)
@@ -146,16 +165,31 @@ def factory(
         return A
 
     return planar_pcs_factory(
-        *args, stiffness_fn=stiffness_fn, actuation_mapping_fn=actuation_mapping_fn, **kwargs
+        *args,
+        stiffness_fn=stiffness_fn,
+        actuation_mapping_fn=actuation_mapping_fn,
+        **kwargs,
     )
 
+
 def _compute_stiffness_matrix_for_segment(
-    l: Array, r: Array, r_cham_in: Array, r_cham_out: Array, varphi_cham: Array, E: Array
+    l: Array,
+    r: Array,
+    r_cham_in: Array,
+    r_cham_out: Array,
+    varphi_cham: Array,
+    E: Array,
 ):
     # cross-sectional area [m²] of the material
-    A_mat = jnp.pi * r ** 2 + 2 * r_cham_in ** 2 * varphi_cham - 2 * r_cham_out ** 2 * varphi_cham
+    A_mat = (
+        jnp.pi * r**2 + 2 * r_cham_in**2 * varphi_cham - 2 * r_cham_out**2 * varphi_cham
+    )
     # second moment of area [m⁴] of the material
-    Ib_mat = jnp.pi * r ** 4 / 4 + r_cham_in ** 4 * varphi_cham / 2 - r_cham_out ** 4 * varphi_cham / 2
+    Ib_mat = (
+        jnp.pi * r**4 / 4
+        + r_cham_in**4 * varphi_cham / 2
+        - r_cham_out**4 * varphi_cham / 2
+    )
     # poisson ratio of the material
     nu = 0.0
     # shear modulus
@@ -172,6 +206,7 @@ def _compute_stiffness_matrix_for_segment(
 
     return S
 
+
 def stiffness_fn(
     params: Dict[str, Array],
     B_xi: Array,
@@ -187,10 +222,13 @@ def stiffness_fn(
         S: elastic matrix of shape (n_q, n_q) if formulate_in_strain_space is False or (n_xi, n_xi) otherwise
     """
     # stiffness matrix of shape (num_segments, 3, 3)
-    S_sms = vmap(
-    _compute_stiffness_matrix_for_segment
-    )(
-        params["l"], params["r"], params["r_cham_in"], params["r_cham_out"], params["varphi_cham"], params["E"]
+    S_sms = vmap(_compute_stiffness_matrix_for_segment)(
+        params["l"],
+        params["r"],
+        params["r_cham_in"],
+        params["r_cham_out"],
+        params["varphi_cham"],
+        params["E"],
     )
     # we define the elastic matrix of shape (n_xi, n_xi) as K(xi) = S @ xi where K is equal to
     S = blk_diag(S_sms)
