@@ -24,13 +24,6 @@ from jsrm.utils.lie_operators import (
     compute_weighted_sums,
 )
 
-# To extract the interest coordinates and strains from the SE(3) elements
-INTEREST_COORDINATES = jnp.array(
-    [2, 3, 4]
-)  # indices of the interest coordinates in the SE3 forward kinematics vector [theta_x, theta_y, theta_z, x, y, z] => [theta_z, x, y]
-INTEREST_STRAIN = jnp.array(
-    [2, 3, 4]
-)  # indices of the interest strains in the SE3 strain vector [kappa_x, kappa_y, kappa_z, sigma_x, sigma_y, sigma_z] => [kappa_z, sigma_x, sigma_y]
 # To reorder the lines to match the forward kinematics vector or strain vector
 REORDERED_LINES_FWD_KINE = jnp.array(
     [1, 2, 0]
@@ -46,7 +39,7 @@ def factory(
     xi_eq: Optional[Array] = None,
     stiffness_fn: Optional[Callable] = None,
     actuation_mapping_fn: Optional[Callable] = None,
-    global_eps: float = jnp.finfo(jnp.float32).eps,
+    global_eps: float = jnp.finfo(jnp.float64).eps,
     integration_type: Optional[
         Literal["gauss-legendre", "gauss-kronrad", "trapezoid"]
     ] = "gauss-legendre",
@@ -165,7 +158,7 @@ def factory(
                 f"xi_eq must be a floating point array, but got {xi_eq.dtype}"
             )
         else:
-            xi_eq = xi_eq.astype(jnp.float32)
+            xi_eq = xi_eq.astype(jnp.float64)
 
     # Stiffness function
     compute_stiffness_matrix_for_all_segments_fn = vmap(compute_planar_stiffness_matrix)

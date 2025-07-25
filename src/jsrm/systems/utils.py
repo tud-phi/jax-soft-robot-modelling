@@ -202,3 +202,23 @@ def gauss_quadrature(N_GQ: int, a=0.0, b=1.0) -> Tuple[Array, Array, int]:
     Ws = jnp.concatenate([jnp.array([0.0]), Ws, jnp.array([0.0])])
 
     return Xs, Ws, N_GQ + 2
+
+def scale_gaussian_quadrature(
+    Xs: Array, Ws: Array, a: float = 0.0, b: float = 1.0
+) -> Tuple[Array, Array]:
+    """
+    Scale the Gauss nodes and weights from [0, 1] to the interval [a, b].
+
+    Args:
+        Xs (Array): The Gauss nodes on [0, 1].
+        Ws (Array): The Gauss weights on [0, 1].
+        a (float): The lower bound of the interval.
+        b (float): The upper bound of the interval.
+
+    Returns:
+        Xs_scaled (Array): The scaled Gauss nodes on [a, b].
+        Ws_scaled (Array): The scaled Gauss weights on [a, b].
+    """
+    Xs_scaled = a + (b - a) * Xs
+    Ws_scaled = Ws * (b - a)
+    return Xs_scaled, Ws_scaled
