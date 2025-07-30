@@ -131,8 +131,6 @@ if __name__ == "__main__":
     ode_fn = ode_factory(dynamical_matrices_fn, params, tau)
     # jit the ODE function
     ode_fn = jax.jit(ode_fn)
-    # jit the ODE function
-    ode_fn = jax.jit(ode_fn)
     term = ODETerm(ode_fn)
 
     sol = diffeqsolve(
@@ -159,7 +157,6 @@ if __name__ == "__main__":
     forward_kinematics_fn_end_effector = vmap(forward_kinematics_fn_end_effector)
 
     # evaluate the forward kinematics along the trajectory
-    chi_ee_ts = forward_kinematics_fn_end_effector(q_ts)
     chi_ee_ts = forward_kinematics_fn_end_effector(q_ts)
     # plot the configuration vs time
     plt.figure()
@@ -217,7 +214,6 @@ if __name__ == "__main__":
 
     # plot the energy along the trajectory
     kinetic_energy_fn_vmapped = vmap(
-        partial(jax.jit(auxiliary_fns["kinetic_energy_fn"]), params)
         partial(jax.jit(auxiliary_fns["kinetic_energy_fn"]), params)
     )
     potential_energy_fn_vmapped = vmap(
