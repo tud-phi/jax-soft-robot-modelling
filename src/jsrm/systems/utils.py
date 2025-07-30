@@ -132,13 +132,10 @@ def compute_planar_stiffness_matrix(
     Returns:
         S: stiffness matrix of shape (3, 3)
     """
-    S = l * jnp.diag(jnp.stack([
-        Ib * E, 
-        4 / 3 * A * G, 
-        A * E
-        ], axis=0))
+    S = l * jnp.diag(jnp.stack([Ib * E, 4 / 3 * A * G, A * E], axis=0))
 
     return S
+
 
 def compute_spatial_stiffness_matrix(
     l: Array, A: Array, Ib: Array, J: Array, E: Array, G: Array
@@ -156,14 +153,19 @@ def compute_spatial_stiffness_matrix(
     Returns:
         S: stiffness matrix of shape (3, 3)
     """
-    S = l * jnp.diag(jnp.stack([
-        E * Ib,       # bending X
-        E * Ib,       # bending Y
-        G * J,        # torsion Z
-        4/3 * A * G,  # shear X (approx.)
-        4/3 * A * G,  # shear Y (approx.)
-        A * E,        # axial Z
-        ], axis=0))
+    S = l * jnp.diag(
+        jnp.stack(
+            [
+                E * Ib,  # bending X
+                E * Ib,  # bending Y
+                G * J,  # torsion Z
+                4 / 3 * A * G,  # shear X (approx.)
+                4 / 3 * A * G,  # shear Y (approx.)
+                A * E,  # axial Z
+            ],
+            axis=0,
+        )
+    )
 
     return S
 
@@ -238,6 +240,7 @@ def gauss_quadrature(N_GQ: int, a=0.0, b=1.0) -> Tuple[Array, Array, int]:
     Ws = jnp.concatenate([jnp.array([0.0]), Ws, jnp.array([0.0])])
 
     return Xs, Ws, N_GQ + 2
+
 
 def scale_gaussian_quadrature(
     Xs: Array, Ws: Array, a: float = 0.0, b: float = 1.0
