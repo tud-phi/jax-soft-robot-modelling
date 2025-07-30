@@ -4,7 +4,14 @@ from jax import Array, lax
 def blk_diag(
     a: Array
 ) -> Array:
+from jax import Array, lax
+
+def blk_diag(
+    a: Array
+) -> Array:
     """
+    Create a block diagonal matrix from a tensor of blocks.
+
     Create a block diagonal matrix from a tensor of blocks.
 
     Args:
@@ -32,6 +39,7 @@ def blk_diag(
 
     # Implement for loop to assign each block in `a` to the block-diagonal of `b`
     # Hint: use `jax.lax.fori_loop` and pass `assign_block_diagonal` as an argument
+    b = jnp.zeros((a.shape[0] * a.shape[1], a.shape[0] * a.shape[2]), dtype=a.dtype)
     b = jnp.zeros((a.shape[0] * a.shape[1], a.shape[0] * a.shape[2]), dtype=a.dtype)
     b = lax.fori_loop(
         lower=0,
