@@ -12,7 +12,7 @@ from .utils import (
     scale_gaussian_quadrature,
 )
 from jsrm.math_utils import (
-    blk_diag, 
+    blk_diag,
     compute_weighted_sums,
 )
 import jsrm.utils.lie_algebra as lie
@@ -88,13 +88,22 @@ class PCS(eqx.Module):
                 Defaults to all strains active (i.e. all True).
             xi_star (Optional[Array], optional):
                 Rest strain of shape (6 * num_segments,).
-                Defaults to 0.0 for bending and shear strains, and 1.0 for axial strain (along local y-axis).
+                Defaults to 0.0 for bending and shear strains, and 1.0 for axial strain (along local z-axis).
             stiffness_fn (Optional[Callable], optional):
                 Function to compute the stiffness matrix.
-                Defaults to a function that computes the stiffness matrix based on the parameters.
+                Defaults to :
+                    l_i * diag( E_i * Ib_i,       # bending X
+                                E_i * Ib_i,       # bending Y
+                                G_i * J_i,        # torsion Z
+                                4/3 * A_i * G_i,  # shear X
+                                4/3 * A_i * G_i,  # shear Y
+                                A_i * E_i,        # axial Z)
             actuation_mapping_fn (Optional[Callable], optional):
                 Function to compute the actuation mapping.
-                Defaults to identity mapping.
+                This function needs to take as input:
+                    - q: generalized coordinates of shape (num_selected_strains,)
+                    - actuation_args: tuple containing the actuation parameters (e.g. torques (tau,)).
+                Defaults to identity linear mapping. actuation_args = (tau,)
 
         """
         # Number of segments
@@ -358,7 +367,6 @@ class PCS(eqx.Module):
 
         return xi
 
-    # ===================================================================================================================
     def forward_kinematics_fn(
         self,
         q: Array,
@@ -412,59 +420,6 @@ class PCS(eqx.Module):
         g_s = g_list[segment_idx]
 
         return g_s
-
-    # def forward_kinematics_fn(
-    #     self,
-    #     q: Array,
-    #     s: Array,
-    #     ) -> Array:
-    #     """
-    #     Compute the forward kinematics of the robot at a point s along the robot.
-
-    #     Args:
-    #         q (Array): generalized coordinates of shape (num_selected_strains,).
-    #         s (Array): point coordinate along the robot in the interval [0, L].
-
-    #     Returns:
-    #         g_s (Array): forward kinematics of the robot at point s, shape (4, 4) :
-    #             [[  R,      p],
-    #             [0, 0, 0,   1]] where R is the rotation matrix and p is the position vector.
-    #     """
-
-    #     g_list = self.forward_kinematics_Gauss_fn(q)  # shape (num_segments, num_gauss_points, 4, 4)
-
-    #     # ================================================================================================
-    #     # Extract and interpolate the transformation at point s
-    #     segment_idx, s_local = self.classify_segment(s)
-
-    #     L_i = self.L[segment_idx]
-
-    #     # Normalized Gauss points (values in [0, 1]) multiplied by L_i
-    #     s_gauss = self.Xs * L_i  # (num_gauss_points,)
-
-    #     # Find the interval [s_gauss[j], s_gauss[j+1]] such that s_local ∈ [s_gauss[j], s_gauss[j+1]].
-    #     j_idx = jnp.searchsorted(s_gauss, s_local) - 1
-    #     j_idx = jnp.clip(j_idx, 0, self.num_gauss_points - 2)
-
-    #     # Linear interpolation between the two transformations
-    #     g_list_i = g_list[segment_idx]  # forme (num_gauss_points, 4, 4)
-    #     g_ji = g_list_i[j_idx]
-    #     g_jip1 = g_list_i[j_idx + 1]
-
-    #     # Lengths between the two points
-    #     s_ji = s_gauss[j_idx]
-    #     s_jip1 = s_gauss[j_idx + 1]
-    #     alpha = (s_local - s_ji) / (s_jip1 - s_ji + 1e-10)
-
-    #     # Interpolation in SE(3) via log-exp
-    #     xi_interp = lie.log_SE3(jnp.linalg.inv(g_ji) @ g_jip1, eps=self.global_eps)
-    #     g_interp = g_ji @ lie.exp_gn_SE3(alpha * xi_interp, eps=self.global_eps)
-
-    #     g_s = g_interp
-
-    #     return g_s
-
-    # ===================================================================================================================
 
     def J_local_for_computation(self, q: Array, s: Array) -> Array:
         """
