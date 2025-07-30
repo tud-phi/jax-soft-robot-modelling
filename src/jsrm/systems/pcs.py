@@ -33,7 +33,7 @@ class PCS(eqx.Module):
     G: Array  # Shear modulus of the segments
     D: Array  # Damping coefficient of the segments
 
-    global_eps: float = jnp.finfo(jnp.float64).eps
+    GLOBAL_EPS: float = jnp.finfo(jnp.float64).eps
 
     stiffness_fn: Callable = eqx.static_field()
     actuation_mapping_fn: Callable = eqx.static_field()
@@ -396,7 +396,7 @@ class PCS(eqx.Module):
             # Magnus expansion
             Magnus_i = length_i * xi_i
 
-            g_step = lie.exp_gn_SE3(Magnus_i, eps=self.global_eps)
+            g_step = lie.exp_gn_SE3(Magnus_i, eps=self.GLOBAL_EPS)
 
             g_i = g_base_i @ g_step
 
@@ -442,11 +442,11 @@ class PCS(eqx.Module):
         xi_0 = xi[0]
         L_0 = self.L[0]
 
-        Ad_g0_inv_L0 = lie.Adjoint_gi_se3_inv(xi_0, L_0, eps=self.global_eps)
-        Ad_g0_inv_s = lie.Adjoint_gi_se3_inv(xi_0, s_local, eps=self.global_eps)
+        Ad_g0_inv_L0 = lie.Adjoint_gi_se3_inv(xi_0, L_0, eps=self.GLOBAL_EPS)
+        Ad_g0_inv_s = lie.Adjoint_gi_se3_inv(xi_0, s_local, eps=self.GLOBAL_EPS)
 
-        T_g0_L0 = lie.Tangent_gi_se3(xi_0, L_0, eps=self.global_eps)
-        T_g0_s = lie.Tangent_gi_se3(xi_0, s_local, eps=self.global_eps)
+        T_g0_L0 = lie.Tangent_gi_se3(xi_0, L_0, eps=self.GLOBAL_EPS)
+        T_g0_s = lie.Tangent_gi_se3(xi_0, s_local, eps=self.GLOBAL_EPS)
 
         mat_0_L0 = Ad_g0_inv_L0 @ T_g0_L0
         mat_0_s = Ad_g0_inv_s @ T_g0_s
@@ -466,11 +466,11 @@ class PCS(eqx.Module):
 
             xi_i = xi[i]
 
-            Ad_gi_inv_Li = lie.Adjoint_gi_se3_inv(xi_i, self.L[i], eps=self.global_eps)
-            Ad_gi_inv_s = lie.Adjoint_gi_se3_inv(xi_i, s_local, eps=self.global_eps)
+            Ad_gi_inv_Li = lie.Adjoint_gi_se3_inv(xi_i, self.L[i], eps=self.GLOBAL_EPS)
+            Ad_gi_inv_s = lie.Adjoint_gi_se3_inv(xi_i, s_local, eps=self.GLOBAL_EPS)
 
-            T_gi_Li = lie.Tangent_gi_se3(xi_i, self.L[i], eps=self.global_eps)
-            T_gi_s = lie.Tangent_gi_se3(xi_i, s_local, eps=self.global_eps)
+            T_gi_Li = lie.Tangent_gi_se3(xi_i, self.L[i], eps=self.GLOBAL_EPS)
+            T_gi_s = lie.Tangent_gi_se3(xi_i, s_local, eps=self.GLOBAL_EPS)
 
             mat_i_Li = Ad_gi_inv_Li @ T_gi_Li
             mat_i_s = Ad_gi_inv_s @ T_gi_s

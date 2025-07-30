@@ -317,7 +317,6 @@ def Tangent_gi_se2(
 
     return Tangent
 
-
 # ================================================================================================
 # SE(3) operators
 # ===================================
@@ -755,6 +754,88 @@ def Tangent_gi_se3(
     )
 
     return Tangent
+
+
+def Tangent_d_gi_se3(
+    xi_i: Array,
+    xi_i_d: Array,
+    s_i: float,
+    eps: float,
+) -> Array:
+    """
+    Computes the derivative of the tangent representation of a position of a points at s_i (local curvilinear coordinate)
+    along a rod in SE(3) deformed in the current segment according to a strain vector xi_i.
+
+    Args:
+        xi_i (Array): array-like, shape (6,1)
+            A 6-dimensional vector representing the screw in SE(3).
+            The first three elements correspond to the angular component,
+            and the last three elements correspond to the linear component.
+        xi_i_d (Array): array-like, shape (6,1)
+            A 6-dimensional vector representing the derivative of the screw in SE(3).
+            The first three elements correspond to the angular component,
+            and the last three elements correspond to the linear component.
+        s_i (float):
+            The curvilinear coordinate along the rod, representing the position of a point in the n-th segment.
+        eps (float): small value to avoid division by zero
+
+    Returns:
+        Array: shape (4, 4)
+            A 4x4 matrix representing the derivative of the tangent transformation of the input screw vector at the specified position.
+    """
+    # We suppose here that theta is not zero thanks to a previous use of apply_eps
+    ang = xi_i[:3].reshape((3, 1))  # Angular as a (3,1) vector
+    ang_d =xi_i_d[:3].reshape((3, 1))  # Angular derivative as a (3,1) vector 
+    
+    theta = jnp.linalg.norm(ang)  # Compute the norm of the angular part
+    adjoint_xi_i = adjoint_se3(xi_i)  # Adjoint representation of the input vector
+    
+    theta_d = jnp.dot(ang_d, ang) / theta
+    adjoint_xi_i_d = adjoint_se3(xi_i_d)  # Compute the adjoint representation of the derivative screw vector
+    
+    cos = jnp.cos(s_i * theta)
+    sin = jnp.sin(s_i * theta)
+    
+    adjoint_xi_i_d_2 = (adjoint_xi_i_d@adjoint_xi_i
+                     +adjoint_xi_i@adjoint_xi_i_d)
+    adjoint_xi_i_d_3 = (adjoint_xi_i_d_2@adjoint_xi_i
+                     +jnp.linalg.matrix_power(adjoint_xi_i, 2)@adjoint_xi_i_d)
+    adjoint_xi_i_d_4 = (adjoint_xi_i_d_3@adjoint_xi_i
+                     +jnp.linalg.matrix_power(adjoint_xi_i, 3)@adjoint_xi_i_d)
+
+    Tangent_d = lax.cond(
+        jnp.abs(theta) <= eps,
+        lambda _: 1/2 * adjoint_xi_i_d,
+        lambda _: (
+            (theta_d/(2*jnp.power(theta, 3)))*(
+                - 8 + (8 - jnp.power(s_i*theta, 2))*cos + 5 * s_i * theta * sin
+                ) * adjoint_xi_i
+            + 1/(2*jnp.power(theta, 2))*(
+                4 - 4 * cos - s_i * theta * sin
+                ) * adjoint_xi_i_d
+            + (theta_d/(2*jnp.power(theta, 4)))*(
+                - 8 * s_i * theta + (15 - jnp.power(s_i*theta, 2))*sin - 7 * s_i * theta * cos
+                ) * jnp.linalg.matrix_power(adjoint_xi_i, 2)
+            + 1/(2*jnp.power(theta, 3))*(
+                4 * s_i * theta - 5 * sin + s_i * theta * cos
+                ) * adjoint_xi_i_d_2
+            + (theta_d/(2*jnp.power(theta, 5)))*(
+                - 8 + (8 - jnp.power(s_i*theta, 2)) * cos + 5 * s_i * theta * sin
+                ) * jnp.linalg.matrix_power(adjoint_xi_i, 3)
+            + 1/(2*jnp.power(theta, 4))*(
+                2 - 2 * cos - s_i * theta * sin
+                )*adjoint_xi_i_d_3
+            + (theta_d/(2*jnp.power(theta, 6)))*(
+                - 8 * s_i * theta + (15 - jnp.power(s_i*theta, 2)) * sin - 7 * s_i * theta * cos
+                )*jnp.linalg.matrix_power(adjoint_xi_i, 4)
+            + 1/(2*jnp.power(theta, 5))*(
+                2 * s_i * theta - 3 * sin + s_i * theta * sin #TODO: check if it is a cos or a sin
+                )*adjoint_xi_i_d_4
+        ),
+        operand=None
+    )
+
+    return Tangent_d
 
 
 # ================================================================================================
