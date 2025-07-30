@@ -13,7 +13,7 @@ from typing import Callable, Dict
 
 import jsrm
 from jsrm import ode_factory
-from jsrm.systems import planar_pcs
+from jsrm.systems import planar_pcs_sym
 
 num_segments = 1
 
@@ -36,16 +36,19 @@ params = {
     "G": 1e3 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
 }
 params["D"] = 1e-3 * jnp.diag(
-    (jnp.repeat(
-        jnp.array([[1e0, 1e3, 1e3]]), num_segments, axis=0
-    ) * params["l"][:, None]).flatten()
+    (
+        jnp.repeat(jnp.array([[1e0, 1e3, 1e3]]), num_segments, axis=0)
+        * params["l"][:, None]
+    ).flatten()
 )
 
 # activate all strains (i.e. bending, shear, and axial)
 strain_selector = jnp.ones((3 * num_segments,), dtype=bool)
 
 # define initial configuration
-q0 = jnp.repeat(jnp.array([5.0 * jnp.pi, 0.1, 0.2])[None, :], num_segments, axis=0).flatten()
+q0 = jnp.repeat(
+    jnp.array([5.0 * jnp.pi, 0.1, 0.2])[None, :], num_segments, axis=0
+).flatten()
 # number of generalized coordinates
 n_q = q0.shape[0]
 
@@ -98,7 +101,7 @@ def draw_robot(
 
 if __name__ == "__main__":
     strain_basis, forward_kinematics_fn, dynamical_matrices_fn, auxiliary_fns = (
-        planar_pcs.factory(sym_exp_filepath, strain_selector)
+        planar_pcs_sym.factory(sym_exp_filepath, strain_selector)
     )
     # jit the functions
     dynamical_matrices_fn = jax.jit(partial(dynamical_matrices_fn))
@@ -148,27 +151,30 @@ if __name__ == "__main__":
     q_d_ts = sol.ys[:, n_q:]
 
     s_max = jnp.array([jnp.sum(params["l"])])
-    
+
     forward_kinematics_fn_end_effector = partial(forward_kinematics_fn, params, s=s_max)
     forward_kinematics_fn_end_effector = jax.jit(forward_kinematics_fn_end_effector)
     forward_kinematics_fn_end_effector = vmap(forward_kinematics_fn_end_effector)
-    
+
     # evaluate the forward kinematics along the trajectory
     chi_ee_ts = forward_kinematics_fn_end_effector(q_ts)
     # plot the configuration vs time
     plt.figure()
     for segment_idx in range(num_segments):
         plt.plot(
-            video_ts, q_ts[:, 3 * segment_idx + 0],
-            label=r"$\kappa_\mathrm{be," + str(segment_idx + 1) + "}$ [rad/m]"
+            video_ts,
+            q_ts[:, 3 * segment_idx + 0],
+            label=r"$\kappa_\mathrm{be," + str(segment_idx + 1) + "}$ [rad/m]",
         )
         plt.plot(
-            video_ts, q_ts[:, 3 * segment_idx + 1],
-            label=r"$\sigma_\mathrm{sh," + str(segment_idx + 1) + "}$ [-]"
+            video_ts,
+            q_ts[:, 3 * segment_idx + 1],
+            label=r"$\sigma_\mathrm{sh," + str(segment_idx + 1) + "}$ [-]",
         )
         plt.plot(
-            video_ts, q_ts[:, 3 * segment_idx + 2],
-            label=r"$\sigma_\mathrm{ax," + str(segment_idx + 1) + "}$ [-]"
+            video_ts,
+            q_ts[:, 3 * segment_idx + 2],
+            label=r"$\sigma_\mathrm{ax," + str(segment_idx + 1) + "}$ [-]",
         )
     plt.xlabel("Time [s]")
     plt.ylabel("Configuration")
