@@ -4,11 +4,6 @@ from jax import Array, lax
 def blk_diag(
     a: Array
 ) -> Array:
-from jax import Array, lax
-
-def blk_diag(
-    a: Array
-) -> Array:
     """
     Create a block diagonal matrix from a tensor of blocks.
 
@@ -78,7 +73,8 @@ if __name__ == "__main__":
     c = blk_concat(a)
     print("Concatenated matrix:")
     print(c)
-    
+
+
 def compute_weighted_sums(M: Array, vecm: Array, idx: int) -> Array:
     """
     Compute the weighted sums of the matrix product of M and vecm,

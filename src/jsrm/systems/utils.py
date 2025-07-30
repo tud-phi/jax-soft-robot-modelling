@@ -9,13 +9,8 @@ import sympy as sp
 from jax import Array
 from typing import Dict, List, Tuple, Union
 
-# For documentation purposes
-from jax import Array
-from typing import Dict, List, Tuple, Union
-
 
 def substitute_params_into_all_symbolic_expressions(
-    sym_exps: Dict, params: Dict[str, Array]
     sym_exps: Dict, params: Dict[str, Array]
 ) -> Dict:
     """
@@ -56,7 +51,6 @@ def substitute_params_into_all_symbolic_expressions(
 def substitute_params_into_single_symbolic_expression(
     sym_exp: sp.Expr,
     params_syms: Dict[str, List[sp.Symbol]],
-    params: Dict[str, Array],
     params: Dict[str, Array],
 ) -> sp.Expr:
     """
@@ -99,7 +93,6 @@ def concatenate_params_syms(
 def compute_strain_basis(
     strain_selector: Array,
 ) -> Array:
-) -> Array:
     """
     Compute strain basis based on boolean strain selector.
     Args:
@@ -124,9 +117,6 @@ def compute_strain_basis(
     return strain_basis
 
 
-def compute_planar_stiffness_matrix(
-    l: Array, A: Array, Ib: Array, E: Array, G: Array
-) -> Array:
 def compute_planar_stiffness_matrix(
     l: Array, A: Array, Ib: Array, E: Array, G: Array
 ) -> Array:

@@ -150,14 +150,7 @@ if __name__ == "__main__":
     # the evolution of the generalized coordinates
     q_ts = sol.ys[:, :n_q]
     # the evolution of the generalized velocities
-    q_d_ts = sol.ys[:, n_q:]
-
-    s_max = jnp.array([jnp.sum(params["l"])])
-    
-    forward_kinematics_fn_end_effector = partial(forward_kinematics_fn, params, s=s_max)
-    forward_kinematics_fn_end_effector = jax.jit(forward_kinematics_fn_end_effector)
-    forward_kinematics_fn_end_effector = vmap(forward_kinematics_fn_end_effector)
-    
+    q_d_ts = sol.ys[:, n_q:]    
 
     s_max = jnp.array([jnp.sum(params["l"])])
 
@@ -166,7 +159,6 @@ if __name__ == "__main__":
     forward_kinematics_fn_end_effector = vmap(forward_kinematics_fn_end_effector)
 
     # evaluate the forward kinematics along the trajectory
-    chi_ee_ts = forward_kinematics_fn_end_effector(q_ts)
     chi_ee_ts = forward_kinematics_fn_end_effector(q_ts)
     # plot the configuration vs time
     plt.figure()
@@ -225,10 +217,8 @@ if __name__ == "__main__":
     # plot the energy along the trajectory
     kinetic_energy_fn_vmapped = vmap(
         partial(jax.jit(auxiliary_fns["kinetic_energy_fn"]), params)
-        partial(jax.jit(auxiliary_fns["kinetic_energy_fn"]), params)
     )
     potential_energy_fn_vmapped = vmap(
-        partial(jax.jit(auxiliary_fns["potential_energy_fn"]), params)
         partial(jax.jit(auxiliary_fns["potential_energy_fn"]), params)
     )
     U_ts = potential_energy_fn_vmapped(q_ts)
