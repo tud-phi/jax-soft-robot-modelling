@@ -68,6 +68,61 @@ Finally, we can simulate the pendulum
 python examples/simulate_pendulum.py
 ```
 
+## Documentation
+
+The full documentation is available at: https://tud-cor-sr.github.io/jax-soft-robot-modelling
+
+### Building Documentation Locally
+
+To build and serve the documentation locally:
+
+```bash
+# Install documentation dependencies
+pip install -e ".[docs]"
+
+# Serve documentation with live reload (if mkdocs is in PATH)
+mkdocs serve
+
+# OR using conda environment
+conda run --live-stream --name jsrm mkdocs serve
+```
+
+The documentation will be available at `http://127.0.0.1:8000`.
+
+### Building Documentation for Production
+
+```bash
+# Build static documentation (if mkdocs is in PATH)
+mkdocs build
+
+# OR using conda environment
+conda run --live-stream --name jsrm mkdocs build
+
+# Build with strict mode (for CI/development)
+mkdocs build --strict
+# OR: conda run --live-stream --name jsrm mkdocs build --strict
+
+# Deploy to GitHub Pages (maintainers only)
+mkdocs gh-deploy
+# OR: conda run --live-stream --name jsrm mkdocs gh-deploy
+```
+
+You can also use the Makefile targets:
+
+```bash
+# Serve locally
+make docs-serve
+
+# Build documentation
+make docs-build
+
+# Build with strict mode checking
+make docs-build-strict
+
+# Deploy to GitHub Pages
+make docs-deploy
+```
+
 ## See also
 
 You might also be interested in the following repositories:

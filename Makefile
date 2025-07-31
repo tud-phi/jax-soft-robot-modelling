@@ -54,6 +54,23 @@ pytestcache-remove:
 build-remove:
 	rm -rf build/
 
+#* Documentation
+.PHONY: docs-serve
+docs-serve:
+	conda run --live-stream --name jsrm mkdocs serve
+
+.PHONY: docs-build
+docs-build:
+	conda run --live-stream --name jsrm mkdocs build --clean
+
+.PHONY: docs-build-strict
+docs-build-strict:
+	conda run --live-stream --name jsrm mkdocs build --clean --strict
+
+.PHONY: docs-deploy
+docs-deploy:
+	conda run --live-stream --name jsrm mkdocs gh-deploy --force
+
 .PHONY: cleanup
 cleanup: pycache-remove dsstore-remove ipynbcheckpoints-remove pytestcache-remove
 

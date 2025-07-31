@@ -1,0 +1,111 @@
+site_name: JAX Soft Robot Modelling
+site_description: Kinematic and dynamic models of continuum and articulated soft robots
+site_author: Maximilian Stölzle, Solange Gribonval
+site_url: https://tud-cor-sr.github.io/jax-soft-robot-modelling
+
+repo_name: tud-cor-sr/jax-soft-robot-modelling
+repo_url: https://github.com/tud-cor-sr/jax-soft-robot-modelling
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.action.edit
+    - content.action.view
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - User Guide:
+    - Quick Start: user-guide/quick-start.md
+    - Examples: user-guide/examples.md
+  - API Reference:
+    - Systems: api/systems.md
+    - Utils: api/utils.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Changelog: development/changelog.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_toc_entry: false
+            merge_init_into_class: true
+  # Temporarily disable auto-generated API pages
+  # - gen-files:
+  #     scripts:
+  #       - docs/gen_ref_pages.py
+  # - literate-nav:
+  #     nav_file: SUMMARY.md
+  - section-index
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - attr_list
+  - md_in_html
+  - footnotes
+  - def_list
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/tud-cor-sr/jax-soft-robot-modelling
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/jsrm/
+
+watch:
+  - src/jsrm

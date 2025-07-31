@@ -148,6 +148,15 @@ test = [
     "pytest-html",
     "tox",
 ]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
+    "mkdocs-section-index",
+    "mkdocs-autorefs",
+]
 
 # List URLs that are relevant to your project
 #
