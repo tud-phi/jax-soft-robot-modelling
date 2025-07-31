@@ -30,9 +30,9 @@ from diffrax import (
 
 class PlanarPCS(eqx.Module):
     """
-    Piecewise Constant Strain (PCS) model for 3D soft continuum robots.
+    Planar Piecewise Constant Strain (PCS) model for 2D soft continuum robots.
 
-    This class implements the geometric and dynamic modeling of a 3D soft robot
+    This class implements the geometric and dynamic modeling of a 2D soft robot
     using the Cosserat rod theory and piecewise constant strain assumption.
     It supports computation of forward kinematics, Jacobians, dynamical matrices.
 
