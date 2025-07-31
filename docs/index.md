@@ -53,4 +53,4 @@ We welcome contributions! Please see our [Contributing Guide](development/contri
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.txt](https://github.com/tud-cor-sr/jax-soft-robot-modelling/blob/main/LICENSE.txt) file for details.
+This project is licensed under the MIT License - see the [LICENSE.txt](https://github.com/tud-phi/jax-soft-robot-modelling/blob/main/LICENSE.txt) file for details.

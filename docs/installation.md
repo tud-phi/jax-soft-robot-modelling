@@ -19,7 +19,7 @@ pip install jsrm
 For development or to get the latest features:
 
 ```bash
-git clone https://github.com/tud-cor-sr/jax-soft-robot-modelling.git
+git clone https://github.com/tud-phi/jax-soft-robot-modelling.git
 cd jax-soft-robot-modelling
 pip install -e .
 ```

@@ -1,10 +1,10 @@
 site_name: JAX Soft Robot Modelling
 site_description: Kinematic and dynamic models of continuum and articulated soft robots
 site_author: Maximilian Stölzle, Solange Gribonval
-site_url: https://tud-cor-sr.github.io/jax-soft-robot-modelling
+site_url: https://tud-phi.github.io/jax-soft-robot-modelling
 
-repo_name: tud-cor-sr/jax-soft-robot-modelling
-repo_url: https://github.com/tud-cor-sr/jax-soft-robot-modelling
+repo_name: tud-phi/jax-soft-robot-modelling
+repo_url: https://github.com/tud-phi/jax-soft-robot-modelling
 edit_uri: edit/main/docs/
 
 theme:
@@ -128,7 +128,7 @@ extra_javascript:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/tud-cor-sr/jax-soft-robot-modelling
+      link: https://github.com/tud-phi/jax-soft-robot-modelling
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/jsrm/
 

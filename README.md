@@ -70,7 +70,7 @@ python examples/simulate_pendulum.py
 
 ## Documentation
 
-The full documentation is available at: https://tud-cor-sr.github.io/jax-soft-robot-modelling
+The full documentation is available at: https://tud-phi.github.io/jax-soft-robot-modelling
 
 ### Building Documentation Locally
 
