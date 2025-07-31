@@ -1,9 +1,9 @@
 import jax
 
-from jsrm.systems.planar_pcs import PlanarPCS
+from jsrm.systems.pcs import PCS
 import jax.numpy as jnp
 
-from typing import Callable, Dict
+from typing import Callable
 from jax import Array
 
 import numpy as onp
@@ -32,15 +32,14 @@ def draw_robot_curve(
     num_points: int = 50,
 ):
     s_ps = jnp.linspace(0, L_max, num_points)
-    chi_ps = batched_forward_kinematics(q, s_ps)
+    g_ps = batched_forward_kinematics(q, s_ps)[:, :3, 3]
 
-    curve = onp.array(chi_ps[1:, :], dtype=onp.float32).T
-
-    return curve  # (N, 2)
+    curve = onp.array(g_ps, dtype=onp.float64)
+    return curve  # (N, 3)
 
 
 def animate_robot_matplotlib(
-    robot: PlanarPCS,
+    robot: PCS,
     t_list: Array,  # shape (T,)
     q_list: Array,  # shape (T, DOF)
     num_points: int = 50,
@@ -56,26 +55,26 @@ def animate_robot_matplotlib(
             "Cannot use both animation and slider at the same time. Choose one."
         )
 
-    batched_forward_kinematics = jax.vmap(
-        robot.forward_kinematics, in_axes=(None, 0), out_axes=-1
-    )
+    batched_forward_kinematics = jax.vmap(robot.forward_kinematics, in_axes=(None, 0))
     L_max = jnp.sum(robot.L)
 
     width = jnp.linalg.norm(robot.L) * 3
     height = width
 
     fig = plt.figure()
-    ax = fig.add_subplot(111)
+    ax = fig.add_subplot(111, projection="3d")
     ax_slider = fig.add_axes([0.2, 0.05, 0.6, 0.03])  # [left, bottom, width, height]
 
     if animation:
-        (line,) = ax.plot([], [], lw=4, color="blue")
+        (line,) = ax.plot([], [], [], lw=4, color="blue")
         ax.set_xlim(-width / 2, width / 2)
-        ax.set_ylim(0, height)
+        ax.set_ylim(-width / 2, width / 2)
+        ax.set_zlim(0, height)
         title_text = ax.set_title("t = 0.00 s")
 
         def init():
             line.set_data([], [])
+            line.set_3d_properties([])
             title_text.set_text("t = 0.00 s")
             return line, title_text
 
@@ -84,6 +83,7 @@ def animate_robot_matplotlib(
             t = t_list[frame_idx]
             curve = draw_robot_curve(batched_forward_kinematics, L_max, q, num_points)
             line.set_data(curve[:, 0], curve[:, 1])
+            line.set_3d_properties(curve[:, 2])
             title_text.set_text(f"t = {t:.2f} s")
             return line, title_text
 
@@ -98,6 +98,7 @@ def animate_robot_matplotlib(
 
         if show:
             plt.show()
+
         plt.close(fig)
         return HTML(ani.to_jshtml())
 
@@ -106,13 +107,15 @@ def animate_robot_matplotlib(
         def update_plot(frame_idx):
             ax.cla()  # Clear current axes
             ax.set_xlim(-width / 2, width / 2)
-            ax.set_ylim(0, height)
+            ax.set_ylim(-width / 2, width / 2)
+            ax.set_zlim(0, height)
             ax.set_xlabel("X [m]")
             ax.set_ylabel("Y [m]")
+            ax.set_zlabel("Z [m]")
             ax.set_title(f"t = {t_list[frame_idx]:.2f} s")
             q = q_list[frame_idx]
             curve = draw_robot_curve(batched_forward_kinematics, L_max, q, num_points)
-            ax.plot(curve[:, 0], curve[:, 1], lw=4, color="blue")
+            ax.plot(curve[:, 0], curve[:, 1], curve[:, 2], lw=4, color="blue")
             fig.canvas.draw_idle()
 
         # Create slider
@@ -143,17 +146,21 @@ if __name__ == "__main__":
         (num_segments,)
     )  # Volumetric density of Dragon Skin 20 [kg/m^3]
     params = {
-        "th0": jnp.array(0.0),  # initial orientation angle [rad]
+        "p0": jnp.array(
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        ),  # Initial position and orientation
         "l": 1e-1 * jnp.ones((num_segments,)),
         "r": 2e-2 * jnp.ones((num_segments,)),
         "rho": rho,
-        "g": jnp.array([0.0, -9.81]),
+        "g": jnp.array([0.0, 0.0, -9.81]),  # Gravity vector [m/s^2]
         "E": 2e3 * jnp.ones((num_segments,)),  # Elastic modulus [Pa]
         "G": 1e3 * jnp.ones((num_segments,)),  # Shear modulus [Pa]
     }
     params["D"] = 1e-3 * jnp.diag(
         (
-            jnp.repeat(jnp.array([[1e0, 1e3, 1e3]]), num_segments, axis=0)
+            jnp.repeat(
+                jnp.array([[1e0, 1e0, 1e0, 1e3, 1e3, 1e3]]), num_segments, axis=0
+            )
             * params["l"][:, None]
         ).flatten()
     )
@@ -161,7 +168,7 @@ if __name__ == "__main__":
     # ======================================================
     # Robot initialization
     # ======================================================
-    robot = PlanarPCS(
+    robot = PCS(
         num_segments=num_segments,
         params=params,
         order_gauss=5,
@@ -172,7 +179,9 @@ if __name__ == "__main__":
     # =====================================================
     # Initial configuration
     q0 = jnp.repeat(
-        jnp.array([5.0 * jnp.pi, 0.1, 0.2])[None, :], num_segments, axis=0
+        jnp.array([5.0 * jnp.pi, 0.0, 0.0, 0.0, 0.1, 0.2])[None, :],
+        num_segments,
+        axis=0,
     ).flatten()
     # Initial velocities
     qd0 = jnp.zeros_like(q0)
@@ -180,6 +189,7 @@ if __name__ == "__main__":
     # Actuation parameters
     tau = jnp.zeros_like(q0)
     # WARNING: actuation_args need to be a tuple, even if it contains only one element
+    # so (tau, ) is necessary NOT (tau) or tau
     actuation_args = (tau,)
 
     # Simulation time parameters
@@ -212,11 +222,12 @@ if __name__ == "__main__":
             s=jnp.sum(robot.L),  # end-effector position
         )
     )
-    chi_ee_ts = jax.vmap(forward_kinematics_end_effector)(q_ts)
+    g_ee_ts = jax.vmap(forward_kinematics_end_effector)(q_ts)
 
     plt.figure()
-    plt.plot(ts, chi_ee_ts[:, 1], label="End-effector x [m]")
-    plt.plot(ts, chi_ee_ts[:, 2], label="End-effector y [m]")
+    plt.plot(ts, g_ee_ts[:, 0, 3], label="End-effector x [m]")
+    plt.plot(ts, g_ee_ts[:, 1, 3], label="End-effector y [m]")
+    plt.plot(ts, g_ee_ts[:, 2, 3], label="End-effector z [m]")
     plt.xlabel("Time [s]")
     plt.ylabel("End-effector position [m]")
     plt.legend()
@@ -225,14 +236,17 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
 
-    plt.figure()
-    plt.scatter(chi_ee_ts[:, 1], chi_ee_ts[:, 2], c=ts, cmap="viridis")
-    plt.axis("equal")
-    plt.grid(True)
-    plt.xlabel("End-effector x [m]")
-    plt.ylabel("End-effector y [m]")
-    plt.colorbar(label="Time [s]")
-    plt.tight_layout()
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    p = ax.scatter(
+        g_ee_ts[:, 0, 3], g_ee_ts[:, 1, 3], g_ee_ts[:, 2, 3], c=ts, cmap="viridis"
+    )
+    ax.axis("equal")
+    ax.set_xlabel("X [m]")
+    ax.set_ylabel("Y [m]")
+    ax.set_zlabel("Z [m]")
+    ax.set_title("End-effector trajectory (3D)")
+    fig.colorbar(p, ax=ax, label="Time [s]")
     plt.show()
 
     # =====================================================
@@ -257,7 +271,7 @@ if __name__ == "__main__":
     # Plot the robot configuration upon time
     # =====================================================
     animate_robot_matplotlib(
-        robot=robot,
+        robot,
         t_list=ts,  # shape (T,)
         q_list=q_ts,  # shape (T, DOF)
         num_points=50,

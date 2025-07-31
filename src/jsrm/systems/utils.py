@@ -93,7 +93,7 @@ def compute_strain_basis(
     strain_selector: Array,
 ) -> Array:
     """
-    Compute strain basis based on boolean strain selector.
+    Compute constant strain basis based on boolean strain selector.
     Args:
         strain_selector (Array):
             boolean array of shape (n_xi, ) specifying which strain components are active
@@ -128,6 +128,39 @@ def compute_planar_stiffness_matrix(
         S: stiffness matrix of shape (3, 3)
     """
     S = l * jnp.diag(jnp.stack([Ib * E, 4 / 3 * A * G, A * E], axis=0))
+
+    return S
+
+
+def compute_spatial_stiffness_matrix(
+    l: Array, A: Array, Ib: Array, J: Array, E: Array, G: Array
+) -> Array:
+    """
+    Compute the stiffness matrix of the system.
+    Args:
+        l: length of the segment of shape ()
+        A: cross-sectional area of shape ()
+        Ib: second moment of area of shape ()
+        J: polar moment of inertia of shape ()
+        E: Elastic modulus of shape ()
+        G: Shear modulus of shape ()
+
+    Returns:
+        S: stiffness matrix of shape (3, 3)
+    """
+    S = l * jnp.diag(
+        jnp.stack(
+            [
+                E * Ib,  # bending X
+                E * Ib,  # bending Y
+                G * J,  # torsion Z
+                4 / 3 * A * G,  # shear X (approx.)
+                4 / 3 * A * G,  # shear Y (approx.)
+                A * E,  # axial Z
+            ],
+            axis=0,
+        )
+    )
 
     return S
 
@@ -202,3 +235,24 @@ def gauss_quadrature(N_GQ: int, a=0.0, b=1.0) -> Tuple[Array, Array, int]:
     Ws = jnp.concatenate([jnp.array([0.0]), Ws, jnp.array([0.0])])
 
     return Xs, Ws, N_GQ + 2
+
+
+def scale_gaussian_quadrature(
+    Xs: Array, Ws: Array, a: float = 0.0, b: float = 1.0
+) -> Tuple[Array, Array]:
+    """
+    Scale the Gauss nodes and weights from [0, 1] to the interval [a, b].
+
+    Args:
+        Xs (Array): The Gauss nodes on [0, 1].
+        Ws (Array): The Gauss weights on [0, 1].
+        a (float): The lower bound of the interval.
+        b (float): The upper bound of the interval.
+
+    Returns:
+        Xs_scaled (Array): The scaled Gauss nodes on [a, b].
+        Ws_scaled (Array): The scaled Gauss weights on [a, b].
+    """
+    Xs_scaled = a + (b - a) * Xs
+    Ws_scaled = Ws * (b - a)
+    return Xs_scaled, Ws_scaled
