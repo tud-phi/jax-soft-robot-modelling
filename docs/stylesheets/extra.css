@@ -187,21 +187,77 @@
   border-left: 4px solid var(--md-accent-fg-color);
 }
 
-/* Enhanced method signatures - more prominent method names */
+/* Enhanced method signatures - hierarchical styling with blue/purple background */
+/* Class headers (h4) - larger and more prominent */
 h2[id^="jsrm"], h3[id^="jsrm"], h4[id^="jsrm"] {
   background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
   color: white !important;
-  padding: 1rem 1.25rem;
-  margin: 1.75rem 0 1rem 0;
+  padding: 1.2rem 1.5rem;
+  margin: 2rem 0 1.2rem 0;
   border-radius: 8px;
-  font-size: 1.25rem !important;
+  font-size: 1.5rem !important;
   font-weight: 700 !important;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.25);
+  border: none !important;
+  position: relative;
+}
+
+/* Method headers (h5) - smaller than class headers */
+h5[id^="jsrm"] {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white !important;
+  padding: 0.8rem 1rem;
+  margin: 1.5rem 0 0.8rem 0;
+  border-radius: 6px;
+  font-size: 1.2rem !important;
+  font-weight: 600 !important;
   box-shadow: 0 3px 12px rgba(79, 70, 229, 0.2);
   border: none !important;
   position: relative;
 }
 
+/* Target mkdocstrings method headings specifically */
+.doc.doc-heading {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+  color: white !important;
+  padding: 0.8rem 1rem !important;
+  margin: 1.5rem 0 0.8rem 0 !important;
+  border-radius: 6px !important;
+  font-size: 1.2rem !important;
+  font-weight: 600 !important;
+  box-shadow: 0 3px 12px rgba(79, 70, 229, 0.2) !important;
+  border: none !important;
+  position: relative;
+}
+
+/* Method name styling within the heading */
+.doc-object-name.doc-function-name {
+  color: white !important;
+  font-size: 1.2rem !important;
+  font-weight: 600 !important;
+}
+
+/* Code symbols in method headings */
+.doc-heading .doc-symbol {
+  color: white !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  padding: 0.2rem 0.4rem !important;
+  border-radius: 4px !important;
+}
+
+/* Icons for class headers (larger) */
 h2[id^="jsrm"]:before, h3[id^="jsrm"]:before, h4[id^="jsrm"]:before {
+  content: "🏗️";
+  position: absolute;
+  right: 1.2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  opacity: 0.8;
+}
+
+/* Icons for method headers (smaller) */
+h5[id^="jsrm"]:before {
   content: "🔧";
   position: absolute;
   right: 1rem;
@@ -211,14 +267,24 @@ h2[id^="jsrm"]:before, h3[id^="jsrm"]:before, h4[id^="jsrm"]:before {
   opacity: 0.8;
 }
 
+/* Code styling for class headers */
 h2[id^="jsrm"] code, h3[id^="jsrm"] code, h4[id^="jsrm"] code {
   background: rgba(255, 255, 255, 0.15) !important;
   color: white !important;
-  padding: 0.3rem 0.6rem;
+  padding: 0.4rem 0.8rem;
   border-radius: 5px;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+}
+
+/* Code styling for method headers */
+h5[id^="jsrm"] code {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: white !important;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
   font-size: 1.1rem !important;
   font-weight: 600 !important;
-  margin-right: 2rem;
 }
 
 h2[id^="jsrm"] a, h3[id^="jsrm"] a, h4[id^="jsrm"] a {
@@ -266,31 +332,31 @@ h3[id*="property"]:before, h4[id*="property"]:before {
   content: "📋";
 }
 
-/* Parameter and return tables - more subtle and compact */
+/* Parameter and Return tables - reduced size and padding */
 .md-typeset table:not([class]) {
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(var(--md-default-fg-color--rgb), 0.1);
-  margin: 0.75rem 0;
-  font-size: 0.85rem;
+  margin: 0.5rem 0;
+  font-size: 0.78rem;
 }
 
 .md-typeset table:not([class]) th {
   background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
   color: white;
   font-weight: 600;
-  font-size: 0.8rem;
-  padding: 0.5rem 0.6rem;
+  font-size: 0.72rem;
+  padding: 0.35rem 0.5rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
 }
 
 .md-typeset table:not([class]) td {
-  padding: 0.45rem 0.6rem;
+  padding: 0.3rem 0.5rem;
   vertical-align: top;
-  font-size: 0.85rem;
-  line-height: 1.4;
+  font-size: 0.78rem;
+  line-height: 1.3;
 }
 
 .md-typeset table:not([class]) tr:nth-child(even) {
@@ -302,9 +368,9 @@ h3[id*="property"]:before, h4[id*="property"]:before {
   background: rgba(var(--md-accent-fg-color--rgb), 0.08);
   color: var(--md-accent-fg-color);
   font-weight: 500;
-  padding: 0.15rem 0.3rem;
+  padding: 0.1rem 0.25rem;
   border-radius: 3px;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
 }
 
 /* Docstring sections - consistent with sidebar */
@@ -326,7 +392,44 @@ hr {
 
 /* Footer enhancements */
 .md-footer {
-  background: var(--gradient-primary);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.md-footer-meta {
+  background: rgba(0, 0, 0, 0.1) !important;
+}
+
+.md-footer__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.md-footer-meta__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Fix oversized social media icons */
+.md-footer__social-link {
+  width: 32px !important;
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.md-footer__social-link svg {
+  width: 20px !important;
+  height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+}
+
+.md-footer__social {
+  display: flex !important;
+  gap: 0.5rem !important;
+  align-items: center !important;
 }
 
 /* Responsive adjustments */
