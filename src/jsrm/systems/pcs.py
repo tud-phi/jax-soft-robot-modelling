@@ -79,6 +79,8 @@ class PCS(eqx.Module):
         Computes the dynamical matrix for the system.
     resolve_upon_time(q0: Array, qd0: Array, actuation_args: Tuple[Array], t0: float, t1: float, dt: float, skip_steps: int, solver: AbstractSolver, max_steps: Optional[int] = None) -> Tuple[Array, Array, Array]:
         Simulates the robot dynamics over time using the specified solver.
+    forward_dynamics(t: float, y: Array, actuation_args: Optional[Tuple]) -> Array:
+        Computes the forward dynamics of the system at a given time t.
 
     kinetic_energy(q: Array, qd: Array) -> float:
         Computes the kinetic energy of the system.
@@ -1382,7 +1384,7 @@ class PCS(eqx.Module):
         return Lambda, mu, J, J_d, JB_pinv
 
     @eqx.filter_jit
-    def _forward_dynamics(
+    def forward_dynamics(
         self,
         t: float,
         y: Array,
@@ -1458,7 +1460,7 @@ class PCS(eqx.Module):
         """
         y0 = jnp.concatenate([q0, qd0])  # Initial state vector
 
-        term = ODETerm(self._forward_dynamics)
+        term = ODETerm(self.forward_dynamics)
 
         t = jnp.arange(t0, t1, dt)  # Time points for the solution
         saveat = SaveAt(ts=t[::skip_steps])  # Save at specified time points
