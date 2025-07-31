@@ -13,14 +13,14 @@ from .utils import (
     gauss_quadrature,
 )
 from jsrm.math_utils import blk_diag, blk_concat
-from jsrm.utils.lie_operators import (  # To use SE(2)
+from jsrm.utils.old_lie_operators import (  # To use SE(2)
     Tangent_gn_SE2,
     Adjoint_gn_SE2_inv,
     Adjoint_g_SE2,
     adjoint_SE2,
     adjoint_star_SE2,
 )
-from jsrm.utils.lie_operators import (
+from jsrm.utils.old_lie_operators import (
     compute_weighted_sums,
 )
 

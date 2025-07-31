@@ -785,7 +785,9 @@ def Tangent_d_gi_se3(
     """
     # We suppose here that theta is not zero thanks to a previous use of apply_eps
     ang = xi_i[:3].reshape((3, 1))  # Angular as a (3,1) vector
-    ang_d =xi_i_d[:3].reshape((3, 1))  # Angular derivative as a (3,1) vector 
+    ang_d = xi_i_d[:3].reshape((3, 1))  # Angular derivative as a (3,1) vector 
+    print("shape ang", ang.shape)
+    print("shape ang_d", ang_d.shape)
     
     theta = jnp.linalg.norm(ang)  # Compute the norm of the angular part
     adjoint_xi_i = adjoint_se3(xi_i)  # Adjoint representation of the input vector

@@ -261,8 +261,8 @@ class GVS(eqx.Module):
         n_gauss_list    : List[int],
         max_dof         : int = None,
         max_nGauss      : int = None,
-        actuation_mapping_fn: Optional[Callable] = None,
         gravity_vector  : List[float] = [0.0, 0.0, -9.81],
+        actuation_mapping_fn: Optional[Callable] = None,
     ) -> 'GVS':
         dofs_joint = [Joint.DICT_JOINT_TYPE_DOF[j.jointtype] for j in joints_list]
         dofs_link = [
@@ -391,6 +391,10 @@ class GVS(eqx.Module):
             def actuation_mapping_fn(q: Array, tau: Array) -> Array:
                 A = jnp.identity(self.dof_tot_system) @ tau
                 return A
+        else:
+            if not callable(actuation_mapping_fn):
+                raise TypeError(f"actuation_mapping_fn must be a callable, got {type(actuation_mapping_fn)}")
+        self.actuation_mapping_fn = actuation_mapping_fn
     
     @staticmethod
     def build_segment(
