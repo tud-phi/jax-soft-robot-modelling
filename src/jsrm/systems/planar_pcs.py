@@ -90,10 +90,10 @@ class PlanarPCS(eqx.Module):
         Computes the total potential energy (elastic + gravitational) of the system.
     total_energy(q: Array, qd: Array) -> float:
         Computes the total energy (kinetic + potential) of the system.
-
+        
     operational_space_dynamical_matrices(q: Array, qd: Array, s: Array, operational_space_selector: Optional[Tuple]) -> Tuple[Array, Array, Array, Array, Array]:
-        # TODO
-
+        Computes the operational space dynamical matrices that define the operational space dynamics of the systems. Can be used, for example, for operational space control.
+    
     inertia_matrix(q: Array) -> Array:
         Computes the inertia matrix of the system.
     coriolis_matrix(q: Array, qd: Array) -> Array:
