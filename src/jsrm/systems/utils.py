@@ -1,7 +1,6 @@
 from copy import deepcopy
 import jax
 
-
 from jax import numpy as jnp
 import sympy as sp
 
@@ -94,15 +93,11 @@ def compute_strain_basis(
     strain_selector: Array,
 ) -> Array:
     """
-    Compute strain basis based on boolean strain selector.
+    Compute constant strain basis based on boolean strain selector.
     Args:
         strain_selector (Array):
             boolean array of shape (n_xi, ) specifying which strain components are active
-        strain_selector (Array):
-            boolean array of shape (n_xi, ) specifying which strain components are active
     Returns:
-        strain_basis (Array):
-            strain basis matrix of shape (n_xi, n_q) where n_q is the number of configuration variables
         strain_basis (Array):
             strain basis matrix of shape (n_xi, n_q) where n_q is the number of configuration variables
             and n_xi is the number of strains

@@ -107,6 +107,7 @@ dependencies = [ # Optional
   "jax",
   "numpy",
   "quadax",
+  "equinox",
   "peppercorn",
   "sympy>=1.11"
 ]

@@ -1,12 +1,9 @@
 from jax import numpy as jnp
 from jax import Array, lax
 
-def blk_diag(
-    a: Array
-) -> Array:
-    """
-    Create a block diagonal matrix from a tensor of blocks.
 
+def blk_diag(a: Array) -> Array:
+    """
     Create a block diagonal matrix from a tensor of blocks.
 
     Args:
@@ -35,7 +32,6 @@ def blk_diag(
     # Implement for loop to assign each block in `a` to the block-diagonal of `b`
     # Hint: use `jax.lax.fori_loop` and pass `assign_block_diagonal` as an argument
     b = jnp.zeros((a.shape[0] * a.shape[1], a.shape[0] * a.shape[2]), dtype=a.dtype)
-    b = jnp.zeros((a.shape[0] * a.shape[1], a.shape[0] * a.shape[2]), dtype=a.dtype)
     b = lax.fori_loop(
         lower=0,
         upper=a.shape[0],
@@ -45,9 +41,8 @@ def blk_diag(
 
     return b
 
-def blk_concat(
-    a: Array
-) -> Array:
+
+def blk_concat(a: Array) -> Array:
     """
     Concatenate horizontally (along the columns) a list of N matrices of size (m, n) to create a single matrix of size (m, n * N).
 
@@ -59,20 +54,6 @@ def blk_concat(
     """
     b = a.transpose(1, 0, 2).reshape(a.shape[1], -1)
     return b
-
-if __name__ == "__main__":
-    # Example usage
-    a = jnp.array([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
-    print("Original array:")
-    print(a)
-    
-    b = blk_diag(a)
-    print("Block diagonal matrix:")
-    print(b)
-    
-    c = blk_concat(a)
-    print("Concatenated matrix:")
-    print(c)
 
 
 def compute_weighted_sums(M: Array, vecm: Array, idx: int) -> Array:
