@@ -1,5 +1,12 @@
 # JAX Soft Robot Modelling
 
+[![Test](https://github.com/tud-phi/jax-soft-robot-modeling/actions/workflows/test.yml/badge.svg)](https://github.com/tud-phi/jax-soft-robot-modeling/actions/workflows/test.yml)
+[![Documentation](https://github.com/tud-phi/jax-soft-robot-modeling/actions/workflows/docs.yml/badge.svg)](https://github.com/tud-phi/jax-soft-robot-modeling/actions/workflows/docs.yml)
+[![PyPI version](https://badge.fury.io/py/jsrm.svg)](https://badge.fury.io/py/jsrm)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/github/license/tud-phi/jax-soft-robot-modeling.svg)](https://github.com/tud-phi/jax-soft-robot-modeling/blob/main/LICENSE.txt)
+[![Docs](https://img.shields.io/badge/docs-live-brightgreen.svg)](https://tud-phi.github.io/jax-soft-robot-modelling)
+
 This repository contains symbolic derivations of the kinematics and dynamics of various soft robots using Sympy.
 The symbolic expressions are then implemented in JAX and can be used for fast, parallelizable, and differentiable simulations.
 So far, we have focused on planar settings and implemented the following soft robots:
