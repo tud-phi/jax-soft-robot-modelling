@@ -1,5 +1,5 @@
-site_name: JAX Soft Robot Modelling
-site_description: Kinematic and dynamic models of continuum and articulated soft robots
+site_name: 🤖 JAX Soft Robot Modelling
+site_description: High-performance kinematic and dynamic models of continuum and articulated soft robots using JAX
 site_author: Maximilian Stölzle, Solange Gribonval
 site_url: https://tud-phi.github.io/jax-soft-robot-modelling
 
@@ -7,37 +7,63 @@ repo_name: tud-phi/jax-soft-robot-modelling
 repo_url: https://github.com/tud-phi/jax-soft-robot-modelling
 edit_uri: edit/main/docs/
 
+copyright: Copyright &copy; 2023-2025 TU Delft Robotics Institute
+
 theme:
   name: material
+  custom_dir: docs/overrides
   palette:
     # Palette toggle for light mode
     - scheme: default
-      primary: blue
-      accent: blue
+      primary: indigo
+      accent: teal
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     # Palette toggle for dark mode
     - scheme: slate
-      primary: blue
-      accent: blue
+      primary: indigo
+      accent: teal
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.tabs
-    - navigation.tabs.sticky
-    - navigation.sections
-    - navigation.expand
-    - navigation.top
-    - search.highlight
-    - search.share
-    - content.code.copy
-    - content.code.annotate
+    - announce.dismiss
     - content.action.edit
     - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.code.select
+    - content.footnote.tooltips
+    - content.tabs.link
+    - content.tooltips
+    - header.autohide
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.prune
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+    - toc.integrate
   icon:
     repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+    tag:
+      default: material/tag
+      robot: material/robot
+      math: material/function-variant
+      api: material/api
 
 nav:
   - Home: index.md
@@ -87,6 +113,11 @@ plugins:
             docstring_section_style: table
             line_length: 80
             show_if_no_docstring: false
+            separate_signature: true
+            show_signature: true
+            signature_crossrefs: true
+            show_bases: true
+            show_inheritance_diagram: false
           paths: [src]
   # Temporarily disable auto-generated API pages
   # - gen-files:
@@ -97,40 +128,83 @@ plugins:
   - section-index
 
 markdown_extensions:
+  - abbr
   - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      title: On this page
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
+      use_pygments: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
-  - attr_list
-  - md_in_html
-  - footnotes
-  - def_list
-  - pymdownx.arithmatex:
-      generic: true
-  - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tilde
 
 extra_javascript:
   - javascripts/mathjax.js
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
+extra_css:
+  - stylesheets/extra.css
+
 extra:
+  version:
+    provider: mike
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/tud-phi/jax-soft-robot-modelling
+      name: View on GitHub
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/jsrm/
+      name: View on PyPI
+    - icon: fontawesome/solid/paper-plane
+      link: mailto:m.stolzle@tudelft.nl
+      name: Contact us
+  generator: false
+  analytics:
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/emoticon-happy-outline
+          name: This page was helpful
+          data: 1
+          note: >-
+            Thanks for your feedback!
+        - icon: material/emoticon-sad-outline
+          name: This page could be improved
+          data: 0
+          note: >- 
+            Thanks for your feedback! Help us improve this page by
+            <a href="https://github.com/tud-phi/jax-soft-robot-modelling/issues/new/?title=[Feedback]+{title}+-+{url}" target="_blank" rel="noopener">telling us what you need</a>.
 
 watch:
   - src/jsrm
