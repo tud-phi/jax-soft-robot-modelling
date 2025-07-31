@@ -46,8 +46,23 @@ nav:
     - Quick Start: user-guide/quick-start.md
     - Examples: user-guide/examples.md
   - API Reference:
-    - Systems: api/systems.md
-    - Utils: api/utils.md
+    - Overview: api/systems.md
+    - Systems:
+      - Pendulum: api/pendulum.md
+      - PCS Systems:
+        - General PCS: api/pcs.md
+        - Planar PCS: api/planar-pcs.md
+        - Planar PCS Symbolic: api/planar-pcs-sym.md
+        - Pneumatic Planar PCS: api/pneumatic-planar-pcs.md
+        - Tendon Planar PCS: api/tendon-planar-pcs.md
+      - Planar HSA: api/planar-hsa.md
+    - Utilities:
+      - Overview: api/utils.md
+      - Math Utils: api/math-utils.md
+      - Integration: api/integration.md
+      - Parameters: api/parameters.md
+      - Rendering: api/rendering.md
+      - Symbolic Derivation: api/symbolic-derivation.md
   - Development:
     - Contributing: development/contributing.md
     - Changelog: development/changelog.md
@@ -59,10 +74,20 @@ plugins:
         python:
           options:
             docstring_style: google
-            show_source: true
+            show_source: false
             show_root_heading: true
             show_root_toc_entry: false
             merge_init_into_class: true
+            show_signature_annotations: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            group_by_category: true
+            heading_level: 2
+            members_order: source
+            docstring_section_style: table
+            line_length: 80
+            show_if_no_docstring: false
+          paths: [src]
   # Temporarily disable auto-generated API pages
   # - gen-files:
   #     scripts:

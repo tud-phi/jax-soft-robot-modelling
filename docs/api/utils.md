@@ -1,25 +1,58 @@
 # Utils API
 
-This module contains utility functions used throughout JSRM.
+This module contains utility functions and helper modules used throughout JSRM.
 
-::: jsrm.utils
+## Overview
 
-## Math Utils
+JSRM provides various utility modules that support the core robot system implementations. These utilities handle mathematical operations, numerical integration, parameter management, visualization, and symbolic computations.
 
-::: jsrm.math_utils
+## Available Utilities
 
-## Integration
+### [Math Utils](math-utils.md)
+Core mathematical operations and linear algebra utilities.
 
-::: jsrm.integration
+- Matrix operations and manipulations
+- Specialized robotics mathematics
+- Linear algebra helper functions
+- Numerical computation utilities
 
-## Parameters
+### [Integration](integration.md)
+Numerical integration methods for differential equations.
 
-::: jsrm.parameters
+- Gauss-Legendre quadrature
+- Integration schemes for robot dynamics
+- Numerical differentiation utilities
+- Solver interfaces
 
-## Rendering
+### [Parameters](parameters.md)
+Parameter handling and configuration management.
 
-::: jsrm.rendering
+- Robot parameter validation
+- Default parameter sets
+- Configuration utilities
+- Parameter conversion functions
 
-## Symbolic Derivation
+### [Rendering](rendering.md)
+Visualization and animation tools for robot systems.
 
-::: jsrm.symbolic_derivation
+- 2D robot visualization
+- OpenCV-based rendering
+- Animation generation
+- Trajectory plotting
+
+### [Symbolic Derivation](symbolic-derivation.md)
+SymPy-based symbolic mathematics for robot modeling.
+
+- Symbolic kinematics derivation
+- Dynamic equation generation
+- Expression optimization
+- JAX code generation from symbolic expressions
+
+## Common Patterns
+
+All utility modules are designed to integrate seamlessly with the main robot systems, providing:
+
+- **JAX Compatibility**: All functions work with JAX arrays and transformations
+- **Vectorization**: Support for batch operations where applicable  
+- **Type Safety**: Comprehensive type hints for all functions
+- **Documentation**: Detailed docstrings with examples
