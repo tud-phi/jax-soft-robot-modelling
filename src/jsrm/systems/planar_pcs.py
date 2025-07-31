@@ -1143,9 +1143,6 @@ class PlanarPCS(eqx.Module):
         """
         Compute the damping matrix of the robot.
 
-        Args:
-            None
-
         Returns:
             D (Array): Damping matrix of shape (num_active_strains, num_active_strains).
         """

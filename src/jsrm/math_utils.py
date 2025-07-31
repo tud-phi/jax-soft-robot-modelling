@@ -62,14 +62,14 @@ def compute_weighted_sums(M: Array, vecm: Array, idx: int) -> Array:
 
     Args:
         M (Array): array of shape (N, m, m)
-           Describes the matrix to be multiplied with vecm
+            Describes the matrix to be multiplied with vecm
         vecm (Array): array-like of shape (N, m)
-           Describes the vector to be multiplied with M
+            Describes the vector to be multiplied with M
         idx (int): index of the last row to be summed over
 
     Returns:
         Array: array of shape (N, m)
-           The result of the weighted sums. For each i, the result is the sum of the products of M[i, j] and vecm[j] for j from 0 to idx.
+            The result of the weighted sums. For each i, the result is the sum of the products of M[i, j] and vecm[j] for j from 0 to idx.
     """
     N = M.shape[0]
     # Matrix product for each j: (N, m, m) @ (N, m, 1) -> (N, m)
