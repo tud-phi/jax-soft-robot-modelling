@@ -123,9 +123,9 @@ def test_planar_cs():
     # test dynamical matrices
     print("\nTesting dynamical matrices... ------------------------")
     q = jnp.zeros((3,))
-    q_d = jnp.zeros((3,))
-    print("q = ", q, "q_d = ", q_d)
-    B, C, G, K, D, A = dynamical_matrices_fn(params, q, q_d)
+    qd = jnp.zeros((3,))
+    print("q = ", q, "qd = ", qd)
+    B, C, G, K, D, A = dynamical_matrices_fn(params, q, qd)
     assert not jnp.isnan(B).any(), "B matrix contains NaN!"
     assert not jnp.isnan(C).any(), "C matrix contains NaN!"
     assert not jnp.isnan(G).any(), "G matrix contains NaN!"
@@ -143,9 +143,9 @@ def test_planar_cs():
     print("[Valid test]\n")
 
     q = jnp.array([jnp.pi / (2 * params["l"][0]), 0.0, 0.0])
-    q_d = jnp.zeros((3,))
-    print("q = ", q, "q_d = ", q_d)
-    B, C, G, K, D, A = dynamical_matrices_fn(params, q, q_d)
+    qd = jnp.zeros((3,))
+    print("q = ", q, "qd = ", qd)
+    B, C, G, K, D, A = dynamical_matrices_fn(params, q, qd)
     assert not jnp.isnan(B).any(), "B matrix contains NaN!"
     assert not jnp.isnan(C).any(), "C matrix contains NaN!"
     assert not jnp.isnan(G).any(), "G matrix contains NaN!"
@@ -167,11 +167,11 @@ def test_planar_cs():
     potential_energy_fn = auxiliary_fns["potential_energy_fn"]
 
     q = jnp.zeros((3,))
-    q_d = jnp.zeros((3,))
-    print("q = ", q, "q_d = ", q_d)
+    qd = jnp.zeros((3,))
+    print("q = ", q, "qd = ", qd)
 
     print("Testing kinetic energy...")
-    E_kin = kinetic_energy_fn(params, q, q_d)
+    E_kin = kinetic_energy_fn(params, q, qd)
     assert not jnp.isnan(E_kin).any(), "Kinetic energy contains NaN!"
     E_kin_th = 0.0
     assert_allclose(E_kin, E_kin_th, rtol=Tolerance.rtol(), atol=Tolerance.atol())
@@ -210,23 +210,23 @@ def test_planar_cs():
     # test forward dynamics
     print("\nTesting forward dynamics... ------------------------")
     q = jnp.zeros((3,))
-    q_d = jnp.zeros((3,))
+    qd = jnp.zeros((3,))
     tau = jnp.array([0.0, 0.0, 0.0])  # no external forces
     params_bis = params.copy()
     params_bis["g"] = jnp.array([0.0, 0.0])  # no gravity for this test
-    print("q = ", q, "q_d = ", q_d, "tau = ", tau, "g = ", params_bis["g"])
-    q_dd = forward_dynamics_fn(params_bis, q, q_d, tau)
-    assert not jnp.isnan(q_dd).any(), "Forward dynamics output contains NaN!"
-    assert_allclose(q_dd, jnp.zeros((3,)), rtol=Tolerance.rtol(), atol=Tolerance.atol())
+    print("q = ", q, "qd = ", qd, "tau = ", tau, "g = ", params_bis["g"])
+    qdd = forward_dynamics_fn(params_bis, q, qd, tau)
+    assert not jnp.isnan(qdd).any(), "Forward dynamics output contains NaN!"
+    assert_allclose(qdd, jnp.zeros((3,)), rtol=Tolerance.rtol(), atol=Tolerance.atol())
     print("[Valid test]\n")
 
     # test nonlinear state space
     print("\nTesting nonlinear state space... ------------------------")
-    x = jnp.concatenate([q, q_d])
+    x = jnp.concatenate([q, qd])
     print("x = ", x, "tau = ", tau)
-    x_dot = nonlinear_state_space_fn(params, x, tau)
-    assert not jnp.isnan(x_dot).any(), "Nonlinear state space output contains NaN!"
-    print("x_dot = ", x_dot)
+    xd = nonlinear_state_space_fn(params, x, tau)
+    assert not jnp.isnan(xd).any(), "Nonlinear state space output contains NaN!"
+    print("xd = ", xd)
     print("[To check]")
 
 

@@ -191,7 +191,7 @@ if __name__ == "__main__":
     # Solver
     solver = Tsit5()  # Runge-Kutta 5(4) method
 
-    ts, q_ts, q_d_ts = robot.resolve_upon_time(
+    ts, q_ts, qd_ts = robot.resolve_upon_time(
         q0=q0,
         qd0=qd0,
         actuation_args=actuation_args,
@@ -239,7 +239,7 @@ if __name__ == "__main__":
     # Energy computation upon time
     # =====================================================
     U_ts = jax.vmap(jax.jit(partial(robot.potential_energy)))(q_ts)
-    T_ts = jax.vmap(jax.jit(partial(robot.kinetic_energy)))(q_ts, q_d_ts)
+    T_ts = jax.vmap(jax.jit(partial(robot.kinetic_energy)))(q_ts, qd_ts)
 
     plt.figure()
     plt.plot(ts, U_ts, label="Potential Energy")
