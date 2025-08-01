@@ -47,7 +47,7 @@ class PCS(eqx.Module):
         [0, 0, 0, g_x, g_y, g_z]
     L, r, E, G, rho, D : Array
         Physical properties of each segment (length, radius, elastic/shear modulus, etc.).
-    num_active_strains : int
+    num_dofs : int
         Number of active strain components (based on strain_selector).
     num_strains : int
         Total number of strain components (6 * num_segments).
@@ -159,7 +159,7 @@ class PCS(eqx.Module):
     xi_star: Array  # Rest configuration strain
     B_xi: Array  # Strain basis matrix
 
-    num_active_strains: Array  # Number of selected strains
+    num_dofs: Array  # Number of active strains
 
     Xs: Array  # Gauss nodes
     Ws: Array  # Gauss weights
@@ -216,7 +216,7 @@ class PCS(eqx.Module):
             actuation_mapping_fn (Optional[Callable], optional):
                 Function to compute the actuation mapping.
                 This function needs to take as input:
-                    - q: generalized coordinates of shape (num_active_strains,)
+                    - q: generalized coordinates of shape (num_dofs,)
                     - actuation_args: tuple containing the actuation parameters (e.g. torques (tau,)).
                 Defaults to identity linear mapping. actuation_args = (tau,)
 
@@ -372,7 +372,7 @@ class PCS(eqx.Module):
             strain_selector = strain_selector.reshape(num_strains)
         self.B_xi = compute_strain_basis(strain_selector)
 
-        self.num_active_strains = jnp.sum(strain_selector)
+        self.num_dofs = jnp.sum(strain_selector)
 
         # Rest configuration strain
         if xi_star is None:
@@ -454,7 +454,7 @@ class PCS(eqx.Module):
 
         Returns:
             segment_idx (Array): index of the segment where the point is located
-            s_segment (Array): point coordinate along the segment in the interval [0, l_segment]
+            s_local (Array): point coordinate along the segment in the interval [0, l_segment]
         """
 
         # Classify the point along the robot to the corresponding segment
@@ -473,10 +473,10 @@ class PCS(eqx.Module):
         Compute the strain vector from the generalized coordinates.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
 
         Returns:
-            xi (Array): strain vector of shape (num_active_strains,)
+            xi (Array): strain vector of shape (num_dofs,)
         """
         xi = self.B_xi @ q + self.xi_star
 
@@ -491,7 +491,7 @@ class PCS(eqx.Module):
         Compute the forward kinematics of the robot at a point s along the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
@@ -541,7 +541,7 @@ class PCS(eqx.Module):
         Compute the Jacobian of the forward kinematics at a point s along the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
@@ -619,13 +619,13 @@ class PCS(eqx.Module):
 
     def _final_size_jacobian(self, J_full: Array) -> Array:
         """
-        Convert the Jacobian or its derivative from the full computation form to the selected strains form.
+        Convert the Jacobian or its derivative from the full computation form to the active strains form.
 
         Args:
             J_full (Array): Full Jacobian of shape (num_segments, 6, 6)
 
         Returns:
-            J_selected (Array): Jacobian for the selected strains of shape (6, num_active_strains)
+            J_active (Array): Jacobian for the active strains of shape (6, num_dofs)
         """
         J_final = J_full.transpose(1, 0, 2).reshape(6, self.num_strains)
 
@@ -636,7 +636,7 @@ class PCS(eqx.Module):
         Compute the Jacobian of the forward kinematics at a point s along the robot in the body frame (for every strains)
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
@@ -653,11 +653,11 @@ class PCS(eqx.Module):
         Compute the Jacobian of the forward kinematics at a point s along the robot in the body frame.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J_local (Array): Jacobian of the forward kinematics at point s in the body frame, shape (6, num_active_strains)
+            J_local (Array): Jacobian of the forward kinematics at point s in the body frame, shape (6, num_dofs)
         """
         _J_local = self._J_local(q, s)
 
@@ -670,11 +670,11 @@ class PCS(eqx.Module):
         Compute the Jacobian of the forward kinematics at a point s along the robot in the inertial frame.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J_global (Array): Jacobian of the forward kinematics at point s in the inertial frame, shape (6, num_active_strains)
+            J_global (Array): Jacobian of the forward kinematics at point s in the inertial frame, shape (6, num_dofs)
         """
         _J_local = self._J_local(q, s)
 
@@ -701,8 +701,8 @@ class PCS(eqx.Module):
         Compute the Jacobian and its time-derivative for the forward kinematics at a point s along the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
@@ -751,13 +751,13 @@ class PCS(eqx.Module):
         Compute the Jacobian and its time-derivative for the forward kinematics at a point s along the robot in the body frame.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J_local (Array): Jacobian of the forward kinematics at point s in the body frame, shape (6, num_active_strains)
-            J_d_local (Array): Time-derivative of the Jacobian at point s in the body frame, shape (6, num_active_strains)
+            J_local (Array): Jacobian of the forward kinematics at point s in the body frame, shape (6, num_dofs)
+            J_d_local (Array): Time-derivative of the Jacobian at point s in the body frame, shape (6, num_dofs)
         """
         _J_local, _J_d_local = self._J_Jd(q, qd, s)
 
@@ -773,13 +773,13 @@ class PCS(eqx.Module):
         Compute the Jacobian and its time-derivative for the forward kinematics at a point s along the robot in the body frame.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J_local (Array): Jacobian of the forward kinematics at point s in the body frame, shape (6, num_active_strains)
-            J_d_local (Array): Time-derivative of the Jacobian at point s in the body frame, shape (6, num_active_strains)
+            J_local (Array): Jacobian of the forward kinematics at point s in the body frame, shape (6, num_dofs)
+            J_d_local (Array): Time-derivative of the Jacobian at point s in the body frame, shape (6, num_dofs)
         """
         _J_local, _J_d_local = self._J_Jd(q, qd, s)
 
@@ -795,13 +795,13 @@ class PCS(eqx.Module):
         Compute the Jacobian and its time-derivative for the forward kinematics at a point s along the robot in the inertial frame.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J_global (Array): Jacobian of the forward kinematics at point s in the inertial frame, shape (6, num_active_strains)
-            J_d_global (Array): Time-derivative of the Jacobian at point s in the inertial frame, shape (6, num_active_strains)
+            J_global (Array): Jacobian of the forward kinematics at point s in the inertial frame, shape (6, num_dofs)
+            J_d_global (Array): Time-derivative of the Jacobian at point s in the inertial frame, shape (6, num_dofs)
         """
         _J_local, _J_d_local = self._J_Jd(q, qd, s)
 
@@ -838,11 +838,11 @@ class PCS(eqx.Module):
         Compute the Jacobian of the forward kinematics at a point s along the robot in the body frame.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J_local (Array): Jacobian of the forward kinematics at point s in the body frame, shape (6, num_active_strains)
+            J_local (Array): Jacobian of the forward kinematics at point s in the body frame, shape (6, num_dofs)
         """
         J_local = self.jacobian_bodyframe(q, s)
 
@@ -858,13 +858,13 @@ class PCS(eqx.Module):
         Compute the Jacobian and its time-derivative for the forward kinematics at a point s along the robot in the body frame.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
 
         Returns:
-            J_local (Array): Jacobian of the forward kinematics at point s in the body frame, shape (6, num_active_strains)
-            J_d_local (Array): Time-derivative of the Jacobian at point s in the body frame, shape (6, num_active_strains)
+            J_local (Array): Jacobian of the forward kinematics at point s in the body frame, shape (6, num_dofs)
+            J_d_local (Array): Time-derivative of the Jacobian at point s in the body frame, shape (6, num_dofs)
         """
         J_local, J_d_local = self.jacobian_and_derivative_bodyframe(q, qd, s)
 
@@ -913,7 +913,7 @@ class PCS(eqx.Module):
         Compute the full inertia matrix of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
 
         Returns:
             B_full (Array): Full inertia matrix of shape (num_strains, num_strains).
@@ -959,10 +959,10 @@ class PCS(eqx.Module):
         Compute the inertia matrix of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
 
         Returns:
-            B (Array): Inertia matrix of shape (num_active_strains, num_active_strains).
+            B (Array): Inertia matrix of shape (num_dofs, num_dofs).
         """
         B_full = self._inertia_full_matrix(q)
 
@@ -979,8 +979,8 @@ class PCS(eqx.Module):
         Compute the full Coriolis matrix of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
 
         Returns:
             C_full (Array): Full Coriolis matrix of shape (num_strains, num_strains).
@@ -1023,11 +1023,11 @@ class PCS(eqx.Module):
         Compute the Coriolis matrix of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
 
         Returns:
-            C (Array): Coriolis matrix of shape (num_active_strains, num_active_strains).
+            C (Array): Coriolis matrix of shape (num_dofs, num_dofs).
         """
         C_full = self._coriolis_full_matrix(q, qd)
 
@@ -1043,7 +1043,7 @@ class PCS(eqx.Module):
         Compute the full gravitational vector of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
 
         Returns:
             G (Array): Full gravitational vector of shape (num_strains,).
@@ -1093,10 +1093,10 @@ class PCS(eqx.Module):
         Compute the gravitational vector of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
 
         Returns:
-            G (Array): Gravitational vector of shape (num_active_strains,).
+            G (Array): Gravitational vector of shape (num_dofs,).
         """
         G_full = self._gravitational_full_vector(q)
 
@@ -1124,7 +1124,7 @@ class PCS(eqx.Module):
         Compute the stiffness matrix of the robot.
 
         Returns:
-            K (Array): Stiffness matrix of shape (num_active_strains, num_active_strains).
+            K (Array): Stiffness matrix of shape (num_dofs, num_dofs).
         """
         K = self.stiffness_fn()
 
@@ -1156,7 +1156,7 @@ class PCS(eqx.Module):
             None
 
         Returns:
-            D (Array): Damping matrix of shape (num_active_strains, num_active_strains).
+            D (Array): Damping matrix of shape (num_dofs, num_dofs).
         """
         D_full = self._damping_full_matrix()
 
@@ -1173,11 +1173,11 @@ class PCS(eqx.Module):
         Compute the actuation mapping of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
             actuation_args (Tuple, optional): Additional arguments for the actuation mapping function, if any.
 
         Returns:
-            alpha (Array): Actuation mapping of shape (num_active_strains, num_active_strains).
+            alpha (Array): Actuation mapping of shape (num_dofs, num_dofs).
         """
         alpha = self.actuation_mapping_fn(q, *actuation_args)
 
@@ -1193,17 +1193,17 @@ class PCS(eqx.Module):
         Compute the dynamical matrices of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
             actuation_args (Tuple, optional): Additional arguments for the actuation mapping function, if any.
 
         Returns:
-            B (Array): Inertia matrix of shape (num_active_strains, num_active_strains).
-            C (Array): Coriolis matrix of shape (num_active_strains, num_active_strains).
-            G (Array): Gravitational vector of shape (num_active_strains,).
-            K (Array): Stiffness matrix of shape (num_active_strains, num_active_strains).
-            D (Array): Damping matrix of shape (num_active_strains, num_active_strains).
-            alpha (Array): Actuation mapping of shape (num_active_strains, num_active_strains).
+            B (Array): Inertia matrix of shape (num_dofs, num_dofs).
+            C (Array): Coriolis matrix of shape (num_dofs, num_dofs).
+            G (Array): Gravitational vector of shape (num_dofs,).
+            K (Array): Stiffness matrix of shape (num_dofs, num_dofs).
+            D (Array): Damping matrix of shape (num_dofs, num_dofs).
+            alpha (Array): Actuation mapping of shape (num_dofs, num_dofs).
         """
         B = self.inertia_matrix(q)
         C = self.coriolis_matrix(q, qd)
@@ -1223,8 +1223,8 @@ class PCS(eqx.Module):
         Compute the kinetic energy of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
 
         Returns:
             T (float): Kinetic energy of the robot.
@@ -1242,7 +1242,7 @@ class PCS(eqx.Module):
         Compute the elastic energy of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
 
         Returns:
             U_K (float): Elastic energy of the robot.
@@ -1260,7 +1260,7 @@ class PCS(eqx.Module):
         Compute the gravitational energy of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
 
         Returns:
             U_G (float): Gravitational energy of the robot.
@@ -1279,7 +1279,7 @@ class PCS(eqx.Module):
                 p_j = jnp.concatenate(
                     [jnp.zeros(3), self.forward_kinematics(q, Xs_j)[:3, 3]]
                 )  # Add zeros for the orientation angles
-                return Ws_j * rho_i * A_i * jnp.dot(p_j, self.g)
+                return - Ws_j * rho_i * A_i * jnp.dot(p_j, self.g)
 
             U_G_blocks_segment_i = vmap(U_G_j)(jnp.arange(self.num_gauss_points))
 
@@ -1299,7 +1299,7 @@ class PCS(eqx.Module):
         Compute the potential energy of the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
 
         Returns:
             U (float): Potential energy of the robot.
@@ -1318,8 +1318,8 @@ class PCS(eqx.Module):
         Compute the total energy of the robot, which is the sum of kinetic and potential energy.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
 
         Returns:
             E (float): Total energy of the robot.
@@ -1340,8 +1340,8 @@ class PCS(eqx.Module):
         Compute the operational space dynamical matrices for the robot at a point s along the robot.
 
         Args:
-            q (Array): generalized coordinates of shape (num_active_strains,).
-            qd (Array): time-derivative of the generalized coordinates of shape (num_active_strains,).
+            q (Array): generalized coordinates of shape (num_dofs,).
+            qd (Array): time-derivative of the generalized coordinates of shape (num_dofs,).
             s (Array): point coordinate along the robot in the interval [0, L].
             operational_space_selector (Tuple): Selector for the operational space dimensions.
                 Default is (True, True, True, True, True, True) for all dimensions.
@@ -1349,9 +1349,9 @@ class PCS(eqx.Module):
         Returns:
             Lambda (Array): Inertia matrix in the operational space, shape (num_operational_space_dims, num_operational_space_dims).
             mu (Array): Coriolis and centrifugal matrix in the operational space, shape (num_operational_space_dims,).
-            J (Array): Jacobian of the forward kinematics at point s in the body frame, shape (num_operational_space_dims, num_active_strains).
-            J_d (Array): Time-derivative of the Jacobian at point s in the body frame, shape (num_operational_space_dims, num_active_strains).
-            JB_pinv (Array): Dynamically-consistent pseudo-inverse of the Jacobian, shape (num_active_strains, num_operational_space_dims).
+            J (Array): Jacobian of the forward kinematics at point s in the body frame, shape (num_operational_space_dims, num_dofs).
+            J_d (Array): Time-derivative of the Jacobian at point s in the body frame, shape (num_operational_space_dims, num_dofs).
+            JB_pinv (Array): Dynamically-consistent pseudo-inverse of the Jacobian, shape (num_dofs, num_operational_space_dims).
         """
         # classify the point along the robot to the corresponding segment
         _, s_local = self.classify_segment(s)

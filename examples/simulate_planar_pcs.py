@@ -3,7 +3,7 @@ import jax
 from jsrm.systems.planar_pcs import PlanarPCS
 import jax.numpy as jnp
 
-from typing import Callable, Dict
+from typing import Callable
 from jax import Array
 
 import numpy as onp
