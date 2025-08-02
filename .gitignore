@@ -137,3 +137,6 @@ dmypy.json
 .DS_Store
 *.mp4
 *.gif
+
+# Documentation build
+site/

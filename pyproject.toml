@@ -148,6 +148,15 @@ test = [
     "pytest-html",
     "tox",
 ]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
+    "mkdocs-section-index",
+    "mkdocs-autorefs",
+]
 
 # List URLs that are relevant to your project
 #
@@ -160,9 +169,9 @@ test = [
 # maintainers, and where to support the project financially. The key is
 # what's used to render the link text on PyPI.
 [project.urls]  # Optional
-"Homepage" = "https://github.com/tud-cor-sr/jax-soft-robot-modelling"
-"Bug Reports" = "https://github.com/tud-cor-sr/jax-soft-robot-modelling/issues"
-"Source" = "https://github.com/tud-cor-sr/jax-soft-robot-modelling"
+"Homepage" = "https://github.com/tud-phi/jax-soft-robot-modelling"
+"Bug Reports" = "https://github.com/tud-phi/jax-soft-robot-modelling/issues"
+"Source" = "https://github.com/tud-phi/jax-soft-robot-modelling"
 
 # The following would provide a command line executable called `sample`
 # which executes the function `main` from this package when invoked.

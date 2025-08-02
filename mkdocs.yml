@@ -1,0 +1,211 @@
+site_name: 🤖 JAX Soft Robot Modelling
+site_description: High-performance kinematic and dynamic models of continuum and articulated soft robots using JAX
+site_author: Maximilian Stölzle, Solange Gribonval
+site_url: https://tud-phi.github.io/jax-soft-robot-modelling
+
+repo_name: tud-phi/jax-soft-robot-modelling
+repo_url: https://github.com/tud-phi/jax-soft-robot-modelling
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2020-2025 Physical Intelligence (PhI) Lab @ TU Delft
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: indigo
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.code.select
+    - content.footnote.tooltips
+    - content.tabs.link
+    - content.tooltips
+    - header.autohide
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.prune
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+    - toc.integrate
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+    tag:
+      default: material/tag
+      robot: material/robot
+      math: material/function-variant
+      api: material/api
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - User Guide:
+    - Quick Start: user-guide/quick-start.md
+    - Examples: user-guide/examples.md
+  - API Reference:
+    - Overview: api/systems.md
+    - Systems:
+      - Pendulum: api/pendulum.md
+      - PCS Systems:
+        - General PCS: api/pcs.md
+        - Planar PCS: api/planar-pcs.md
+        - Planar PCS Symbolic: api/planar-pcs-sym.md
+        - Pneumatic Planar PCS: api/pneumatic-planar-pcs.md
+        - Tendon Planar PCS: api/tendon-planar-pcs.md
+      - Planar HSA: api/planar-hsa.md
+    - Utilities:
+      - Overview: api/utils.md
+      - Math Utils: api/math-utils.md
+      - Integration: api/integration.md
+      - Parameters: api/parameters.md
+      - Rendering: api/rendering.md
+      - Symbolic Derivation: api/symbolic-derivation.md
+  - Authors & Maintainers: authors.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Changelog: development/changelog.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_root_toc_entry: false
+            merge_init_into_class: true
+            show_signature_annotations: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            group_by_category: true
+            heading_level: 2
+            members_order: source
+            docstring_section_style: table
+            line_length: 80
+            show_if_no_docstring: false
+            separate_signature: true
+            show_signature: true
+            signature_crossrefs: true
+            show_bases: true
+            show_inheritance_diagram: false
+          paths: [src]
+  # Temporarily disable auto-generated API pages
+  # - gen-files:
+  #     scripts:
+  #       - docs/gen_ref_pages.py
+  # - literate-nav:
+  #     nav_file: SUMMARY.md
+  - section-index
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      title: On this page
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      use_pygments: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/tud-phi/jax-soft-robot-modelling
+      name: View on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/jsrm/
+      name: View on PyPI
+    - icon: fontawesome/solid/paper-plane
+      link: mailto:m.stolzle@tudelft.nl
+      name: Contact us
+  generator: false
+  analytics:
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/emoticon-happy-outline
+          name: This page was helpful
+          data: 1
+          note: >-
+            Thanks for your feedback!
+        - icon: material/emoticon-sad-outline
+          name: This page could be improved
+          data: 0
+          note: >- 
+            Thanks for your feedback! Help us improve this page by
+            <a href="https://github.com/tud-phi/jax-soft-robot-modelling/issues/new/?title=[Feedback]+{title}+-+{url}" target="_blank" rel="noopener">telling us what you need</a>.
+
+watch:
+  - src/jsrm
