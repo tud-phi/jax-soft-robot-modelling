@@ -141,6 +141,9 @@ class PCS(eqx.Module):
 
     L: Array  # Length of the segments
     L_cum: Array  # Cumulative length of the segments
+    
+    Lmax : Array  # Maximum length of the robot
+    
     r: Array  # Radius of the segments
     rho: Array
     E: Array  # Young's modulus of the segments
@@ -276,6 +279,9 @@ class PCS(eqx.Module):
 
         L_cum = jnp.cumsum(jnp.concatenate([jnp.zeros(1), self.L]))
         self.L_cum = L_cum
+        
+        # Maximum length of the robot
+        self.Lmax = L_cum[-1]
 
         # Radius of the segments
         try:
@@ -947,7 +953,7 @@ class PCS(eqx.Module):
 
         B_full = jnp.sum(
             B_blocks_tot, axis=(0, 1)
-        )  # Sum over segments and Gauss points
+        ) # Sum over segments and Gauss points
 
         return B_full
 
@@ -1010,7 +1016,9 @@ class PCS(eqx.Module):
 
         C_blocks_tot = vmap(C_i)(jnp.arange(self.num_segments))
 
-        C_full = jnp.sum(C_blocks_tot, axis=(0, 1))
+        C_full = jnp.sum(
+            C_blocks_tot, axis=(0, 1)
+        ) # Sum over segments and Gauss points
 
         return C_full
 
@@ -1081,7 +1089,7 @@ class PCS(eqx.Module):
 
         G_full = jnp.sum(
             G_blocks_tot, axis=(0, 1)
-        )  # Sum over links and quadrature points
+        ) # Sum over segments and Gauss points
 
         return G_full
 
@@ -1287,7 +1295,9 @@ class PCS(eqx.Module):
 
         U_G_blocks_tot = vmap(U_G_i)(jnp.arange(self.num_segments))
 
-        U_G = jnp.sum(U_G_blocks_tot, axis=(0, 1))  # Sum over segments and Gauss points
+        U_G = jnp.sum(
+            U_G_blocks_tot, axis=(0, 1)
+        ) # Sum over segments and Gauss points
 
         return U_G
 

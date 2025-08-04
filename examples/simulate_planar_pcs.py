@@ -26,12 +26,15 @@ jnp.set_printoptions(
 
 
 def draw_robot_curve(
-    batched_forward_kinematics: Callable,
-    L_max: float,
+    robot: PlanarPCS,
     q: Array,
     num_points: int = 50,
 ):
-    s_ps = jnp.linspace(0, L_max, num_points)
+    batched_forward_kinematics = jax.vmap(
+        robot.forward_kinematics, in_axes=(None, 0), out_axes=-1
+    )
+    
+    s_ps = jnp.linspace(0, robot.Lmax, num_points)
     chi_ps = batched_forward_kinematics(q, s_ps)
 
     curve = onp.array(chi_ps[1:, :], dtype=onp.float32).T
@@ -56,11 +59,6 @@ def animate_robot_matplotlib(
             "Cannot use both animation and slider at the same time. Choose one."
         )
 
-    batched_forward_kinematics = jax.vmap(
-        robot.forward_kinematics, in_axes=(None, 0), out_axes=-1
-    )
-    L_max = jnp.sum(robot.L)
-
     width = jnp.linalg.norm(robot.L) * 3
     height = width
 
@@ -82,7 +80,7 @@ def animate_robot_matplotlib(
         def update(frame_idx):
             q = q_list[frame_idx]
             t = t_list[frame_idx]
-            curve = draw_robot_curve(batched_forward_kinematics, L_max, q, num_points)
+            curve = draw_robot_curve(robot, q, num_points)
             line.set_data(curve[:, 0], curve[:, 1])
             title_text.set_text(f"t = {t:.2f} s")
             return line, title_text
@@ -111,7 +109,7 @@ def animate_robot_matplotlib(
             ax.set_ylabel("Y [m]")
             ax.set_title(f"t = {t_list[frame_idx]:.2f} s")
             q = q_list[frame_idx]
-            curve = draw_robot_curve(batched_forward_kinematics, L_max, q, num_points)
+            curve = draw_robot_curve(robot, q, num_points)
             ax.plot(curve[:, 0], curve[:, 1], lw=4, color="blue")
             fig.canvas.draw_idle()
 

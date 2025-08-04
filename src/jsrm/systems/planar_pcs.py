@@ -138,6 +138,9 @@ class PlanarPCS(eqx.Module):
 
     L: Array  # Length of the segments
     L_cum: Array  # Cumulative length of the segments
+    
+    Lmax : Array # Maximum length of the robot (sum of all segments)
+    
     r: Array  # Radius of the segments
     rho: Array
     E: Array  # Young's modulus of the segments
@@ -263,6 +266,10 @@ class PlanarPCS(eqx.Module):
 
         L_cum = jnp.cumsum(jnp.concatenate([jnp.zeros(1), self.L]))
         self.L_cum = L_cum
+        
+        # Maximum length of the robot
+        Lmax = L_cum[-1]
+        self.Lmax = Lmax
 
         # Radius of the segments
         try:

@@ -33,17 +33,26 @@ class PlanarHSA(eqx.Module):
     global_eps: float = 1e-6
     
     consider_hysteresis: bool = eqx.static_field()
+    num_hysteresis: int = eqx.static_field()
+    B_hyst: Array
+    hyst_alpha:Array
+    hyst_A: Array
+    hyst_n: Array
+    hyst_beta: Array
+    hyst_gamma: Array
     
-    num_segments: int = eqx.static_field()
+    num_segments        : int = eqx.static_field()
     num_rods_per_segment: int = eqx.static_field()
-    num_dofs: int = eqx.static_field()
+    num_dofs            : int = eqx.static_field()
 
     B_xi: Array
     
-    params_syms: Dict[str, Array] = eqx.static_field()
-    params: Dict[str, Array] = eqx.static_field()
-    params_for_lambdify: List[Array] = eqx.static_field()
-    L_cum: Array = eqx.static_field()
+    params_syms         : Dict[str, Array]  #= eqx.static_field()
+    params_for_lambdify : List[Array]       #= eqx.static_field()
+    
+    L       : Array
+    L_cum   : Array
+    Lmax    : Array # Maximum length of the robot (sum of all segments)
     
     chiv_lambda_sms: List[Callable]
     chir_lambda_sms: List[Callable]
@@ -51,7 +60,7 @@ class PlanarHSA(eqx.Module):
     
     chiee_lambda: Callable
     Jee_lambda: Callable
-    Jee_d_lambda: Callable
+    Jeed_lambda: Callable
     
     B_lambda: Callable
     C_lambda: Callable
@@ -60,6 +69,16 @@ class PlanarHSA(eqx.Module):
     K_lambda: Callable
     D_lambda: Callable
     alpha_lambda: Callable
+    
+    roff: Array
+    kappa_b_eq: Array
+    sigma_sh_eq: Array
+    sigma_a_eq: Array
+    
+    pcudim: Array
+    lpc: Array
+    ldc: Array
+    chiee_off: Array
     
     def __init__(
         self,
@@ -80,9 +99,6 @@ class PlanarHSA(eqx.Module):
             consider_hysteresis: If True, Bouc-Wen is used to model hysteresis. Otherwise, hysteresis will be neglected.
         """
         self.global_eps = global_eps
-        
-        # Hysteresis
-        self.consider_hysteresis = consider_hysteresis
     
         # Load saved symbolic data
         try:
@@ -93,7 +109,72 @@ class PlanarHSA(eqx.Module):
             )
         
         # Parameters numerical values
-        self.params = params
+        try:
+            roff = params["roff"]
+        except KeyError:
+            return KeyError(
+                f"Symbolic expressions file {sym_exp_filepath} does not contain 'roff'. Please generate the symbolic expressions first."
+            )
+        self.roff = roff
+        try:
+            kappa_b_eq = params["kappa_b_eq"]
+        except KeyError:
+            return KeyError(
+                f"Symbolic expressions file {sym_exp_filepath} does not contain 'kappa_b_eq'. Please generate the symbolic expressions first."
+            )
+        self.kappa_b_eq = kappa_b_eq
+        try:
+            sigma_sh_eq = params["sigma_sh_eq"]
+        except KeyError:
+            return KeyError(
+                f"Symbolic expressions file {sym_exp_filepath} does not contain 'sigma_sh_eq'. Please generate the symbolic expressions first."
+            )
+        self.sigma_sh_eq = sigma_sh_eq
+        try:
+            sigma_a_eq = params["sigma_a_eq"]
+        except KeyError:
+            return KeyError(
+                f"Symbolic expressions file {sym_exp_filepath} does not contain 'sigma_a_eq'. Please generate the symbolic expressions first."
+            )
+        self.sigma_a_eq = sigma_a_eq
+        
+        try:
+            pcudim = params["pcudim"]
+        except KeyError:
+            return KeyError(
+                f"Symbolic expressions file {sym_exp_filepath} does not contain 'pcudim'. Please generate the symbolic expressions first."
+            )
+        self.pcudim = pcudim
+        try:
+            lpc = params["lpc"]
+        except KeyError:
+            return KeyError(
+                f"Symbolic expressions file {sym_exp_filepath} does not contain 'lpc'. Please generate the symbolic expressions first."
+            )
+        self.lpc = lpc
+        try:
+            ldc = params["ldc"]
+        except KeyError:
+            return KeyError(
+                f"Symbolic expressions file {sym_exp_filepath} does not contain 'ldc'. Please generate the symbolic expressions first."
+            )
+        self.ldc = ldc
+        try:
+            chiee_off = params["chiee_off"]
+        except KeyError:
+            return KeyError(
+                f"Symbolic expressions file {sym_exp_filepath} does not contain 'chiee_off'. Please generate the symbolic expressions first."
+            )
+        self.chiee_off = chiee_off
+        
+        # Symbols for robot parameters
+        try:
+            params_syms = sym_exps["params_syms"]
+        except KeyError:
+            return KeyError(
+                f"Symbolic expressions file {sym_exp_filepath} does not contain 'params_syms'. Please generate the symbolic expressions first."
+            )
+        self.params_syms = params_syms
         
         try:
             params_for_lambdify = []
@@ -107,14 +188,13 @@ class PlanarHSA(eqx.Module):
             )
         self.params_for_lambdify = params_for_lambdify
         
-        # Symbols for robot parameters
-        try:
-            params_syms = sym_exps["params_syms"]
+        try: 
+            L = params["l"]
         except KeyError:
             return KeyError(
-                f"Symbolic expressions file {sym_exp_filepath} does not contain 'params_syms'. Please generate the symbolic expressions first."
+                f"Symbolic expressions file {sym_exp_filepath} does not contain 'l'. Please generate the symbolic expressions first."
             )
-        self.params_syms = params_syms
+        self.L = L
         
         try: 
             # cumsum of the segment lengths
@@ -124,6 +204,9 @@ class PlanarHSA(eqx.Module):
                 f"Symbolic expressions file {sym_exp_filepath} does not contain 'l'. Please generate the symbolic expressions first."
             )
         self.L_cum = L_cum
+        
+        # Maximum length of the robot
+        self.Lmax = L_cum[-1]
         
         # Number of segments
         try:
@@ -158,6 +241,81 @@ class PlanarHSA(eqx.Module):
                 f"Symbolic expressions file {sym_exp_filepath} does not contain 'state_syms'. Please generate the symbolic expressions first."
             )
         self.num_dofs = num_dofs
+        
+        # Hysteresis
+        self.consider_hysteresis = consider_hysteresis
+        
+        if consider_hysteresis:
+            try: 
+                hyst_params = params["hysteresis"]
+            except KeyError:
+                raise KeyError(
+                    f"Symbolic expressions file {sym_exp_filepath} does not contain 'hysteresis' parameters. Please generate the symbolic expressions first."
+                )
+            try:
+                B_hyst = hyst_params["basis"]
+            except KeyError:
+                raise KeyError(
+                    f"Symbolic expressions file {sym_exp_filepath} does not contain 'hysteresis' basis. Please generate the symbolic expressions first."
+                )
+            self.B_hyst = B_hyst
+            
+            try:
+                num_hysteresis = B_hyst.shape[1]
+            except AttributeError:
+                raise AttributeError(
+                    f"Symbolic expressions file {sym_exp_filepath} does not contain 'hysteresis' basis. Please generate the symbolic expressions first."
+                )
+            self.num_hysteresis = num_hysteresis
+            
+            try:
+                hyst_alpha = params["hysteresis"]["alpha"]
+            except KeyError:
+                raise KeyError(
+                    f"Symbolic expressions file {sym_exp_filepath} does not contain 'hysteresis' alpha. Please generate the symbolic expressions first."
+                )
+            self.hyst_alpha = hyst_alpha
+            
+            try:
+                hyst_A = hyst_params["A"]
+            except KeyError:
+                raise KeyError(
+                    f"Symbolic expressions file {sym_exp_filepath} does not contain 'hysteresis' A. Please generate the symbolic expressions first."
+                )
+            self.hyst_A = hyst_A
+            
+            try:
+                hyst_n = hyst_params["n"]
+            except KeyError:
+                raise KeyError(
+                    f"Symbolic expressions file {sym_exp_filepath} does not contain 'hysteresis' n. Please generate the symbolic expressions first."
+                )
+            self.hyst_n = hyst_n
+            
+            try:
+                hyst_beta = hyst_params["beta"]
+            except KeyError:
+                raise KeyError(
+                    f"Symbolic expressions file {sym_exp_filepath} does not contain 'hysteresis' beta. Please generate the symbolic expressions first."
+                )
+            self.hyst_beta = hyst_beta
+            
+            try: 
+                hyst_gamma = hyst_params["gamma"]
+            except KeyError:
+                raise KeyError(
+                    f"Symbolic expressions file {sym_exp_filepath} does not contain 'hysteresis' gamma. Please generate the symbolic expressions first."
+                )
+            self.hyst_gamma = hyst_gamma
+        else:
+            self.num_hysteresis = 0
+            self.B_hyst = jnp.zeros((num_dofs, 0))
+            self.hyst_alpha = jnp.zeros((num_dofs,))
+            self.hyst_A = jnp.zeros((1,))
+            self.hyst_n = jnp.zeros((1,))
+            self.hyst_beta = jnp.zeros((1,))
+            self.hyst_gamma = jnp.zeros((1,))
+        
 
         # compute the strain basis
         if strain_selector is None:
@@ -181,7 +339,7 @@ class PlanarHSA(eqx.Module):
 
         # concatenate the list of state symbols
         try: 
-            state_syms_cat = sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["xi_d"]
+            state_syms_cat = sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["xid"]
         except KeyError:
             return KeyError(
                 f"Symbolic expressions file {sym_exp_filepath} does not contain 'state_syms'. Please generate the symbolic expressions first."
@@ -264,14 +422,14 @@ class PlanarHSA(eqx.Module):
         self.Jee_lambda = Jee_lambda
         
         try:
-            Jee_d_lambda = sp.lambdify(
-                params_syms_cat + sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["xi_d"],
-                sym_exps["exps"]["Jee_d"],
+            Jeed_lambda = sp.lambdify(
+                params_syms_cat + sym_exps["state_syms"]["xi"] + sym_exps["state_syms"]["xid"],
+                sym_exps["exps"]["Jeed"],
                 "jax",
             )
         except ValueError:
-            return "Fail to lambdify Jee_d. Check the symbolic expressions file."
-        self.Jee_d_lambda = Jee_d_lambda
+            return "Fail to lambdify Jeed. Check the symbolic expressions file."
+        self.Jeed_lambda = Jeed_lambda
 
         # dynamical matrices
         try:
@@ -346,7 +504,7 @@ class PlanarHSA(eqx.Module):
         pxi = jnp.repeat(vxi, self.num_rods_per_segment, axis=1)
         psigma_a = (
             pxi[:, :, 2]
-            + self.params["roff"] * jnp.repeat(vxi, self.num_rods_per_segment, axis=1)[..., 0]
+            + self.roff * jnp.repeat(vxi, self.num_rods_per_segment, axis=1)[..., 0]
         )
         pxi = pxi.at[:, :, 2].set(psigma_a)
 
@@ -364,7 +522,7 @@ class PlanarHSA(eqx.Module):
         """
         vxi = jnp.mean(pxi, axis=1)
         vxi = vxi.at[:, 2].set(
-            vxi[:, 2] - jnp.mean(self.params["roff"] * pxi[..., 0], axis=1)
+            vxi[:, 2] - jnp.mean(self.roff * pxi[..., 0], axis=1)
         )
         vxi = vxi.flatten()
 
@@ -381,9 +539,9 @@ class PlanarHSA(eqx.Module):
         """
         # rest strains of the physical rods
         pxi_star = jnp.zeros((self.num_segments, self.num_rods_per_segment, 3))
-        pxi_star = pxi_star.at[:, :, 0].set(self.params["kappa_b_eq"])
-        pxi_star = pxi_star.at[:, :, 1].set(self.params["sigma_sh_eq"])
-        pxi_star = pxi_star.at[:, :, 2].set(self.params["sigma_a_eq"])
+        pxi_star = pxi_star.at[:, :, 0].set(self.kappa_b_eq)
+        pxi_star = pxi_star.at[:, :, 1].set(self.sigma_sh_eq)
+        pxi_star = pxi_star.at[:, :, 2].set(self.sigma_a_eq)
 
         # map the rest strains from the physical rods to the virtual backbone
         vxi_star = self.beta_inv_fn(pxi_star)
@@ -481,7 +639,7 @@ class PlanarHSA(eqx.Module):
                 p_x is the x-position, p_y is the y-position,
         """
         # map the configuration to the strains
-        xi = self.strains(q)
+        xi = self.strain(q)
 
         # add a small number to the bending strain to avoid singularities
         xi_epsed = self.apply_eps_to_bend_strains_fn(xi)
@@ -493,15 +651,7 @@ class PlanarHSA(eqx.Module):
             segment_idx, self.chiv_lambda_sms, *self.params_for_lambdify, *xi_epsed, s_local
         ).squeeze()
         
-        p_x_p_y = chi[:2]
-        theta = chi[2]
-        
-        chi = jnp.concatenate(
-            [
-                jnp.array([theta]),
-                p_x_p_y,
-            ]
-        )
+        chi = jnp.roll(chi, 1)
 
         return chi
 
@@ -542,15 +692,7 @@ class PlanarHSA(eqx.Module):
             s_local,
         ).squeeze()
         
-        p_x_p_y = chir[:2]
-        theta = chir[2]
-        
-        chir = jnp.concatenate(
-            [
-                jnp.array([theta]),
-                p_x_p_y,
-            ]
-        )
+        chir = jnp.roll(chir, 1)
 
         return chir
 
@@ -583,15 +725,7 @@ class PlanarHSA(eqx.Module):
             *xi_epsed
         ).squeeze()
         
-        p_x_p_y = chip[:2]
-        theta = chip[2]
-        
-        chip = jnp.concatenate(
-            [
-                jnp.array([theta]),
-                p_x_p_y,
-            ]
-        )
+        chip = jnp.roll(chip, 1)
 
         return chip
 
@@ -620,15 +754,7 @@ class PlanarHSA(eqx.Module):
             *xi_epsed
         ).squeeze()
         
-        p_x_p_y = chiee[:2]
-        theta = chiee[2]
-        
-        chiee = jnp.concatenate(
-            [
-                jnp.array([theta]),
-                p_x_p_y,
-            ]
-        )
+        chiee = jnp.roll(chiee, 1)
 
         return chiee
 
@@ -674,13 +800,13 @@ class PlanarHSA(eqx.Module):
         assert self.num_segments == 1, "Inverse kinematics only works for one segment!"
 
         # height of platform
-        hp = self.params["pcudim"][0, 1]
+        hp = self.pcudim[0, 1]
         # length of the proximal rod caps
-        lpc = self.params["lpc"][0]
+        lpc = self.lpc[0]
         # length of the distal rod caps
-        ldc = self.params["ldc"][0]
+        ldc = self.ldc[0]
         # offset of the end-effector from the distal surface of the platform
-        chiee_off = self.params["chiee_off"]
+        chiee_off = self.chiee_off
 
         # transformation from the base to the proximal end of the virtual backbone
         T_b_to_pe = jnp.array(
@@ -734,7 +860,7 @@ class PlanarHSA(eqx.Module):
         # compute the inverse kinematics for the virtual backbone
         vxi = (
             th_epsed
-            / (2 * self.params["l"].sum())
+            / (2 * self.Lmax)
             * jnp.array(
                 [
                     2,
@@ -815,7 +941,7 @@ class PlanarHSA(eqx.Module):
             C_full (Array): Full Coriolis matrix of shape (num_dofs_max, num_dofs_max).
         """
         xi = self.strain(q)
-        xi_d = self.B_xi @ qd
+        xid = self.B_xi @ qd
         
         # add a small number to the bending strain to avoid singularities
         xi_epsed = self.apply_eps_to_bend_strains_fn(xi, eps)
@@ -823,7 +949,7 @@ class PlanarHSA(eqx.Module):
         C_full = self.C_lambda(
             *self.params_for_lambdify, 
             *xi_epsed, 
-            *xi_d
+            *xid
         )
 
         return C_full
@@ -1041,7 +1167,7 @@ class PlanarHSA(eqx.Module):
         q: Array,
         qd: Array,
         z: Optional[Array] = None,
-        phi: Array = jnp.zeros((num_segments * num_rods_per_segment,)),
+        phi: Optional[Array] = None,
         eps: float = 1e4 * global_eps,
     ) -> Tuple[Array, Array, Array, Array, Array, Array]:
         """
@@ -1060,6 +1186,8 @@ class PlanarHSA(eqx.Module):
             D: dissipative matrix of shape (num_dofs, num_dofs)
             alpha: actuation vector acting on the generalized coordinates of shape (num_dofs, )
         """
+        if phi is None:
+            phi = jnp.zeros((self.num_segments * self.num_rods_per_segment,))
         B = self.inertia_matrix(q, eps)
         C = self.coriolis_matrix(q, qd, eps)
         G = self.gravitational_vector(q, eps)
@@ -1069,11 +1197,8 @@ class PlanarHSA(eqx.Module):
         
         if self.consider_hysteresis is True:
             Shat = self.Shat()
-            # hysteresis parameters
-            B_z = self.params["hysteresis"]["basis"]
-            hyst_alpha = self.params["hysteresis"]["alpha"]
             # add the post-yield potential forces
-            K = hyst_alpha * K + (1 - hyst_alpha) * Shat @ (B_z @ z)
+            K = self.hyst_alpha * K + (1 - self.hyst_alpha) * Shat @ (self.B_hyst @ z)
 
             # TODO: add post-yield potential forces (i.e., hysteresis effects) to the actuation vector
 
@@ -1099,20 +1224,20 @@ class PlanarHSA(eqx.Module):
             Lambda: inertia matrix in the operational space of shape (n_x, n_x)
             mu: matrix with corioli and centrifugal terms in the operational space of shape (n_x, n_x)
             Jee: Jacobian of the end-effector pose with respect to the generalized coordinates of shape (3, num_dofs)
-            Jee_d: time-derivative of the Jacobian of the end-effector pose with respect to the generalized coordinates
+            Jeed: time-derivative of the Jacobian of the end-effector pose with respect to the generalized coordinates
             JeeB_pinv: Dynamically-consistent pseudo-inverse of the Jacobian. Allows the mapping of torques
                 from the generalized coordinates to the operational space: f = JB_pinv.T @ tau_q
                 Shape (num_dofs, n_x)
         """
         # map the configuration to the strains
         xi = self.strain(q)
-        xi_d = self.B_xi @ qd
+        xid = self.B_xi @ qd
         # add a small number to the bending strain to avoid singularities
         xi_epsed = self.apply_eps_to_bend_strains_fn(xi, eps)
 
         # end-effector Jacobian and its time-derivative
         Jee = self.Jee_lambda(*self.params_for_lambdify, *xi_epsed)
-        Jee_d = self.Jee_d_lambda(*self.params_for_lambdify, *xi_epsed, *xi_d)
+        Jeed = self.Jeed_lambda(*self.params_for_lambdify, *xi_epsed, *xid)
 
         # inverse of the inertia matrix in the configuration space
         B = self.inertia_matrix(q, eps)
@@ -1124,21 +1249,21 @@ class PlanarHSA(eqx.Module):
             Jee @ B_inv @ Jee.T
         )  # inertia matrix in the operational space
         mu = Lambda @ (
-            Jee @ B_inv @ C - Jee_d
+            Jee @ B_inv @ C - Jeed
         )  # coriolis and centrifugal matrix in the operational space
 
         JeeB_pinv = (
             B_inv @ Jee.T @ Lambda
         )  # dynamically-consistent pseudo-inverse of the Jacobian
 
-        return Lambda, mu, Jee, Jee_d, JeeB_pinv
+        return Lambda, mu, Jee, Jeed, JeeB_pinv
     
     @eqx.filter_jit
     def forward_dynamics(
         self,
         t: float,
         y: Array,
-        actuation_args: Tuple = None,
+        actuation_args: Tuple[Array, Callable, bool] = None,
     ) -> Array:
         """
         Forward dynamics function.
@@ -1164,37 +1289,29 @@ class PlanarHSA(eqx.Module):
         """
         u, control_fn, consider_underactuation_model = actuation_args
         
-        if self.consider_hysteresis is True:
-            B_z = self.params["hysteresis"]["basis"]
-            
-            num_hysteresis = B_z.shape[1]
-        
-            q, qd, z = jnp.split(
-                y, [self.num_dofs, self.num_dofs + num_hysteresis]
+        q, qd, z = jnp.split(
+            y, [self.num_dofs, 2*self.num_dofs]
+        )
+              
+        zd = (self.B_hyst.T @ qd) * (
+            self.hyst_A
+            - jnp.abs(z) ** self.hyst_n
+            * (
+                self.hyst_gamma
+                + self.hyst_beta * jnp.sign((self.B_hyst.T @ qd) * z)
             )
-            
-            zd = (B_z.T @ qd) * (
-                self.params["hysteresis"]["A"]
-                - jnp.abs(z) ** self.params["hysteresis"]["n"]
-                * (
-                    self.params["hysteresis"]["gamma"]
-                    + self.params["hysteresis"]["beta"] * jnp.sign((B_z.T @ qd) * z)
-                )
-            )
-        else:
-            q, qd = jnp.split(y, 2)
-            z = None
-            zd = jnp.zeros((0,))
+        )
         
         if control_fn is not None:
             u = u + control_fn(t, y)
             
-        if consider_underactuation_model is True:        
+        if consider_underactuation_model is True: 
+            phi = u       
             B, C, G, K, D, alpha = self.dynamical_matrices(
                 q,
                 qd,
                 z=z,
-                phi=u,
+                phi=phi,
             )
         else:
             B, C, G, K, D, _ = self.dynamical_matrices(
@@ -1274,7 +1391,7 @@ class PlanarHSA(eqx.Module):
             qs (Array): Configuration (strains) at the saved time points.
             qds (Array): Velocity (strains) at the saved time points.
         """
-        y0 = jnp.concatenate([q0, qd0])  # Initial state vector
+        y0 = jnp.concatenate([q0, qd0, jnp.zeros((self.num_hysteresis,))])
 
         term = ODETerm(self.forward_dynamics)
 
@@ -1300,6 +1417,10 @@ class PlanarHSA(eqx.Module):
         ts = sol.ts
         # Extract the configuration and velocity from the solution
         y_out = sol.ys
-        qs, qds = jnp.split(y_out, 2, axis=1)
-
+        qs, qds, zs = jnp.split(
+            y_out, 
+            [self.num_dofs, 2*self.num_dofs],
+            axis=1
+        )
+        
         return ts, qs, qds

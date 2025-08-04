@@ -1,5 +1,7 @@
 import jax
 
+jax.config.update("jax_enable_x64", True)  # double precision
+
 from jsrm.systems.pcs import PCS
 import jax.numpy as jnp
 
@@ -17,7 +19,6 @@ from diffrax import Tsit5
 from functools import partial
 from matplotlib.widgets import Slider
 
-jax.config.update("jax_enable_x64", True)  # double precision
 jnp.set_printoptions(
     threshold=jnp.inf,
     linewidth=jnp.inf,
@@ -26,12 +27,13 @@ jnp.set_printoptions(
 
 
 def draw_robot_curve(
-    batched_forward_kinematics: Callable,
-    L_max: float,
+    robot: PCS,
     q: Array,
     num_points: int = 50,
 ):
-    s_ps = jnp.linspace(0, L_max, num_points)
+    batched_forward_kinematics = jax.vmap(robot.forward_kinematics, in_axes=(None, 0))
+    
+    s_ps = jnp.linspace(0, robot.Lmax, num_points)
     g_ps = batched_forward_kinematics(q, s_ps)[:, :3, 3]
 
     curve = onp.array(g_ps, dtype=onp.float64)
@@ -54,9 +56,6 @@ def animate_robot_matplotlib(
         raise ValueError(
             "Cannot use both animation and slider at the same time. Choose one."
         )
-
-    batched_forward_kinematics = jax.vmap(robot.forward_kinematics, in_axes=(None, 0))
-    L_max = jnp.sum(robot.L)
 
     width = jnp.linalg.norm(robot.L) * 3
     height = width
@@ -81,7 +80,7 @@ def animate_robot_matplotlib(
         def update(frame_idx):
             q = q_list[frame_idx]
             t = t_list[frame_idx]
-            curve = draw_robot_curve(batched_forward_kinematics, L_max, q, num_points)
+            curve = draw_robot_curve(robot, q, num_points)
             line.set_data(curve[:, 0], curve[:, 1])
             line.set_3d_properties(curve[:, 2])
             title_text.set_text(f"t = {t:.2f} s")
@@ -114,7 +113,7 @@ def animate_robot_matplotlib(
             ax.set_zlabel("Z [m]")
             ax.set_title(f"t = {t_list[frame_idx]:.2f} s")
             q = q_list[frame_idx]
-            curve = draw_robot_curve(batched_forward_kinematics, L_max, q, num_points)
+            curve = draw_robot_curve(robot, q, num_points)
             ax.plot(curve[:, 0], curve[:, 1], curve[:, 2], lw=4, color="blue")
             fig.canvas.draw_idle()
 
